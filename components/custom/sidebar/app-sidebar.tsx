@@ -66,7 +66,7 @@ const data = {
       title: "Production",
       url: "#",
       icon: Factory,
-      isActive: true,
+      isActive: false,
       items: [
         {
           title: "History",
@@ -86,7 +86,7 @@ const data = {
       title: "Inventory",
       url: "#",
       icon: Package,
-      isActive: true,
+      isActive: false,
       items: [
         {
           title: "All Inventory",
@@ -106,7 +106,7 @@ const data = {
       title: "Sales",
       url: "#",
       icon: ShoppingBag,
-      isActive: true,
+      isActive: false,
       items: [
         {
           title: "Sales to Trade",
@@ -118,7 +118,7 @@ const data = {
       title: "Expenses",
       url: "#",
       icon: Coins,
-      isActive: true,
+      isActive: false,
       items: [
         {
           title: "History",
@@ -138,7 +138,7 @@ const data = {
       title: "Visits",
       url: "#",
       icon: MapPin,
-      isActive: true,
+      isActive: false,
       items: [
         {
           title: "History",
@@ -158,7 +158,7 @@ const data = {
       title: "Reports",
       url: "#",
       icon: BarChart,
-      isActive: true,
+      isActive: false,
       items: [
         {
           title: "History",
@@ -178,7 +178,7 @@ const data = {
       title: "Database",
       url: "#",
       icon: Database,
-      isActive: true,
+      isActive: false,
       items: [
         {
           title: "Item Master Data",
@@ -194,7 +194,7 @@ const data = {
       title: "Administration",
       url: "#",
       icon: Settings,
-      isActive: true,
+      isActive: false,
       items: [
         {
           title: "Authorizations",
