@@ -11,42 +11,43 @@ import { Field, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 
 import {
-  createSkuUom,
-  getSkuUom,
-  updateSkuUom,
-} from "@/forms/queries/sku_uom.query"
-import { skuUomSchema } from "@/forms/schemas/sku_uom.schema"
+  createProductionArea,
+  getProductionArea,
+  updateProductionArea,
+} from "@/forms/queries/production_area.query"
+import { productionAreaSchema } from "@/forms/schemas/production_area.schema"
 
-export function SkuUomForm() {
+export function ProductionAreaForm() {
   const params = useParams()
 
   const id = params?.id as string | undefined
   const isEditMode = !!id
 
   // 1. Fetch data if in edit mode
-  const { data: skuUomData, isLoading } = useQuery({
-    queryKey: ["sku_uoms", id],
-    queryFn: () => getSkuUom(id!),
+  const { data: productionAreaData, isLoading } = useQuery({
+    queryKey: ["production_areas", id],
+    queryFn: () => getProductionArea(id!),
     enabled: isEditMode,
   })
 
   // 2. Handle mutations conditionally
   const mutation = useMutation({
-    mutationFn: (values: z.infer<typeof skuUomSchema>) => {
+    mutationFn: (values: z.infer<typeof productionAreaSchema>) => {
       if (isEditMode) {
-        return updateSkuUom({ ...values, id })
+        return updateProductionArea({ ...values, id })
       }
-      return createSkuUom(values)
+      return createProductionArea(values)
     },
   })
 
   // 3. Initialize Form
   const form = useForm({
     defaultValues: {
-      uom: "",
+      area_name: "",
+      area_code: "",
     },
     validators: {
-      onSubmit: skuUomSchema,
+      onSubmit: productionAreaSchema,
     },
     onSubmit: async ({ value }) => {
       mutation.mutate(value)
@@ -57,7 +58,7 @@ export function SkuUomForm() {
   if (isEditMode && isLoading) {
     return (
       <div className="animate-pulse text-sm text-muted-foreground">
-        Loading UOM details...
+        Loading production area details...
       </div>
     )
   }
@@ -71,7 +72,7 @@ export function SkuUomForm() {
         form.handleSubmit()
       }}
     >
-      <form.Field name="uom">
+      <form.Field name="area_code">
         {(field) => {
           const isInvalid =
             field.state.meta.isTouched && !field.state.meta.isValid
@@ -79,7 +80,7 @@ export function SkuUomForm() {
           return (
             <Field data-invalid={isInvalid}>
               <FieldLabel htmlFor={field.name}>
-                Unit of Measure (UOM)
+                Area Code
                 <span className="font-bold text-red-500">*</span>
               </FieldLabel>
               <Input
@@ -89,7 +90,35 @@ export function SkuUomForm() {
                 onBlur={field.handleBlur}
                 onChange={(e) => field.handleChange(e.target.value)}
                 aria-invalid={isInvalid}
-                placeholder="e.g., kg, pcs, box"
+                placeholder="e.g., LINE-01, SEC-B"
+                autoComplete="off"
+                disabled={mutation.isPending}
+              />
+              {isInvalid && <FieldError errors={field.state.meta.errors} />}
+            </Field>
+          )
+        }}
+      </form.Field>
+
+      <form.Field name="area_name">
+        {(field) => {
+          const isInvalid =
+            field.state.meta.isTouched && !field.state.meta.isValid
+
+          return (
+            <Field data-invalid={isInvalid}>
+              <FieldLabel htmlFor={field.name}>
+                Area Name
+                <span className="font-bold text-red-500">*</span>
+              </FieldLabel>
+              <Input
+                id={field.name}
+                name={field.name}
+                value={field.state.value}
+                onBlur={field.handleBlur}
+                onChange={(e) => field.handleChange(e.target.value)}
+                aria-invalid={isInvalid}
+                placeholder="e.g., Packaging Area, Mixing Lab"
                 autoComplete="off"
                 disabled={mutation.isPending}
               />
@@ -103,8 +132,8 @@ export function SkuUomForm() {
         {mutation.isPending
           ? "Saving..."
           : isEditMode
-            ? "Update Unit of Measure"
-            : "Create Unit of Measure"}
+            ? "Update Production Area"
+            : "Create Production Area"}
       </Button>
     </form>
   )

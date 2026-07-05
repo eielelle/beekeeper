@@ -1,161 +1,83 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-
 import { supabase } from "@/lib/supabase"
+import { toast } from "sonner"
 
-export type skuUomType = {
-  id: string
-  uom_name: string
+export type SkuUomStoreType = {
+  id?: string
+  uom: string
+  organization_id?: number
   created_at?: string
 }
 
-const queryKey = ["sku_uoms"]
+export async function fetchSkuUoms() {
+  const t = toast.loading("Fetching Units of Measure. Please wait.")
 
-// =================
-// GET ALL
-// =================
+  const { data, error } = await supabase.from("sku_uoms").select("*")
 
-async function getSkuUoms(): Promise<skuUomType[]> {
-  const { data, error } = await supabase
-    .from("sku_uoms")
-    .select("*")
-    .order("created_at", {
-      ascending: false,
-    })
+  toast.dismiss(t)
 
-  if (error) throw error
+  if (error) {
+    toast.error(`ERR: ${error.message}`)
+    throw error
+  }
 
   return data
 }
 
-// =================
-// GET ONE
-// =================
+export async function getSkuUom(id: string) {
+  const t = toast.loading("Fetching Unit of Measure. Please wait.")
 
-async function getSkuUom(id: string): Promise<skuUomType> {
   const { data, error } = await supabase
     .from("sku_uoms")
     .select("*")
     .eq("id", id)
     .single()
 
-  if (error) throw error
+  toast.dismiss(t)
+
+  if (error) {
+    toast.error(`ERR: ${error.message}`)
+    throw error
+  }
 
   return data
 }
 
-// =================
-// CREATE
-// =================
+export async function createSkuUom(value: SkuUomStoreType) {
+  const t = toast.loading("Creating Unit of Measure. Please wait.")
 
-async function createSkuUom(item: Omit<skuUomType, "id">) {
+  const { data, error } = await supabase.from("sku_uoms").insert([value])
+
+  toast.dismiss(t)
+
+  if (error) {
+    toast.error(`ERR: ${error.message}`)
+    throw error
+  }
+
+  toast.success("Unit of Measure successfully created.")
+
+  return data
+}
+
+export async function updateSkuUom(value: SkuUomStoreType) {
+  const t = toast.loading("Updating Unit of Measure. Please wait.")
+
+  const { id, ...updates } = value
+
   const { data, error } = await supabase
     .from("sku_uoms")
-    .insert({
-      uom_name: item.uom_name,
-    })
+    .update(updates)
+    .eq("id", id)
     .select()
-    .single()
 
-  if (error) throw error
+  toast.dismiss(t)
+
+  if (error) {
+    toast.error(`ERR: ${error.message}`)
+    throw error
+  }
+
+  toast.success("Unit of Measure successfully updated.")
 
   return data
-}
-
-// =================
-// UPDATE
-// =================
-
-async function updateSkuUom(item: skuUomType) {
-  const { data, error } = await supabase
-    .from("sku_uoms")
-    .update({
-      uom_name: item.uom_name,
-    })
-    .eq("id", item.id)
-    .select()
-    .single()
-
-  if (error) throw error
-
-  return data
-}
-
-// =================
-// DELETE
-// =================
-
-async function deleteSkuUom(id: string) {
-  const { error } = await supabase.from("sku_uoms").delete().eq("id", id)
-
-  if (error) throw error
-
-  return id
-}
-
-// =================
-// QUERY HOOKS
-// =================
-
-export function useSkuUoms() {
-  return useQuery({
-    queryKey,
-    queryFn: getSkuUoms,
-  })
-}
-
-export function useSkuUom(id: string) {
-  return useQuery({
-    queryKey: [...queryKey, id],
-    queryFn: () => getSkuUom(id),
-    enabled: !!id,
-  })
-}
-
-// =================
-// MUTATION HOOKS
-// =================
-
-export function useCreateSkuUom() {
-  const client = useQueryClient()
-
-  return useMutation({
-    mutationFn: createSkuUom,
-
-    onSuccess: (newItem) => {
-      client.setQueryData<skuUomType[]>(queryKey, (old = []) => [
-        newItem,
-        ...old,
-      ])
-    },
-  })
-}
-
-export function useUpdateSkuUom() {
-  const client = useQueryClient()
-
-  return useMutation({
-    mutationFn: updateSkuUom,
-
-    onSuccess: (updated) => {
-      client.setQueryData<skuUomType[]>(queryKey, (old = []) =>
-        old.map((item) => (item.id === updated.id ? updated : item))
-      )
-
-      client.setQueryData([...queryKey, updated.id], updated)
-    },
-  })
-}
-
-export function useDeleteSkuUom() {
-  const client = useQueryClient()
-
-  return useMutation({
-    mutationFn: deleteSkuUom,
-
-    onSuccess: (deletedId) => {
-      client.setQueryData<skuUomType[]>(queryKey, (old = []) =>
-        old.filter((item) => item.id !== deletedId)
-      )
-    },
-  })
 }

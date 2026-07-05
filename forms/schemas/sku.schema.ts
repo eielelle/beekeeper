@@ -1,10 +1,10 @@
 import * as z from "zod"
 
 export const skuSchema = z.object({
-  sku_category: z.string().max(12),
-  sku_uom: z.string().max(12),
-  item_name: z.string().max(80),
-  item_description: z.string().max(160),
-  sku_code: z.string().max(40),
-  barcode: z.string().max(80),
+  sku_category_id: z.string().min(1, "This field is required"),
+  sku_uom_id: z.string().min(1, "This field is required"),
+  item_name: z.string().min(1, "This field is required").max(100),
+  item_description: z.string().max(500).or(z.literal("")),
+  sku_code: z.string().min(1, "This field is required").max(50),
+  barcode: z.string().max(50).or(z.literal("")),
 })

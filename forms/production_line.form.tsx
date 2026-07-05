@@ -9,44 +9,46 @@ import { useMutation, useQuery } from "@tanstack/react-query"
 import { Button } from "@/components/ui/button"
 import { Field, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 
 import {
-  createSkuUom,
-  getSkuUom,
-  updateSkuUom,
-} from "@/forms/queries/sku_uom.query"
-import { skuUomSchema } from "@/forms/schemas/sku_uom.schema"
+  createProductionLine,
+  getProductionLine,
+  updateProductionLine,
+} from "@/forms/queries/production_line.query"
+import { productionLineSchema } from "@/forms/schemas/production_line.schema"
 
-export function SkuUomForm() {
+export function ProductionLineForm() {
   const params = useParams()
 
   const id = params?.id as string | undefined
   const isEditMode = !!id
 
   // 1. Fetch data if in edit mode
-  const { data: skuUomData, isLoading } = useQuery({
-    queryKey: ["sku_uoms", id],
-    queryFn: () => getSkuUom(id!),
+  const { data: productionLineData, isLoading } = useQuery({
+    queryKey: ["production_lines", id],
+    queryFn: () => getProductionLine(id!),
     enabled: isEditMode,
   })
 
   // 2. Handle mutations conditionally
   const mutation = useMutation({
-    mutationFn: (values: z.infer<typeof skuUomSchema>) => {
+    mutationFn: (values: z.infer<typeof productionLineSchema>) => {
       if (isEditMode) {
-        return updateSkuUom({ ...values, id })
+        return updateProductionLine({ ...values, id })
       }
-      return createSkuUom(values)
+      return createProductionLine(values)
     },
   })
 
   // 3. Initialize Form
   const form = useForm({
     defaultValues: {
-      uom: "",
+      line_name: "",
+      line_description: "",
     },
     validators: {
-      onSubmit: skuUomSchema,
+      onSubmit: productionLineSchema,
     },
     onSubmit: async ({ value }) => {
       mutation.mutate(value)
@@ -57,7 +59,7 @@ export function SkuUomForm() {
   if (isEditMode && isLoading) {
     return (
       <div className="animate-pulse text-sm text-muted-foreground">
-        Loading UOM details...
+        Loading production line details...
       </div>
     )
   }
@@ -71,7 +73,7 @@ export function SkuUomForm() {
         form.handleSubmit()
       }}
     >
-      <form.Field name="uom">
+      <form.Field name="line_name">
         {(field) => {
           const isInvalid =
             field.state.meta.isTouched && !field.state.meta.isValid
@@ -79,7 +81,7 @@ export function SkuUomForm() {
           return (
             <Field data-invalid={isInvalid}>
               <FieldLabel htmlFor={field.name}>
-                Unit of Measure (UOM)
+                Line Name
                 <span className="font-bold text-red-500">*</span>
               </FieldLabel>
               <Input
@@ -89,7 +91,32 @@ export function SkuUomForm() {
                 onBlur={field.handleBlur}
                 onChange={(e) => field.handleChange(e.target.value)}
                 aria-invalid={isInvalid}
-                placeholder="e.g., kg, pcs, box"
+                placeholder="e.g., Bottling Line A"
+                autoComplete="off"
+                disabled={mutation.isPending}
+              />
+              {isInvalid && <FieldError errors={field.state.meta.errors} />}
+            </Field>
+          )
+        }}
+      </form.Field>
+
+      <form.Field name="line_description">
+        {(field) => {
+          const isInvalid =
+            field.state.meta.isTouched && !field.state.meta.isValid
+
+          return (
+            <Field data-invalid={isInvalid}>
+              <FieldLabel htmlFor={field.name}>Line Description</FieldLabel>
+              <Textarea
+                id={field.name}
+                name={field.name}
+                value={field.state.value}
+                onBlur={field.handleBlur}
+                onChange={(e) => field.handleChange(e.target.value)}
+                aria-invalid={isInvalid}
+                placeholder="Enter operational boundaries or layout notes..."
                 autoComplete="off"
                 disabled={mutation.isPending}
               />
@@ -103,8 +130,8 @@ export function SkuUomForm() {
         {mutation.isPending
           ? "Saving..."
           : isEditMode
-            ? "Update Unit of Measure"
-            : "Create Unit of Measure"}
+            ? "Update Production Line"
+            : "Create Production Line"}
       </Button>
     </form>
   )

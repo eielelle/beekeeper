@@ -3,52 +3,55 @@
 import * as React from "react"
 import { useForm } from "@tanstack/react-form"
 import * as z from "zod"
-import { useParams } from "next/navigation"
-import { useMutation, useQuery } from "@tanstack/react-query"
+import { useParams, useRouter } from "next/navigation" // Added useRouter for redirects
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query" // Added useQuery and useQueryClient
 
 import { Button } from "@/components/ui/button"
 import { Field, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-
 import {
-  createSkuCategory,
-  getSkuCategory,
-  updateSkuCategory,
-} from "./queries/sku_category.query"
-import { skuCategorySchema } from "./schemas/sku_category.schema"
+  createSalesGroup,
+  getSalesGroup,
+  updateSalesGroup,
+} from "./queries/sales_group.query"
+import { SalesGroupType } from "./queries/sales_group.query"
+import { salesGroupSchema } from "./schemas/sales_group.schema"
 
-export function SkuCategoryForm() {
+export function SalesGroupForm() {
   const params = useParams()
 
+  // If your route is /outlet-types/[id], params.id will contain the ID string.
   const id = params?.id as string | undefined
   const isEditMode = !!id
 
   // 1. Fetch data if in edit mode
-  const { data: skuCategoryData, isLoading } = useQuery({
-    queryKey: ["sku_categories", id],
-    queryFn: () => getSkuCategory(id!),
-    enabled: isEditMode,
+  const { data: SalesGroupType, isLoading } = useQuery({
+    queryKey: ["sales-groups", id],
+    queryFn: () => getSalesGroup(id!),
+    enabled: isEditMode, // Only run this query if an ID exists
   })
 
   // 2. Handle mutations conditionally
   const mutation = useMutation({
-    mutationFn: (values: z.infer<typeof skuCategorySchema>) => {
+    mutationFn: (values: z.infer<typeof salesGroupSchema>) => {
       if (isEditMode) {
-        return updateSkuCategory({ ...values, id })
+        return updateSalesGroup({ ...values, id })
       }
-      return createSkuCategory(values)
+      return createSalesGroup(values)
     },
   })
 
   // 3. Initialize Form
   const form = useForm({
+    // Use 'values' instead of 'defaultValues' so TanStack Form automatically
+    // updates when the async data finishes loading from useQuery.
     defaultValues: {
-      category_name: "",
-      category_description: "",
+      group_name: SalesGroupType?.type_name ?? "",
+      group_description: SalesGroupType?.type_description ?? "",
     },
     validators: {
-      onSubmit: skuCategorySchema,
+      onSubmit: salesGroupSchema,
     },
     onSubmit: async ({ value }) => {
       mutation.mutate(value)
@@ -59,7 +62,7 @@ export function SkuCategoryForm() {
   if (isEditMode && isLoading) {
     return (
       <div className="animate-pulse text-sm text-muted-foreground">
-        Loading category details...
+        Loading outlet type details...
       </div>
     )
   }
@@ -73,7 +76,7 @@ export function SkuCategoryForm() {
         form.handleSubmit()
       }}
     >
-      <form.Field name="category_name">
+      <form.Field name="group_name">
         {(field) => {
           const isInvalid =
             field.state.meta.isTouched && !field.state.meta.isValid
@@ -81,7 +84,7 @@ export function SkuCategoryForm() {
           return (
             <Field data-invalid={isInvalid}>
               <FieldLabel htmlFor={field.name}>
-                Category Name
+                Sales Group Name
                 <span className="font-bold text-red-500">*</span>
               </FieldLabel>
               <Input
@@ -91,7 +94,7 @@ export function SkuCategoryForm() {
                 onBlur={field.handleBlur}
                 onChange={(e) => field.handleChange(e.target.value)}
                 aria-invalid={isInvalid}
-                placeholder="e.g., Beverages"
+                placeholder="Team Apple"
                 autoComplete="off"
                 disabled={mutation.isPending}
               />
@@ -101,14 +104,16 @@ export function SkuCategoryForm() {
         }}
       </form.Field>
 
-      <form.Field name="category_description">
+      <form.Field name="group_description">
         {(field) => {
           const isInvalid =
             field.state.meta.isTouched && !field.state.meta.isValid
 
           return (
             <Field data-invalid={isInvalid}>
-              <FieldLabel htmlFor={field.name}>Category Description</FieldLabel>
+              <FieldLabel htmlFor={field.name}>
+                Sales Group Description
+              </FieldLabel>
               <Textarea
                 id={field.name}
                 name={field.name}
@@ -116,7 +121,7 @@ export function SkuCategoryForm() {
                 onBlur={field.handleBlur}
                 onChange={(e) => field.handleChange(e.target.value)}
                 aria-invalid={isInvalid}
-                placeholder="Enter description details here..."
+                placeholder="Enter Description"
                 autoComplete="off"
                 disabled={mutation.isPending}
               />
@@ -130,8 +135,8 @@ export function SkuCategoryForm() {
         {mutation.isPending
           ? "Saving..."
           : isEditMode
-            ? "Update SKU Category"
-            : "Create SKU Category"}
+            ? "Update Sales Group"
+            : "Create Sales Group"}
       </Button>
     </form>
   )

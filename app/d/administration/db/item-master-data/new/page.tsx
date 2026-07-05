@@ -1,7 +1,7 @@
 "use client"
 
-import { ItemMasterDataForm } from "@/forms/sku.form"
+import { SkuForm } from "@/forms/sku.form"
 
 export default function Page() {
-  return <ItemMasterDataForm />
+  return <SkuForm />
 }
