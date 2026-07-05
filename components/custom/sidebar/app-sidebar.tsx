@@ -6,6 +6,7 @@ import {
   BarChart,
   BookOpen,
   Bot,
+  Calendar,
   Coins,
   Command,
   Database,
@@ -69,16 +70,12 @@ const data = {
       isActive: false,
       items: [
         {
-          title: "History",
+          title: "Summary",
           url: "#",
         },
         {
-          title: "Starred",
-          url: "#",
-        },
-        {
-          title: "Settings",
-          url: "#",
+          title: "New Production",
+          url: "/d/production/new",
         },
       ],
     },
@@ -93,11 +90,11 @@ const data = {
           url: "#",
         },
         {
-          title: "Returns",
+          title: "Bad Orders",
           url: "#",
         },
         {
-          title: "Pullouts",
+          title: "Sales to Trade",
           url: "#",
         },
       ],
@@ -109,7 +106,11 @@ const data = {
       isActive: false,
       items: [
         {
-          title: "Sales to Trade",
+          title: "All Orders",
+          url: "#",
+        },
+        {
+          title: "Booking",
           url: "#",
         },
       ],
@@ -121,15 +122,11 @@ const data = {
       isActive: false,
       items: [
         {
-          title: "History",
+          title: "All Expenses",
           url: "#",
         },
         {
-          title: "Starred",
-          url: "#",
-        },
-        {
-          title: "Settings",
+          title: "New Expense Request",
           url: "#",
         },
       ],
@@ -141,15 +138,23 @@ const data = {
       isActive: false,
       items: [
         {
-          title: "History",
+          title: "All Visits",
           url: "#",
         },
         {
-          title: "Starred",
+          title: "Plan Visit",
           url: "#",
         },
+      ],
+    },
+    {
+      title: "Attendance",
+      url: "#",
+      icon: Calendar,
+      isActive: false,
+      items: [
         {
-          title: "Settings",
+          title: "All Attendances",
           url: "#",
         },
       ],
@@ -159,20 +164,7 @@ const data = {
       url: "#",
       icon: BarChart,
       isActive: false,
-      items: [
-        {
-          title: "History",
-          url: "#",
-        },
-        {
-          title: "Starred",
-          url: "#",
-        },
-        {
-          title: "Settings",
-          url: "#",
-        },
-      ],
+      items: [],
     },
     {
       title: "Database",
@@ -197,11 +189,27 @@ const data = {
       isActive: false,
       items: [
         {
-          title: "Authorizations",
+          title: "About Company",
           url: "#",
         },
         {
           title: "Organizations",
+          url: "#",
+        },
+        {
+          title: "Attendance",
+          url: "#",
+        },
+        {
+          title: "Expenses",
+          url: "#",
+        },
+        {
+          title: "Inventory",
+          url: "#",
+        },
+        {
+          title: "Authorizations",
           url: "#",
         },
       ],
