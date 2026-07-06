@@ -16,7 +16,7 @@ import {
   FieldLabel,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { supabaseB } from "@/lib/supabase"
+import { supabase } from "@/lib/supabase"
 import { useState } from "react"
 import { toast } from "sonner"
 
@@ -29,7 +29,7 @@ export function LoginForm() {
     setLoading(true)
 
     try {
-      const { error } = await supabaseB.auth.signInWithPassword({
+      const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })

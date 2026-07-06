@@ -193,6 +193,10 @@ const data = {
           url: "#",
         },
         {
+          title: "Production",
+          url: "/d/administration/production",
+        },
+        {
           title: "Organizations",
           url: "#",
         },
@@ -228,7 +232,7 @@ const data = {
     },
     {
       name: "Employees",
-      url: "#",
+      url: "/d/administration/employees",
       icon: Users,
     },
   ],

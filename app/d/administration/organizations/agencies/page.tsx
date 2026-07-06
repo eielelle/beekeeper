@@ -3,11 +3,6 @@
 import * as React from "react"
 import { DataTable } from "@/components/custom/data-table/app-table"
 import { Button } from "@/components/ui/button"
-import {
-  fetchOrganizations,
-  deleteOrganization,
-  OrganizationStoreType,
-} from "@/forms/queries/organization.query"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { ColumnDef, SortingState, PaginationState } from "@tanstack/react-table"
 import { Plus, MoreHorizontal, Edit, Trash } from "lucide-react"
@@ -23,6 +18,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { toast } from "sonner"
+import {
+  AgencyStoreType,
+  deleteAgency,
+  fetchAgencies,
+} from "@/forms/queries/agency.query"
 
 export default function Page() {
   const queryClient = useQueryClient()
@@ -38,23 +38,27 @@ export default function Page() {
 
   // React Query: Delete Mutation
   const deleteMutation = useMutation({
-    mutationFn: deleteOrganization,
+    mutationFn: deleteAgency,
     onSuccess: () => {
       // Automatically refetches table data from the Supabase server on complete
-      queryClient.invalidateQueries({ queryKey: ["organizations"] })
+      queryClient.invalidateQueries({ queryKey: ["agencies"] })
     },
   })
 
   // Defining columns inline inside the component so they can read the delete mutation state
-  const columns: ColumnDef<OrganizationStoreType>[] = [
+  const columns: ColumnDef<AgencyStoreType>[] = [
     {
       accessorKey: "id",
       header: "ID",
       enableSorting: false,
     },
     {
-      accessorKey: "organization_name",
-      header: "Organization Name",
+      accessorKey: "agency_name",
+      header: "Agency Name",
+    },
+    {
+      accessorKey: "agency_description",
+      header: "Agency Description",
     },
     {
       accessorKey: "created_at",
@@ -64,7 +68,7 @@ export default function Page() {
       id: "actions",
       header: "Actions",
       cell: ({ row }) => {
-        const org = row.original
+        const agency = row.original
 
         return (
           <DropdownMenu>
@@ -80,7 +84,7 @@ export default function Page() {
               {/* Copy ID action */}
               <DropdownMenuItem
                 onClick={() => {
-                  navigator.clipboard.writeText(org.id || "")
+                  navigator.clipboard.writeText(agency.id || "")
                   toast.info("Copied to clipboard")
                 }}
               >
@@ -91,7 +95,9 @@ export default function Page() {
 
               {/* Edit Route Action */}
               <DropdownMenuItem asChild>
-                <Link href={`/d/administration/organizations/edit/${org.id}`}>
+                <Link
+                  href={`/d/administration/organizations/agencies/edit/${agency.id}`}
+                >
                   <Edit className="mr-2 h-4 w-4" /> Edit Details
                 </Link>
               </DropdownMenuItem>
@@ -102,10 +108,10 @@ export default function Page() {
                 onClick={() => {
                   if (
                     confirm(
-                      `Are you sure you want to delete ${org.organization_name}?`
+                      `Are you sure you want to delete ${agency.agency_name}?`
                     )
                   ) {
-                    deleteMutation.mutate(org.id || "")
+                    deleteMutation.mutate(agency.id || "")
                   }
                 }}
               >
@@ -121,14 +127,14 @@ export default function Page() {
   // React Query server data fetcher
   const { data } = useQuery({
     queryKey: [
-      "organizations",
+      "agencies",
       pagination.pageIndex,
       pagination.pageSize,
       sorting,
       deferredGlobalFilter,
     ],
     queryFn: () =>
-      fetchOrganizations({
+      fetchAgencies({
         pageIndex: pagination.pageIndex,
         pageSize: pagination.pageSize,
         globalFilter: deferredGlobalFilter,
@@ -140,16 +146,16 @@ export default function Page() {
     <section className="space-y-6">
       <header className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Your Organizations</h1>
+          <h1 className="text-2xl font-semibold">Your Agencies</h1>
           <p className="text-sm text-muted-foreground">
-            View and manage your company's organizations here
+            View and manage your company's agencies here
           </p>
         </div>
 
         <nav>
-          <Link href={"/organizations/new"}>
+          <Link href={"/d/administration/organizations/agencies/new"}>
             <Button size={"sm"}>
-              <Plus className="mr-2 h-4 w-4" /> Add Organization
+              <Plus className="mr-2 h-4 w-4" /> Add Agency
             </Button>
           </Link>
         </nav>
