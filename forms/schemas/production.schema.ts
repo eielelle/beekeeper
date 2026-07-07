@@ -2,15 +2,15 @@ import * as z from "zod"
 
 export const productionFormSchema = z.object({
   production_date: z.string().min(1, "Production date is required"),
-  production_area_id: z.string().min(1, "Production area is required"),
-  production_line_id: z.string().min(1, "Production line is required"),
-  shift_type: z.string().min(1, "Shift type is required"),
+  production_area_id: z.coerce.string().min(1, "Production area is required"),
+  production_line_id: z.coerce.string().min(1, "Production line is required"),
+  is_day: z.boolean({ required_error: "Shift selection is required" }),
   operation_type: z.string().min(1, "Operation type is required"),
   // Moving the quantity validation inside the nested array objects
   items: z
     .array(
       z.object({
-        sku_id: z.string().min(1, "Please select an item"),
+        sku_id: z.coerce.string().min(1, "Please select an item"),
         qty: z.coerce.number().positive("Quantity must be greater than 0"),
       })
     )

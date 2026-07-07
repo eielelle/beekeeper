@@ -5,27 +5,38 @@ import { useForm } from "@tanstack/react-form"
 import * as z from "zod"
 import { useParams } from "next/navigation"
 import { useMutation, useQuery } from "@tanstack/react-query"
+import { Check, ChevronsUpDown, Search } from "lucide-react"
 
+import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Field, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 
+// 🔌 Global Queries & Template Interceptors
 import { createSku, getSku, updateSku } from "./queries/sku.query"
 import { skuSchema } from "./schemas/sku.schema"
+import { fetchSkuCategories } from "@/forms/queries/sku_category.query"
+import { fetchSkuUoms } from "@/forms/queries/sku_uom.query"
 
 export function SkuForm() {
   const params = useParams()
-
   const id = params?.id as string | undefined
   const isEditMode = !!id
+
+  // --- 🔍 COMBOBOX FILTER & DEBOUNCE STATES ---
+  const [categorySearch, setCategorySearch] = React.useState("")
+  const debouncedCategorySearch = React.useDeferredValue(categorySearch)
+  const [categoryOpen, setCategoryOpen] = React.useState(false)
+
+  const [uomSearch, setUomSearch] = React.useState("")
+  const debouncedUomSearch = React.useDeferredValue(uomSearch)
+  const [uomOpen, setUomOpen] = React.useState(false)
 
   // 1. Fetch data if in edit mode
   const { data: skuData, isLoading } = useQuery({
@@ -34,7 +45,28 @@ export function SkuForm() {
     enabled: isEditMode,
   })
 
-  // 2. Handle mutations conditionally
+  // 2. Server-side paginated & debounced dropdown data streams
+  const { data: categoriesBatch, isLoading: isCategoriesLoading } = useQuery({
+    queryKey: ["sku_categories_combobox", debouncedCategorySearch],
+    queryFn: () =>
+      fetchSkuCategories({
+        pageIndex: 0,
+        pageSize: 10, // Server limits raw throughput payload size
+        globalFilter: debouncedCategorySearch,
+      }),
+  })
+
+  const { data: uomsBatch, isLoading: isUomsLoading } = useQuery({
+    queryKey: ["sku_uoms_combobox", debouncedUomSearch],
+    queryFn: () =>
+      fetchSkuUoms({
+        pageIndex: 0,
+        pageSize: 10, // Only stream highest matches
+        globalFilter: debouncedUomSearch,
+      }),
+  })
+
+  // 3. Handle mutations conditionally
   const mutation = useMutation({
     mutationFn: (values: z.infer<typeof skuSchema>) => {
       if (isEditMode) {
@@ -44,7 +76,7 @@ export function SkuForm() {
     },
   })
 
-  // 3. Initialize Form
+  // 4. Initialize Form
   const form = useForm({
     defaultValues: {
       sku_category_id: "",
@@ -62,7 +94,18 @@ export function SkuForm() {
     },
   })
 
-  // Handle loading state while fetching existing data
+  // Sync edits
+  React.useEffect(() => {
+    if (skuData) {
+      form.setFieldValue("sku_category_id", skuData.sku_category_id)
+      form.setFieldValue("sku_uom_id", skuData.sku_uom_id)
+      form.setFieldValue("item_name", skuData.item_name)
+      form.setFieldValue("item_description", skuData.item_description || "")
+      form.setFieldValue("sku_code", skuData.sku_code)
+      form.setFieldValue("barcode", skuData.barcode || "")
+    }
+  }, [skuData, form])
+
   if (isEditMode && isLoading) {
     return (
       <div className="animate-pulse text-sm text-muted-foreground">
@@ -84,12 +127,10 @@ export function SkuForm() {
         {(field) => {
           const isInvalid =
             field.state.meta.isTouched && !field.state.meta.isValid
-
           return (
             <Field data-invalid={isInvalid}>
               <FieldLabel htmlFor={field.name}>
-                SKU Code
-                <span className="font-bold text-red-500">*</span>
+                SKU Code <span className="font-bold text-red-500">*</span>
               </FieldLabel>
               <Input
                 id={field.name}
@@ -112,12 +153,10 @@ export function SkuForm() {
         {(field) => {
           const isInvalid =
             field.state.meta.isTouched && !field.state.meta.isValid
-
           return (
             <Field data-invalid={isInvalid}>
               <FieldLabel htmlFor={field.name}>
-                Item Name
-                <span className="font-bold text-red-500">*</span>
+                Item Name <span className="font-bold text-red-500">*</span>
               </FieldLabel>
               <Input
                 id={field.name}
@@ -136,68 +175,169 @@ export function SkuForm() {
         }}
       </form.Field>
 
+      {/* 🔍 ASYNC COMBOBOX: SKU CATEGORY */}
       <form.Field name="sku_category_id">
         {(field) => {
           const isInvalid =
             field.state.meta.isTouched && !field.state.meta.isValid
+          const selectedOption = categoriesBatch?.data?.find(
+            (c) => c.id === field.state.value
+          )
 
           return (
             <Field data-invalid={isInvalid}>
               <FieldLabel htmlFor={field.name}>
-                SKU Category
-                <span className="font-bold text-red-500">*</span>
+                SKU Category <span className="font-bold text-red-500">*</span>
               </FieldLabel>
-              <Select
-                value={field.state.value}
-                onValueChange={(value) => field.handleChange(value)}
-                disabled={mutation.isPending}
-              >
-                <SelectTrigger
-                  id={field.name}
-                  aria-invalid={isInvalid}
-                  onBlur={field.handleBlur}
+              <Popover open={categoryOpen} onOpenChange={setCategoryOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={categoryOpen}
+                    className="w-full justify-between text-left font-normal"
+                    disabled={mutation.isPending}
+                  >
+                    {selectedOption
+                      ? selectedOption.category_name
+                      : "Select a category..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="w-[var(--radix-popover-trigger-width)] p-0"
+                  align="start"
                 >
-                  <SelectValue placeholder="Select a category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {/* Map your fetched categories query data here */}
-                  <SelectItem value="sample-cat-id">Sample Category</SelectItem>
-                </SelectContent>
-              </Select>
+                  <div className="flex items-center border-b px-3">
+                    <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                    <input
+                      className="flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                      placeholder="Type code or category name..."
+                      value={categorySearch}
+                      onChange={(e) => setCategorySearch(e.target.value)}
+                    />
+                  </div>
+                  <div className="max-h-60 overflow-y-auto p-1">
+                    {isCategoriesLoading ? (
+                      <p className="animate-pulse py-2 text-center text-xs text-muted-foreground">
+                        Searching
+                      </p>
+                    ) : categoriesBatch?.data?.length ? (
+                      categoriesBatch.data.map((category) => (
+                        <button
+                          key={category.id}
+                          type="button"
+                          className={cn(
+                            "relative flex w-full cursor-default items-center rounded-sm px-2 py-1.5 text-left text-sm outline-none select-none hover:bg-accent hover:text-accent-foreground",
+                            field.state.value === category.id && "bg-accent"
+                          )}
+                          onClick={() => {
+                            field.handleChange(category.id)
+                            setCategoryOpen(false)
+                            setCategorySearch("")
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4 opacity-0",
+                              field.state.value === category.id && "opacity-100"
+                            )}
+                          />
+                          {category.category_name}
+                        </button>
+                      ))
+                    ) : (
+                      <p className="py-2 text-center text-xs text-muted-foreground italic">
+                        Nothing found.
+                      </p>
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
               {isInvalid && <FieldError errors={field.state.meta.errors} />}
             </Field>
           )
         }}
       </form.Field>
 
+      {/* 🔍 ASYNC COMBOBOX: SKU UNIT OF MEASURE (UOM) */}
       <form.Field name="sku_uom_id">
         {(field) => {
           const isInvalid =
             field.state.meta.isTouched && !field.state.meta.isValid
+          const selectedOption = uomsBatch?.data?.find(
+            (u) => u.id === field.state.value
+          )
 
           return (
             <Field data-invalid={isInvalid}>
               <FieldLabel htmlFor={field.name}>
-                Unit of Measure (UOM)
+                Unit of Measure (UOM){" "}
                 <span className="font-bold text-red-500">*</span>
               </FieldLabel>
-              <Select
-                value={field.state.value}
-                onValueChange={(value) => field.handleChange(value)}
-                disabled={mutation.isPending}
-              >
-                <SelectTrigger
-                  id={field.name}
-                  aria-invalid={isInvalid}
-                  onBlur={field.handleBlur}
+              <Popover open={uomOpen} onOpenChange={setUomOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={uomOpen}
+                    className="w-full justify-between text-left font-normal"
+                    disabled={mutation.isPending}
+                  >
+                    {selectedOption ? selectedOption.uom : "Select a UOM..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="w-[var(--radix-popover-trigger-width)] p-0"
+                  align="start"
                 >
-                  <SelectValue placeholder="Select a UOM" />
-                </SelectTrigger>
-                <SelectContent>
-                  {/* Map your fetched UOMs query data here */}
-                  <SelectItem value="sample-uom-id">Sample UOM</SelectItem>
-                </SelectContent>
-              </Select>
+                  <div className="flex items-center border-b px-3">
+                    <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                    <input
+                      className="flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                      placeholder="Type UOM (e.g., Kg, Pcs)..."
+                      value={uomSearch}
+                      onChange={(e) => setUomSearch(e.target.value)}
+                    />
+                  </div>
+                  <div className="max-h-60 overflow-y-auto p-1">
+                    {isUomsLoading ? (
+                      <p className="animate-pulse py-2 text-center text-xs text-muted-foreground">
+                        Searching...
+                      </p>
+                    ) : uomsBatch?.data?.length ? (
+                      uomsBatch.data.map((uomItem) => (
+                        <button
+                          key={uomItem.id}
+                          type="button"
+                          className={cn(
+                            "relative flex w-full cursor-default items-center rounded-sm px-2 py-1.5 text-left text-sm outline-none select-none hover:bg-accent hover:text-accent-foreground",
+                            field.state.value === uomItem.id && "bg-accent"
+                          )}
+                          onClick={() => {
+                            field.handleChange(uomItem.id)
+                            setUomOpen(false)
+                            setUomSearch("")
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4 opacity-0",
+                              field.state.value === uomItem.id && "opacity-100"
+                            )}
+                          />
+                          {uomItem.uom}
+                        </button>
+                      ))
+                    ) : (
+                      <p className="py-2 text-center text-xs text-muted-foreground italic">
+                        Nothing found.
+                      </p>
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
               {isInvalid && <FieldError errors={field.state.meta.errors} />}
             </Field>
           )
@@ -208,7 +348,6 @@ export function SkuForm() {
         {(field) => {
           const isInvalid =
             field.state.meta.isTouched && !field.state.meta.isValid
-
           return (
             <Field data-invalid={isInvalid}>
               <FieldLabel htmlFor={field.name}>Barcode</FieldLabel>
@@ -233,7 +372,6 @@ export function SkuForm() {
         {(field) => {
           const isInvalid =
             field.state.meta.isTouched && !field.state.meta.isValid
-
           return (
             <Field data-invalid={isInvalid}>
               <FieldLabel htmlFor={field.name}>Item Description</FieldLabel>

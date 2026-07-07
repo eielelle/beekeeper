@@ -210,7 +210,7 @@ const data = {
         },
         {
           title: "Inventory",
-          url: "#",
+          url: "/d/administration/inventory",
         },
         {
           title: "Authorizations",

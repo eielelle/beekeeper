@@ -5,7 +5,7 @@ export type ProductionBatchSubmission = {
   production_date: string
   production_area_id: string
   production_line_id: string
-  shift_type: string
+  is_day: boolean
   operation_type: string
   items: {
     sku_id: string
@@ -21,7 +21,7 @@ export async function submitProductionBatch(batch: ProductionBatchSubmission) {
     production_date: batch.production_date,
     production_area_id: batch.production_area_id,
     production_line_id: batch.production_line_id,
-    shift_type: batch.shift_type,
+    is_day: batch.is_day,
     operation_type: batch.operation_type,
     sku_id: item.sku_id,
     qty: item.qty,

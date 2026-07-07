@@ -1,5 +1,7 @@
-import { ProductionBatchForm } from "@/forms/production.form"
+"use client"
+
+import { ProductionForm } from "@/forms/production.form"
 
 export default function Page() {
-  return <ProductionBatchForm />
+  return <ProductionForm />
 }
