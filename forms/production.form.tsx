@@ -37,12 +37,6 @@ import { fetchSkus } from "./queries/sku.query"
 import { productionFormSchema } from "./schemas/production.schema"
 
 export function ProductionForm() {
-  // 🛡️ Fix Server-Client Hydration mismatches
-  const [mounted, setMounted] = React.useState(false)
-  React.useEffect(() => {
-    setMounted(true)
-  }, [])
-
   const [areaSearch, setAreaSearch] = React.useState("")
   const debouncedAreaSearch = React.useDeferredValue(areaSearch)
   const [areaOpen, setAreaOpen] = React.useState(false)
@@ -115,7 +109,7 @@ export function ProductionForm() {
       production_line_id: "",
       is_day: true,
       operation_type: "",
-      items: [{ sku_id: "", qty: "" as unknown as number }],
+      items: [{ sku_id: "", qty: "" }],
     },
     validators: {
       onSubmit: productionFormSchema,
@@ -400,7 +394,7 @@ export function ProductionForm() {
             onClick={() =>
               form.setFieldValue("items", (prev) => [
                 ...prev,
-                { sku_id: "", qty: 0 },
+                { sku_id: "", qty: "0" },
               ])
             }
           >
@@ -588,15 +582,12 @@ export function ProductionForm() {
                                   placeholder="0"
                                   aria-invalid={isSubInvalid}
                                   value={
-                                    subField.state.value === 0
+                                    subField.state.value === "0"
                                       ? ""
                                       : subField.state.value
                                   }
                                   onChange={(e) => {
-                                    const val = e.target.value
-                                    const nextValue =
-                                      val === "" ? "" : Number(val)
-                                    subField.handleChange(nextValue as any)
+                                    subField.handleChange(e.target.value)
                                   }}
                                   disabled={mutation.isPending}
                                 />
@@ -621,16 +612,16 @@ export function ProductionForm() {
                       size="icon"
                       className="h-10 w-10 shrink-0 text-muted-foreground hover:text-destructive"
                       // 🛡️ Safe ternary evaluation prevents Next.js hydration attribute drift errors
-                      disabled={
-                        !mounted
-                          ? false
-                          : field.state.value.length === 1 || mutation.isPending
-                      }
-                      onClick={() =>
+                      disabled={mutation.isPending}
+                      onClick={() => {
                         form.setFieldValue("items", (prev) =>
                           prev.filter((_, i) => i !== index)
                         )
-                      }
+
+                        queueMicrotask(() => {
+                          form.validate("submit")
+                        })
+                      }}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>

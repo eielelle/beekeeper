@@ -11,19 +11,37 @@ export const productionFormSchema = z.object({
     .array(
       z.object({
         sku_id: z.coerce.string().min(1, "Please select an item"),
-        qty: z.coerce.number().positive("Quantity must be greater than 0"),
+        qty: z
+          .string()
+          .refine((val) => Number(val) > 0, {
+            message: "Quantity must be greater than 0",
+          }),
       })
     )
     .min(1, "You must add at least one SKU to your production entry")
-    .refine(
-      (items) => {
-        const activeIds = items.map((i) => i.sku_id).filter(Boolean)
-        return activeIds.length === new Set(activeIds).size
-      },
-      {
-        message:
-          "Duplicate SKUs discovered. Each item in the cart must be unique.",
-        path: [0],
-      }
-    ),
+    .superRefine((items, ctx) => {
+      const seen = new Map<string, number>()
+
+      items.forEach((item, index) => {
+        if (!item.sku_id) return
+
+        const previous = seen.get(item.sku_id)
+
+        if (previous !== undefined) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Duplicate SKU selected.",
+            path: [previous, "sku_id"],
+          })
+
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Duplicate SKU selected.",
+            path: [index, "sku_id"],
+          })
+        } else {
+          seen.set(item.sku_id, index)
+        }
+      })
+    }),
 })

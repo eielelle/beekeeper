@@ -9,7 +9,7 @@ export type ProductionBatchSubmission = {
   operation_type: string
   items: {
     sku_id: string
-    qty: number
+    qty: string
   }[]
 }
 
