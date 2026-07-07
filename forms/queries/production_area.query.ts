@@ -9,10 +9,44 @@ export type ProductionAreaStoreType = {
   created_at?: string
 }
 
-export async function fetchProductionAreas() {
+export type FetchProductionAreasParams = {
+  pageIndex: number
+  pageSize: number
+  globalFilter?: string
+  sorting?: { id: string; desc: boolean }[]
+}
+
+export async function fetchProductionAreas({
+  pageIndex,
+  pageSize,
+  globalFilter,
+  sorting,
+}: FetchProductionAreasParams) {
   const t = toast.loading("Fetching Production Areas. Please wait.")
 
-  const { data, error } = await supabase.from("production_areas").select("*")
+  // 1. Base query setup with exact count for pagination controls
+  let query = supabase.from("production_areas").select("*", { count: "exact" })
+
+  // 2. Server-Side Global Filtering (ILIKE search on area_name)
+  if (globalFilter) {
+    query = query.ilike("area_name", `%${globalFilter}%`)
+  }
+
+  // 3. Server-Side Sorting
+  if (sorting && sorting.length > 0) {
+    const sort = sorting[0] // Handling single column sorting
+    query = query.order(sort.id, { ascending: !sort.desc })
+  } else {
+    // Default fallback sort
+    query = query.order("created_at", { ascending: false })
+  }
+
+  // 4. Server-Side Pagination Range Calc
+  const from = pageIndex * pageSize
+  const to = from + pageSize - 1
+  query = query.range(from, to)
+
+  const { data, error, count } = await query
 
   toast.dismiss(t)
 
@@ -21,7 +55,11 @@ export async function fetchProductionAreas() {
     throw error
   }
 
-  return data
+  // Return both data and the total exact count needed by the frontend pagination controls
+  return {
+    data: data || [],
+    rowCount: count || 0,
+  }
 }
 
 export async function getProductionArea(id: string) {
@@ -82,5 +120,24 @@ export async function updateProductionArea(value: ProductionAreaStoreType) {
 
   toast.success("Production Area successfully updated.")
 
+  return data
+}
+
+export async function deleteProductionArea(id: string) {
+  const t = toast.loading("Deleting Production Area. Please wait.")
+
+  const { data, error } = await supabase
+    .from("production_areas")
+    .delete()
+    .eq("id", id)
+
+  toast.dismiss(t)
+
+  if (error) {
+    toast.error(`ERR: ${error.message}`)
+    throw error
+  }
+
+  toast.success("Production Area successfully deleted.")
   return data
 }

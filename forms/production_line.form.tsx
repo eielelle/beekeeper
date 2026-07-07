@@ -1,6 +1,5 @@
 "use client"
 
-import * as React from "react"
 import { useForm } from "@tanstack/react-form"
 import * as z from "zod"
 import { useParams } from "next/navigation"
@@ -46,6 +45,7 @@ export function ProductionLineForm() {
     defaultValues: {
       line_name: "",
       line_description: "",
+      line_code: "",
     },
     validators: {
       onSubmit: productionLineSchema,
@@ -73,6 +73,34 @@ export function ProductionLineForm() {
         form.handleSubmit()
       }}
     >
+      <form.Field name="line_code">
+        {(field) => {
+          const isInvalid =
+            field.state.meta.isTouched && !field.state.meta.isValid
+
+          return (
+            <Field data-invalid={isInvalid}>
+              <FieldLabel htmlFor={field.name}>
+                Line Code
+                <span className="font-bold text-red-500">*</span>
+              </FieldLabel>
+              <Input
+                id={field.name}
+                name={field.name}
+                value={field.state.value}
+                onBlur={field.handleBlur}
+                onChange={(e) => field.handleChange(e.target.value)}
+                aria-invalid={isInvalid}
+                placeholder="e.g., Bottling Line A"
+                autoComplete="off"
+                disabled={mutation.isPending}
+              />
+              {isInvalid && <FieldError errors={field.state.meta.errors} />}
+            </Field>
+          )
+        }}
+      </form.Field>
+
       <form.Field name="line_name">
         {(field) => {
           const isInvalid =

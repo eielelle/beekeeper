@@ -190,7 +190,7 @@ const data = {
       items: [
         {
           title: "About Company",
-          url: "#",
+          url: "/d/administration/about",
         },
         {
           title: "Production",

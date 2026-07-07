@@ -72,7 +72,7 @@ export function DataTable<TData, TValue>({
   })
 
   return (
-    <div className="grid w-full grid-cols-1 gap-4">
+    <div className="grid w-full grid-cols-1 gap-4 font-mono text-xs">
       {/* 🔍 Search */}
       <div className="">
         <Input
@@ -85,7 +85,7 @@ export function DataTable<TData, TValue>({
 
       {/* 📊 Table */}
       <div className="border">
-        <Table>
+        <Table className="font-mono text-xs">
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
