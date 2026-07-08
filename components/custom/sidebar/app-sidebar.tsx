@@ -64,157 +64,62 @@ const data = {
   ],
   navMain: [
     {
-      title: "Production",
+      title: "Employees",
       url: "#",
       icon: Factory,
       isActive: false,
       items: [
         {
-          title: "Summary",
+          title: "Employee Directory",
           url: "#",
         },
         {
-          title: "New Production",
+          title: "Onboarding",
+          url: "/d/production/new",
+        },
+        {
+          title: "Offboarding",
           url: "/d/production/new",
         },
       ],
     },
     {
-      title: "Inventory",
+      title: "Attendances",
       url: "#",
-      icon: Package,
+      icon: Factory,
       isActive: false,
       items: [
         {
-          title: "All Inventory",
+          title: "My Attendance",
           url: "#",
         },
         {
-          title: "Bad Orders",
+          title: "Attendance Logs",
           url: "#",
         },
         {
-          title: "Sales to Trade",
-          url: "#",
+          title: "Attendance Adjustments",
+          url: "/d/production/new",
         },
       ],
     },
     {
-      title: "Sales",
+      title: "Leaves",
       url: "#",
-      icon: ShoppingBag,
+      icon: Factory,
       isActive: false,
       items: [
         {
-          title: "All Orders",
+          title: "My Attendance",
           url: "#",
         },
         {
-          title: "Booking",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Expenses",
-      url: "#",
-      icon: Coins,
-      isActive: false,
-      items: [
-        {
-          title: "All Expenses",
+          title: "Attendance Logs",
           url: "#",
         },
         {
-          title: "New Expense Request",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Visits",
-      url: "#",
-      icon: MapPin,
-      isActive: false,
-      items: [
-        {
-          title: "All Visits",
-          url: "#",
-        },
-        {
-          title: "Plan Visit",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Attendance",
-      url: "#",
-      icon: Calendar,
-      isActive: false,
-      items: [
-        {
-          title: "All Attendances",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Reports",
-      url: "#",
-      icon: BarChart,
-      isActive: false,
-      items: [],
-    },
-    {
-      title: "Database",
-      url: "#",
-      icon: Database,
-      isActive: false,
-      items: [
-        {
-          title: "Item Master Data",
-          url: "#",
-        },
-        {
-          title: "Outlets",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Administration",
-      url: "#",
-      icon: Settings,
-      isActive: false,
-      items: [
-        {
-          title: "About Company",
-          url: "/d/administration/about",
-        },
-        {
-          title: "Production",
-          url: "/d/administration/production",
-        },
-        {
-          title: "Organizations",
-          url: "#",
-        },
-        {
-          title: "Attendance",
-          url: "#",
-        },
-        {
-          title: "Expenses",
-          url: "#",
-        },
-        {
-          title: "Inventory",
-          url: "/d/administration/inventory",
-        },
-        {
-          title: "Authorizations",
-          url: "#",
+          title: "Attendance Adjustments",
+          url: "/d/production/new",
         },
       ],
     },
