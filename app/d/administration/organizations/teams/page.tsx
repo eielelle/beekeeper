@@ -8,12 +8,12 @@ import { DataTable } from "@/components/custom/data-table/app-table"
 import { ColumnDef, SortingState, PaginationState } from "@tanstack/react-table"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 
-// 🏷️ Expense Categories Query & Types
+// 👥 Teams Query & Types
 import {
-  fetchExpenseCategories,
-  deleteExpenseCategory,
-  ExpenseCategoryStoreType,
-} from "@/forms/queries/expense_category.query"
+  fetchTeams,
+  deleteTeam,
+  TeamStoreType,
+} from "@/forms/queries/team.query"
 
 // Dropdown UI components from shadcn
 import {
@@ -28,53 +28,52 @@ import {
 export default function Page() {
   const queryClient = useQueryClient()
 
-  // --- 🏷️ Expense Categories Table State ---
-  const [sorting, setSorting] = React.useState<SortingState>([])
-  const [globalFilter, setGlobalFilter] = React.useState("")
-  const deferredFilter = React.useDeferredValue(globalFilter)
-  const [pagination, setPagination] = React.useState<PaginationState>({
+  // --- 👥 Teams Table State ---
+  const [teamSorting, setTeamSorting] = React.useState<SortingState>([])
+  const [teamGlobalFilter, setTeamGlobalFilter] = React.useState("")
+  const teamDeferredFilter = React.useDeferredValue(teamGlobalFilter)
+  const [teamPagination, setTeamPagination] = React.useState<PaginationState>({
     pageIndex: 0,
-    pageSize: 10,
+    pageSize: 5,
   })
 
   // --- React Query Server-Side Fetcher ---
-  const { data: categoryData } = useQuery({
+  const { data: teamData } = useQuery({
     queryKey: [
-      "expense_categories",
-      pagination.pageIndex,
-      pagination.pageSize,
-      sorting,
-      deferredFilter,
+      "teams",
+      teamPagination.pageIndex,
+      teamPagination.pageSize,
+      teamSorting,
+      teamDeferredFilter,
     ],
     queryFn: () =>
-      fetchExpenseCategories({
-        pageIndex: pagination.pageIndex,
-        pageSize: pagination.pageSize,
-        globalFilter: deferredFilter,
-        sorting: sorting,
+      fetchTeams({
+        pageIndex: teamPagination.pageIndex,
+        pageSize: teamPagination.pageSize,
+        globalFilter: teamDeferredFilter,
+        sorting: teamSorting,
       }),
   })
 
-  // --- React Query Mutations ---
-  const deleteMutation = useMutation({
-    mutationFn: deleteExpenseCategory,
+  // --- React Query Mutation ---
+  const deleteTeamMutation = useMutation({
+    mutationFn: deleteTeam,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["expense_categories"] })
+      queryClient.invalidateQueries({ queryKey: ["teams"] })
     },
   })
 
   // --- Columns Configuration ---
-  const columns: ColumnDef<ExpenseCategoryStoreType>[] = [
+  const teamColumns: ColumnDef<TeamStoreType>[] = [
     { accessorKey: "id", header: "ID", enableSorting: false },
-    { accessorKey: "category_name", header: "Category Name" },
-    { accessorKey: "category_description", header: "Description" },
+    { accessorKey: "team_name", header: "Team Name" },
+    { accessorKey: "team_description", header: "Description" },
+    { accessorKey: "approver_user_id", header: "Approver ID" },
     {
       accessorKey: "created_at",
       header: "Created At",
       cell: ({ row }) =>
-        row.original.created_at
-          ? new Date(row.original.created_at).toLocaleDateString()
-          : "—",
+        new Date(row.original.created_at || "").toLocaleDateString(),
     },
     {
       id: "actions",
@@ -97,19 +96,15 @@ export default function Page() {
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
-                <Link
-                  href={`/d/administration/expense/categories/edit/${item.id}`}
-                >
-                  <Edit className="mr-2 h-4 w-4" /> Edit Category
+                <Link href={`/d/administration/teams/edit/${item.id}`}>
+                  <Edit className="mr-2 h-4 w-4" /> Edit Team
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="focus:text-destructive-foreground text-destructive focus:bg-destructive"
                 onClick={() => {
-                  if (
-                    confirm(`Delete expense category: ${item.category_name}?`)
-                  ) {
-                    deleteMutation.mutate(item.id || "")
+                  if (confirm(`Delete team: ${item.team_name}?`)) {
+                    deleteTeamMutation.mutate(item.id || "")
                   }
                 }}
               >
@@ -124,33 +119,33 @@ export default function Page() {
 
   return (
     <div className="space-y-6">
-      {/* 🏷️ Expense Categories Section */}
+      {/* 👥 Teams Section */}
       <section className="grid grid-cols-1 gap-4">
         <header className="flex items-center justify-between gap-4">
           <div>
-            <h1 className="text-xs font-semibold">Expense Categories</h1>
+            <h1 className="text-xs font-semibold">Teams</h1>
             <p className="font-mono text-xs text-muted-foreground">
-              Classify and manage chart-of-accounts expense structures
+              Manage internal departments and designated approval hierarchies
             </p>
           </div>
-          <Link href="/d/administration/expenses/category/new">
+          <Link href="/d/administration/organizations/teams/new">
             <Button size="sm">
-              <Plus className="h-4 w-4" /> Add Category
+              <Plus className="h-4 w-4" /> Add Team
             </Button>
           </Link>
         </header>
 
         <DataTable
-          columns={columns}
-          data={categoryData?.data ?? []}
-          rowCount={categoryData?.rowCount ?? 0}
-          pageIndex={pagination.pageIndex}
-          pageSize={pagination.pageSize}
-          sorting={sorting}
-          globalFilter={globalFilter}
-          onPaginationChange={setPagination}
-          onSortingChange={setSorting}
-          onGlobalFilterChange={setGlobalFilter}
+          columns={teamColumns}
+          data={teamData?.data ?? []}
+          rowCount={teamData?.rowCount ?? 0}
+          pageIndex={teamPagination.pageIndex}
+          pageSize={teamPagination.pageSize}
+          sorting={teamSorting}
+          globalFilter={teamGlobalFilter}
+          onPaginationChange={setTeamPagination}
+          onSortingChange={setTeamSorting}
+          onGlobalFilterChange={setTeamGlobalFilter}
         />
       </section>
     </div>

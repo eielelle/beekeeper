@@ -55,7 +55,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           </TabsTrigger>
 
           <TabsTrigger value="reports-teams" asChild>
-            <Link href="/dashboard/teams" className="flex items-center gap-2">
+            <Link
+              href="/d/administration/organizations/teams"
+              className="flex items-center gap-2"
+            >
               <Users2 className="h-4 w-4" /> Teams
             </Link>
           </TabsTrigger>

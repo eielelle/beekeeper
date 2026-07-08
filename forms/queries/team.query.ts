@@ -1,37 +1,36 @@
 import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
 
-export type ExpenseCategoryStoreType = {
+export type TeamStoreType = {
   id?: string
-  category_name: string
-  category_description: string
+  team_name: string
+  team_description?: string
+  approver_user_id?: string
   organization_id?: number
   created_at?: string
 }
 
-export type FetchExpenseCategoriesParams = {
+export type FetchTeamsParams = {
   pageIndex: number
   pageSize: number
   globalFilter?: string
   sorting?: { id: string; desc: boolean }[]
 }
 
-export async function fetchExpenseCategories({
+export async function fetchTeams({
   pageIndex,
   pageSize,
   globalFilter,
   sorting,
-}: FetchExpenseCategoriesParams) {
-  const t = toast.loading("Fetching Expense Categories. Please wait.")
+}: FetchTeamsParams) {
+  const t = toast.loading("Fetching Teams. Please wait.")
 
   // 1. Base query setup with exact count for pagination controls
-  let query = supabase
-    .from("expense_categories")
-    .select("*", { count: "exact" })
+  let query = supabase.from("teams").select("*", { count: "exact" })
 
-  // 2. Server-Side Global Filtering (ILIKE search on category_name)
+  // 2. Server-Side Global Filtering (ILIKE search on team_name text field)
   if (globalFilter) {
-    query = query.ilike("category_name", `%${globalFilter}%`)
+    query = query.ilike("team_name", `%${globalFilter}%`)
   }
 
   // 3. Server-Side Sorting
@@ -64,11 +63,11 @@ export async function fetchExpenseCategories({
   }
 }
 
-export async function getExpenseCategory(id: string) {
-  const t = toast.loading("Fetching Expense Category. Please wait.")
+export async function getTeam(id: string) {
+  const t = toast.loading("Fetching Team details. Please wait.")
 
   const { data, error } = await supabase
-    .from("expense_categories")
+    .from("teams")
     .select("*")
     .eq("id", id)
     .single()
@@ -83,12 +82,10 @@ export async function getExpenseCategory(id: string) {
   return data
 }
 
-export async function createExpenseCategory(value: ExpenseCategoryStoreType) {
-  const t = toast.loading("Creating Expense Category. Please wait.")
+export async function createTeam(value: Partial<TeamStoreType>) {
+  const t = toast.loading("Creating Team. Please wait.")
 
-  const { data, error } = await supabase
-    .from("expense_categories")
-    .insert([value])
+  const { data, error } = await supabase.from("teams").insert([value])
 
   toast.dismiss(t)
 
@@ -97,20 +94,20 @@ export async function createExpenseCategory(value: ExpenseCategoryStoreType) {
     throw error
   }
 
-  toast.success("Expense Category successfully created.")
+  toast.success("Team successfully created.")
 
   return data
 }
 
-export async function updateExpenseCategory(value: ExpenseCategoryStoreType) {
-  const t = toast.loading("Updating Expense Category. Please wait.")
+export async function updateTeam(value: Partial<TeamStoreType>) {
+  const t = toast.loading("Updating Team. Please wait.")
 
   const { id, ...updates } = value
 
   const { data, error } = await supabase
-    .from("expense_categories")
+    .from("teams")
     .update(updates)
-    .eq("id", id)
+    .eq("id", id!)
     .select()
 
   toast.dismiss(t)
@@ -120,18 +117,15 @@ export async function updateExpenseCategory(value: ExpenseCategoryStoreType) {
     throw error
   }
 
-  toast.success("Expense Category successfully updated.")
+  toast.success("Team successfully updated.")
 
   return data
 }
 
-export async function deleteExpenseCategory(id: string) {
-  const t = toast.loading("Deleting Expense Category. Please wait.")
+export async function deleteTeam(id: string) {
+  const t = toast.loading("Deleting Team. Please wait.")
 
-  const { data, error } = await supabase
-    .from("expense_categories")
-    .delete()
-    .eq("id", id)
+  const { data, error } = await supabase.from("teams").delete().eq("id", id)
 
   toast.dismiss(t)
 
@@ -140,6 +134,6 @@ export async function deleteExpenseCategory(id: string) {
     throw error
   }
 
-  toast.success("Expense Category successfully deleted.")
+  toast.success("Team successfully deleted.")
   return data
 }
