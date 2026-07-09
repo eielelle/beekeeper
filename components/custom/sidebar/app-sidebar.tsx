@@ -37,6 +37,7 @@ import {
   SidebarHeader,
   SidebarRail,
 } from "@/components/ui/sidebar"
+import { NavSales } from "./nav.sales"
 
 // This is sample data.
 const data = {
@@ -63,6 +64,18 @@ const data = {
     },
   ],
   navMain: [
+    {
+      title: "Recruitment",
+      url: "#",
+      icon: Factory,
+      isActive: false,
+      items: [
+        {
+          title: "WIP",
+          url: "#",
+        },
+      ],
+    },
     {
       title: "Employees",
       url: "#",
@@ -110,16 +123,174 @@ const data = {
       isActive: false,
       items: [
         {
-          title: "My Attendance",
+          title: "My Leaves",
           url: "#",
         },
         {
-          title: "Attendance Logs",
+          title: "Leaves",
+          url: "#",
+        },
+      ],
+    },
+    {
+      title: "Payroll",
+      url: "#",
+      icon: Factory,
+      isActive: false,
+      items: [
+        {
+          title: "Dashboard",
           url: "#",
         },
         {
-          title: "Attendance Adjustments",
-          url: "/d/production/new",
+          title: "Allowances",
+          url: "#",
+        },
+        {
+          title: "Deductions",
+          url: "#",
+        },
+        {
+          title: "Payslips",
+          url: "#",
+        },
+        {
+          title: "Loans / Advance Salary",
+          url: "#",
+        },
+        {
+          title: "Deductions",
+          url: "#",
+        },
+      ],
+    },
+    {
+      title: "Performance",
+      url: "#",
+      icon: Factory,
+      isActive: false,
+      items: [
+        {
+          title: "KPI Tracking",
+          url: "#",
+        },
+      ],
+    },
+    {
+      title: "Help Desk",
+      url: "#",
+      icon: Factory,
+      isActive: false,
+      items: [
+        {
+          title: "My Tickets",
+          url: "#",
+        },
+        {
+          title: "Tickets",
+          url: "#",
+        },
+      ],
+    },
+    {
+      title: "Administration",
+      url: "#",
+      icon: Factory,
+      isActive: false,
+      items: [
+        {
+          title: "My Tickets",
+          url: "#",
+        },
+        {
+          title: "Tickets",
+          url: "#",
+        },
+      ],
+    },
+  ],
+  navSales: [
+    {
+      title: "Inventory",
+      url: "#",
+      icon: Factory,
+      isActive: false,
+      items: [
+        {
+          title: "My Inventory",
+          url: "#",
+        },
+        {
+          title: "Inventory",
+          url: "#",
+        },
+        {
+          title: "Returns",
+          url: "#",
+        },
+      ],
+    },
+    {
+      title: "Visits",
+      url: "#",
+      icon: Factory,
+      isActive: false,
+      items: [
+        {
+          title: "My Visits",
+          url: "#",
+        },
+        {
+          title: "Visits",
+          url: "#",
+        },
+      ],
+    },
+    {
+      title: "Expenses",
+      url: "#",
+      icon: Factory,
+      isActive: false,
+      items: [
+        {
+          title: "My Expenses",
+          url: "#",
+        },
+        {
+          title: "Expenses",
+          url: "#",
+        },
+      ],
+    },
+    {
+      title: "Outlets",
+      url: "#",
+      icon: Factory,
+      isActive: false,
+      items: [
+        {
+          title: "My Outlets",
+          url: "#",
+        },
+        {
+          title: "Outlets",
+          url: "#",
+        },
+      ],
+    },
+    {
+      title: "Reports",
+      url: "#",
+      icon: Factory,
+      isActive: false,
+      items: [
+        {
+          title: "My Outlets",
+          url: "#",
+        },
+        {
+          title: "Outlets",
+          url: "#",
         },
       ],
     },
@@ -152,6 +323,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarContent>
         <NavSecondary projects={data.projects} />
         <NavMain items={data.navMain} />
+        <NavSales items={data.navSales} />
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={data.user} />

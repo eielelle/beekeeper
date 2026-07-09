@@ -9,38 +9,37 @@ import { useMutation, useQuery } from "@tanstack/react-query"
 import { Button } from "@/components/ui/button"
 import { Field, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
 
 import {
-  createSkuCategory,
-  getSkuCategory,
-  updateSkuCategory,
-} from "./queries/sku_category.query"
-import { skuCategorySchema } from "./schemas/sku_category.schema"
+  createPosition,
+  getPosition,
+  updatePosition,
+} from "./queries/position.query"
+import { positionSchema } from "./schemas/position.schema"
 
-export function SkuCategoryForm() {
+export function PositionForm() {
   const params = useParams()
 
   const id = params?.id as string | undefined
   const isEditMode = !!id
 
   // 1. Fetch data if in edit mode
-  const { data: skuCategoryData, isLoading } = useQuery({
-    queryKey: ["sku_categories", id],
-    queryFn: () => getSkuCategory(id!),
+  const { data: positionData, isLoading } = useQuery({
+    queryKey: ["positions", id],
+    queryFn: () => getPosition(id!),
     enabled: isEditMode,
   })
 
   // 2. Handle mutations conditionally
   const mutation = useMutation({
-    mutationFn: (values: z.infer<typeof skuCategorySchema>) => {
+    mutationFn: (values: z.infer<typeof positionSchema>) => {
       if (isEditMode) {
-        return updateSkuCategory({ ...values, id })
+        return updatePosition({ ...values, id })
       }
-      return createSkuCategory(values)
+      return createPosition(values)
     },
     onSuccess: () => {
-      // Clear/reset form fields on successful creation/update
+      // Clear form on successful submission
       form.reset()
     },
   })
@@ -48,11 +47,11 @@ export function SkuCategoryForm() {
   // 3. Initialize Form
   const form = useForm({
     defaultValues: {
-      category_name: skuCategoryData?.category_name ?? "",
-      category_description: skuCategoryData?.category_description ?? "",
+      title: positionData?.title ?? "",
+      code: positionData?.code ?? "",
     },
     validators: {
-      onSubmit: skuCategorySchema,
+      onSubmit: positionSchema,
     },
     onSubmit: async ({ value }) => {
       mutation.mutate(value)
@@ -63,7 +62,7 @@ export function SkuCategoryForm() {
   if (isEditMode && isLoading) {
     return (
       <div className="animate-pulse text-sm text-muted-foreground">
-        Loading category details...
+        Loading position details...
       </div>
     )
   }
@@ -77,7 +76,7 @@ export function SkuCategoryForm() {
         form.handleSubmit()
       }}
     >
-      <form.Field name="category_name">
+      <form.Field name="title">
         {(field) => {
           const isInvalid =
             field.state.meta.isTouched && !field.state.meta.isValid
@@ -85,7 +84,7 @@ export function SkuCategoryForm() {
           return (
             <Field data-invalid={isInvalid}>
               <FieldLabel htmlFor={field.name}>
-                Category Name
+                Position Title
                 <span className="font-bold text-red-500">*</span>
               </FieldLabel>
               <Input
@@ -95,7 +94,7 @@ export function SkuCategoryForm() {
                 onBlur={field.handleBlur}
                 onChange={(e) => field.handleChange(e.target.value)}
                 aria-invalid={isInvalid}
-                placeholder="e.g., Beverages"
+                placeholder="e.g., Software Engineer"
                 autoComplete="off"
                 disabled={mutation.isPending}
               />
@@ -105,22 +104,22 @@ export function SkuCategoryForm() {
         }}
       </form.Field>
 
-      <form.Field name="category_description">
+      <form.Field name="code">
         {(field) => {
           const isInvalid =
             field.state.meta.isTouched && !field.state.meta.isValid
 
           return (
             <Field data-invalid={isInvalid}>
-              <FieldLabel htmlFor={field.name}>Category Description</FieldLabel>
-              <Textarea
+              <FieldLabel htmlFor={field.name}>Position Code</FieldLabel>
+              <Input
                 id={field.name}
                 name={field.name}
                 value={field.state.value}
                 onBlur={field.handleBlur}
                 onChange={(e) => field.handleChange(e.target.value)}
                 aria-invalid={isInvalid}
-                placeholder="Enter description details here..."
+                placeholder="e.g., SWE-01"
                 autoComplete="off"
                 disabled={mutation.isPending}
               />
@@ -134,8 +133,8 @@ export function SkuCategoryForm() {
         {mutation.isPending
           ? "Saving..."
           : isEditMode
-            ? "Update SKU Category"
-            : "Create SKU Category"}
+            ? "Update Position"
+            : "Create Position"}
       </Button>
     </form>
   )

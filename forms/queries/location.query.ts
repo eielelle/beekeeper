@@ -1,35 +1,37 @@
 import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
 
-export type SkuCategoryStoreType = {
+export type LocationStoreType = {
   id?: string
-  category_name: string
-  category_description?: string
+  name: string
+  address: string
   org_id?: number
   created_at?: string
 }
 
-export type FetchSkuCategoriesParams = {
+export type FetchLocationsParams = {
   pageIndex: number
   pageSize: number
   globalFilter?: string
   sorting?: { id: string; desc: boolean }[]
 }
 
-export async function fetchSkuCategories({
+export async function fetchLocations({
   pageIndex,
   pageSize,
   globalFilter,
   sorting,
-}: FetchSkuCategoriesParams) {
-  const t = toast.loading("Fetching SKU Categories. Please wait.")
+}: FetchLocationsParams) {
+  const t = toast.loading("Fetching Locations. Please wait.")
 
   // 1. Base query setup with exact count for pagination controls
-  let query = supabase.from("sku_categories").select("*", { count: "exact" })
+  let query = supabase.from("locations").select("*", { count: "exact" })
 
-  // 2. Server-Side Global Filtering (ILIKE search on category_name)
+  // 2. Server-Side Global Filtering (ILIKE search on name or address)
   if (globalFilter) {
-    query = query.ilike("category_name", `%${globalFilter}%`)
+    query = query.or(
+      `name.ilike.%${globalFilter}%,address.ilike.%${globalFilter}%`
+    )
   }
 
   // 3. Server-Side Sorting
@@ -62,11 +64,11 @@ export async function fetchSkuCategories({
   }
 }
 
-export async function getSkuCategory(id: string) {
-  const t = toast.loading("Fetching SKU Category. Please wait.")
+export async function getLocation(id: string) {
+  const t = toast.loading("Fetching Location. Please wait.")
 
   const { data, error } = await supabase
-    .from("sku_categories")
+    .from("locations")
     .select("*")
     .eq("id", id)
     .single()
@@ -81,10 +83,10 @@ export async function getSkuCategory(id: string) {
   return data
 }
 
-export async function createSkuCategory(value: SkuCategoryStoreType) {
-  const t = toast.loading("Creating SKU Category. Please wait.")
+export async function createLocation(value: LocationStoreType) {
+  const t = toast.loading("Creating Location. Please wait.")
 
-  const { data, error } = await supabase.from("sku_categories").insert([value])
+  const { data, error } = await supabase.from("locations").insert([value])
 
   toast.dismiss(t)
 
@@ -93,18 +95,18 @@ export async function createSkuCategory(value: SkuCategoryStoreType) {
     throw error
   }
 
-  toast.success("SKU Category successfully created.")
+  toast.success("Location successfully created.")
 
   return data
 }
 
-export async function updateSkuCategory(value: SkuCategoryStoreType) {
-  const t = toast.loading("Updating SKU Category. Please wait.")
+export async function updateLocation(value: LocationStoreType) {
+  const t = toast.loading("Updating Location. Please wait.")
 
   const { id, ...updates } = value
 
   const { data, error } = await supabase
-    .from("sku_categories")
+    .from("locations")
     .update(updates)
     .eq("id", id)
     .select()
@@ -116,18 +118,15 @@ export async function updateSkuCategory(value: SkuCategoryStoreType) {
     throw error
   }
 
-  toast.success("SKU Category successfully updated.")
+  toast.success("Location successfully updated.")
 
   return data
 }
 
-export async function deleteSkuCategory(id: string) {
-  const t = toast.loading("Deleting SKU Category. Please wait.")
+export async function deleteLocation(id: string) {
+  const t = toast.loading("Deleting Location. Please wait.")
 
-  const { data, error } = await supabase
-    .from("sku_categories")
-    .delete()
-    .eq("id", id)
+  const { data, error } = await supabase.from("locations").delete().eq("id", id)
 
   toast.dismiss(t)
 
@@ -136,6 +135,6 @@ export async function deleteSkuCategory(id: string) {
     throw error
   }
 
-  toast.success("SKU Category successfully deleted.")
+  toast.success("Location successfully deleted.")
   return data
 }

@@ -3,8 +3,9 @@ import { toast } from "sonner"
 
 export type SkuUomStoreType = {
   id?: string
-  uom: string
-  organization_id?: number
+  uom_code: string
+  uom_name: string
+  org_id?: number
   created_at?: string
 }
 
@@ -21,14 +22,16 @@ export async function fetchSkuUoms({
   globalFilter,
   sorting,
 }: FetchSkuUomsParams) {
-  const t = toast.loading("Fetching Units of Measure. Please wait.")
+  const t = toast.loading("Fetching Units of Measurement. Please wait.")
 
   // 1. Base query setup with exact count for pagination controls
   let query = supabase.from("sku_uoms").select("*", { count: "exact" })
 
-  // 2. Server-Side Global Filtering (ILIKE search on uom text field)
+  // 2. Server-Side Global Filtering (ILIKE search on uom_code or uom_name)
   if (globalFilter) {
-    query = query.ilike("uom", `%${globalFilter}%`)
+    query = query.or(
+      `uom_code.ilike.%${globalFilter}%,uom_name.ilike.%${globalFilter}%`
+    )
   }
 
   // 3. Server-Side Sorting
@@ -62,7 +65,7 @@ export async function fetchSkuUoms({
 }
 
 export async function getSkuUom(id: string) {
-  const t = toast.loading("Fetching Unit of Measure. Please wait.")
+  const t = toast.loading("Fetching Unit of Measurement. Please wait.")
 
   const { data, error } = await supabase
     .from("sku_uoms")
@@ -81,7 +84,7 @@ export async function getSkuUom(id: string) {
 }
 
 export async function createSkuUom(value: SkuUomStoreType) {
-  const t = toast.loading("Creating Unit of Measure. Please wait.")
+  const t = toast.loading("Creating Unit of Measurement. Please wait.")
 
   const { data, error } = await supabase.from("sku_uoms").insert([value])
 
@@ -92,13 +95,13 @@ export async function createSkuUom(value: SkuUomStoreType) {
     throw error
   }
 
-  toast.success("Unit of Measure successfully created.")
+  toast.success("Unit of Measurement successfully created.")
 
   return data
 }
 
 export async function updateSkuUom(value: SkuUomStoreType) {
-  const t = toast.loading("Updating Unit of Measure. Please wait.")
+  const t = toast.loading("Updating Unit of Measurement. Please wait.")
 
   const { id, ...updates } = value
 
@@ -115,13 +118,13 @@ export async function updateSkuUom(value: SkuUomStoreType) {
     throw error
   }
 
-  toast.success("Unit of Measure successfully updated.")
+  toast.success("Unit of Measurement successfully updated.")
 
   return data
 }
 
 export async function deleteSkuUom(id: string) {
-  const t = toast.loading("Deleting Unit of Measure. Please wait.")
+  const t = toast.loading("Deleting Unit of Measurement. Please wait.")
 
   const { data, error } = await supabase.from("sku_uoms").delete().eq("id", id)
 
@@ -132,6 +135,6 @@ export async function deleteSkuUom(id: string) {
     throw error
   }
 
-  toast.success("Unit of Measure successfully deleted.")
+  toast.success("Unit of Measurement successfully deleted.")
   return data
 }

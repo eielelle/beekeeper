@@ -1,35 +1,36 @@
 import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
 
-export type SkuCategoryStoreType = {
+export type EmploymentStatusStoreType = {
   id?: string
-  category_name: string
-  category_description?: string
+  name: string
   org_id?: number
   created_at?: string
 }
 
-export type FetchSkuCategoriesParams = {
+export type FetchEmploymentStatusesParams = {
   pageIndex: number
   pageSize: number
   globalFilter?: string
   sorting?: { id: string; desc: boolean }[]
 }
 
-export async function fetchSkuCategories({
+export async function fetchEmploymentStatuses({
   pageIndex,
   pageSize,
   globalFilter,
   sorting,
-}: FetchSkuCategoriesParams) {
-  const t = toast.loading("Fetching SKU Categories. Please wait.")
+}: FetchEmploymentStatusesParams) {
+  const t = toast.loading("Fetching Employment Statuses. Please wait.")
 
   // 1. Base query setup with exact count for pagination controls
-  let query = supabase.from("sku_categories").select("*", { count: "exact" })
+  let query = supabase
+    .from("employment_statuses")
+    .select("*", { count: "exact" })
 
-  // 2. Server-Side Global Filtering (ILIKE search on category_name)
+  // 2. Server-Side Global Filtering (ILIKE search on name)
   if (globalFilter) {
-    query = query.ilike("category_name", `%${globalFilter}%`)
+    query = query.ilike("name", `%${globalFilter}%`)
   }
 
   // 3. Server-Side Sorting
@@ -62,11 +63,11 @@ export async function fetchSkuCategories({
   }
 }
 
-export async function getSkuCategory(id: string) {
-  const t = toast.loading("Fetching SKU Category. Please wait.")
+export async function getEmploymentStatus(id: string) {
+  const t = toast.loading("Fetching Employment Status. Please wait.")
 
   const { data, error } = await supabase
-    .from("sku_categories")
+    .from("employment_statuses")
     .select("*")
     .eq("id", id)
     .single()
@@ -81,10 +82,12 @@ export async function getSkuCategory(id: string) {
   return data
 }
 
-export async function createSkuCategory(value: SkuCategoryStoreType) {
-  const t = toast.loading("Creating SKU Category. Please wait.")
+export async function createEmploymentStatus(value: EmploymentStatusStoreType) {
+  const t = toast.loading("Creating Employment Status. Please wait.")
 
-  const { data, error } = await supabase.from("sku_categories").insert([value])
+  const { data, error } = await supabase
+    .from("employment_statuses")
+    .insert([value])
 
   toast.dismiss(t)
 
@@ -93,18 +96,18 @@ export async function createSkuCategory(value: SkuCategoryStoreType) {
     throw error
   }
 
-  toast.success("SKU Category successfully created.")
+  toast.success("Employment Status successfully created.")
 
   return data
 }
 
-export async function updateSkuCategory(value: SkuCategoryStoreType) {
-  const t = toast.loading("Updating SKU Category. Please wait.")
+export async function updateEmploymentStatus(value: EmploymentStatusStoreType) {
+  const t = toast.loading("Updating Employment Status. Please wait.")
 
   const { id, ...updates } = value
 
   const { data, error } = await supabase
-    .from("sku_categories")
+    .from("employment_statuses")
     .update(updates)
     .eq("id", id)
     .select()
@@ -116,16 +119,16 @@ export async function updateSkuCategory(value: SkuCategoryStoreType) {
     throw error
   }
 
-  toast.success("SKU Category successfully updated.")
+  toast.success("Employment Status successfully updated.")
 
   return data
 }
 
-export async function deleteSkuCategory(id: string) {
-  const t = toast.loading("Deleting SKU Category. Please wait.")
+export async function deleteEmploymentStatus(id: string) {
+  const t = toast.loading("Deleting Employment Status. Please wait.")
 
   const { data, error } = await supabase
-    .from("sku_categories")
+    .from("employment_statuses")
     .delete()
     .eq("id", id)
 
@@ -136,6 +139,6 @@ export async function deleteSkuCategory(id: string) {
     throw error
   }
 
-  toast.success("SKU Category successfully deleted.")
+  toast.success("Employment Status successfully deleted.")
   return data
 }

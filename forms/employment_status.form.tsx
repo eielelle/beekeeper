@@ -9,38 +9,37 @@ import { useMutation, useQuery } from "@tanstack/react-query"
 import { Button } from "@/components/ui/button"
 import { Field, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
 
 import {
-  createSkuCategory,
-  getSkuCategory,
-  updateSkuCategory,
-} from "./queries/sku_category.query"
-import { skuCategorySchema } from "./schemas/sku_category.schema"
+  createEmploymentStatus,
+  getEmploymentStatus,
+  updateEmploymentStatus,
+} from "./queries/employment_status.query"
+import { employmentStatusSchema } from "./schemas/employment_status.schema"
 
-export function SkuCategoryForm() {
+export function EmploymentStatusForm() {
   const params = useParams()
 
   const id = params?.id as string | undefined
   const isEditMode = !!id
 
   // 1. Fetch data if in edit mode
-  const { data: skuCategoryData, isLoading } = useQuery({
-    queryKey: ["sku_categories", id],
-    queryFn: () => getSkuCategory(id!),
+  const { data: employmentStatusData, isLoading } = useQuery({
+    queryKey: ["employment_statuses", id],
+    queryFn: () => getEmploymentStatus(id!),
     enabled: isEditMode,
   })
 
   // 2. Handle mutations conditionally
   const mutation = useMutation({
-    mutationFn: (values: z.infer<typeof skuCategorySchema>) => {
+    mutationFn: (values: z.infer<typeof employmentStatusSchema>) => {
       if (isEditMode) {
-        return updateSkuCategory({ ...values, id })
+        return updateEmploymentStatus({ ...values, id })
       }
-      return createSkuCategory(values)
+      return createEmploymentStatus(values)
     },
     onSuccess: () => {
-      // Clear/reset form fields on successful creation/update
+      // Clear form on successful submission
       form.reset()
     },
   })
@@ -48,11 +47,10 @@ export function SkuCategoryForm() {
   // 3. Initialize Form
   const form = useForm({
     defaultValues: {
-      category_name: skuCategoryData?.category_name ?? "",
-      category_description: skuCategoryData?.category_description ?? "",
+      name: employmentStatusData?.name ?? "",
     },
     validators: {
-      onSubmit: skuCategorySchema,
+      onSubmit: employmentStatusSchema,
     },
     onSubmit: async ({ value }) => {
       mutation.mutate(value)
@@ -63,7 +61,7 @@ export function SkuCategoryForm() {
   if (isEditMode && isLoading) {
     return (
       <div className="animate-pulse text-sm text-muted-foreground">
-        Loading category details...
+        Loading employment status details...
       </div>
     )
   }
@@ -77,7 +75,7 @@ export function SkuCategoryForm() {
         form.handleSubmit()
       }}
     >
-      <form.Field name="category_name">
+      <form.Field name="name">
         {(field) => {
           const isInvalid =
             field.state.meta.isTouched && !field.state.meta.isValid
@@ -85,7 +83,7 @@ export function SkuCategoryForm() {
           return (
             <Field data-invalid={isInvalid}>
               <FieldLabel htmlFor={field.name}>
-                Category Name
+                Status Name
                 <span className="font-bold text-red-500">*</span>
               </FieldLabel>
               <Input
@@ -95,32 +93,7 @@ export function SkuCategoryForm() {
                 onBlur={field.handleBlur}
                 onChange={(e) => field.handleChange(e.target.value)}
                 aria-invalid={isInvalid}
-                placeholder="e.g., Beverages"
-                autoComplete="off"
-                disabled={mutation.isPending}
-              />
-              {isInvalid && <FieldError errors={field.state.meta.errors} />}
-            </Field>
-          )
-        }}
-      </form.Field>
-
-      <form.Field name="category_description">
-        {(field) => {
-          const isInvalid =
-            field.state.meta.isTouched && !field.state.meta.isValid
-
-          return (
-            <Field data-invalid={isInvalid}>
-              <FieldLabel htmlFor={field.name}>Category Description</FieldLabel>
-              <Textarea
-                id={field.name}
-                name={field.name}
-                value={field.state.value}
-                onBlur={field.handleBlur}
-                onChange={(e) => field.handleChange(e.target.value)}
-                aria-invalid={isInvalid}
-                placeholder="Enter description details here..."
+                placeholder="e.g., Full-time, Probationary, Contractual"
                 autoComplete="off"
                 disabled={mutation.isPending}
               />
@@ -134,8 +107,8 @@ export function SkuCategoryForm() {
         {mutation.isPending
           ? "Saving..."
           : isEditMode
-            ? "Update SKU Category"
-            : "Create SKU Category"}
+            ? "Update Employment Status"
+            : "Create Employment Status"}
       </Button>
     </form>
   )

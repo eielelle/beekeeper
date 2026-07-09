@@ -10,12 +10,8 @@ import { Button } from "@/components/ui/button"
 import { Field, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 
-import {
-  createSkuUom,
-  getSkuUom,
-  updateSkuUom,
-} from "@/forms/queries/sku_uom.query"
-import { skuUomSchema } from "@/forms/schemas/sku_uom.schema"
+import { createSkuUom, getSkuUom, updateSkuUom } from "./queries/sku_uom.query"
+import { skuUomSchema } from "./schemas/sku_uom.schema"
 
 export function SkuUomForm() {
   const params = useParams()
@@ -38,12 +34,17 @@ export function SkuUomForm() {
       }
       return createSkuUom(values)
     },
+    onSuccess: () => {
+      // Clear form on successful submission
+      form.reset()
+    },
   })
 
   // 3. Initialize Form
   const form = useForm({
     defaultValues: {
-      uom: "",
+      uom_code: skuUomData?.uom_code ?? "",
+      uom_name: skuUomData?.uom_name ?? "",
     },
     validators: {
       onSubmit: skuUomSchema,
@@ -71,7 +72,7 @@ export function SkuUomForm() {
         form.handleSubmit()
       }}
     >
-      <form.Field name="uom">
+      <form.Field name="uom_code">
         {(field) => {
           const isInvalid =
             field.state.meta.isTouched && !field.state.meta.isValid
@@ -79,7 +80,7 @@ export function SkuUomForm() {
           return (
             <Field data-invalid={isInvalid}>
               <FieldLabel htmlFor={field.name}>
-                Unit of Measure (UOM)
+                UOM Code
                 <span className="font-bold text-red-500">*</span>
               </FieldLabel>
               <Input
@@ -89,7 +90,35 @@ export function SkuUomForm() {
                 onBlur={field.handleBlur}
                 onChange={(e) => field.handleChange(e.target.value)}
                 aria-invalid={isInvalid}
-                placeholder="e.g., kg, pcs, box"
+                placeholder="e.g., PCS, KG, BOX"
+                autoComplete="off"
+                disabled={mutation.isPending}
+              />
+              {isInvalid && <FieldError errors={field.state.meta.errors} />}
+            </Field>
+          )
+        }}
+      </form.Field>
+
+      <form.Field name="uom_name">
+        {(field) => {
+          const isInvalid =
+            field.state.meta.isTouched && !field.state.meta.isValid
+
+          return (
+            <Field data-invalid={isInvalid}>
+              <FieldLabel htmlFor={field.name}>
+                UOM Name
+                <span className="font-bold text-red-500">*</span>
+              </FieldLabel>
+              <Input
+                id={field.name}
+                name={field.name}
+                value={field.state.value}
+                onBlur={field.handleBlur}
+                onChange={(e) => field.handleChange(e.target.value)}
+                aria-invalid={isInvalid}
+                placeholder="e.g., Pieces, Kilograms, Box"
                 autoComplete="off"
                 disabled={mutation.isPending}
               />
@@ -103,8 +132,8 @@ export function SkuUomForm() {
         {mutation.isPending
           ? "Saving..."
           : isEditMode
-            ? "Update Unit of Measure"
-            : "Create Unit of Measure"}
+            ? "Update UOM"
+            : "Create UOM"}
       </Button>
     </form>
   )

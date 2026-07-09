@@ -1,35 +1,35 @@
 import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
 
-export type SkuCategoryStoreType = {
+export type JobLevelStoreType = {
   id?: string
-  category_name: string
-  category_description?: string
+  level_name: string
+  rank: number
   org_id?: number
   created_at?: string
 }
 
-export type FetchSkuCategoriesParams = {
+export type FetchJobLevelsParams = {
   pageIndex: number
   pageSize: number
   globalFilter?: string
   sorting?: { id: string; desc: boolean }[]
 }
 
-export async function fetchSkuCategories({
+export async function fetchJobLevels({
   pageIndex,
   pageSize,
   globalFilter,
   sorting,
-}: FetchSkuCategoriesParams) {
-  const t = toast.loading("Fetching SKU Categories. Please wait.")
+}: FetchJobLevelsParams) {
+  const t = toast.loading("Fetching Job Levels. Please wait.")
 
   // 1. Base query setup with exact count for pagination controls
-  let query = supabase.from("sku_categories").select("*", { count: "exact" })
+  let query = supabase.from("job_levels").select("*", { count: "exact" })
 
-  // 2. Server-Side Global Filtering (ILIKE search on category_name)
+  // 2. Server-Side Global Filtering (ILIKE search on level_name)
   if (globalFilter) {
-    query = query.ilike("category_name", `%${globalFilter}%`)
+    query = query.ilike("level_name", `%${globalFilter}%`)
   }
 
   // 3. Server-Side Sorting
@@ -62,11 +62,11 @@ export async function fetchSkuCategories({
   }
 }
 
-export async function getSkuCategory(id: string) {
-  const t = toast.loading("Fetching SKU Category. Please wait.")
+export async function getJobLevel(id: string) {
+  const t = toast.loading("Fetching Job Level. Please wait.")
 
   const { data, error } = await supabase
-    .from("sku_categories")
+    .from("job_levels")
     .select("*")
     .eq("id", id)
     .single()
@@ -81,10 +81,10 @@ export async function getSkuCategory(id: string) {
   return data
 }
 
-export async function createSkuCategory(value: SkuCategoryStoreType) {
-  const t = toast.loading("Creating SKU Category. Please wait.")
+export async function createJobLevel(value: JobLevelStoreType) {
+  const t = toast.loading("Creating Job Level. Please wait.")
 
-  const { data, error } = await supabase.from("sku_categories").insert([value])
+  const { data, error } = await supabase.from("job_levels").insert([value])
 
   toast.dismiss(t)
 
@@ -93,18 +93,18 @@ export async function createSkuCategory(value: SkuCategoryStoreType) {
     throw error
   }
 
-  toast.success("SKU Category successfully created.")
+  toast.success("Job Level successfully created.")
 
   return data
 }
 
-export async function updateSkuCategory(value: SkuCategoryStoreType) {
-  const t = toast.loading("Updating SKU Category. Please wait.")
+export async function updateJobLevel(value: JobLevelStoreType) {
+  const t = toast.loading("Updating Job Level. Please wait.")
 
   const { id, ...updates } = value
 
   const { data, error } = await supabase
-    .from("sku_categories")
+    .from("job_levels")
     .update(updates)
     .eq("id", id)
     .select()
@@ -116,16 +116,16 @@ export async function updateSkuCategory(value: SkuCategoryStoreType) {
     throw error
   }
 
-  toast.success("SKU Category successfully updated.")
+  toast.success("Job Level successfully updated.")
 
   return data
 }
 
-export async function deleteSkuCategory(id: string) {
-  const t = toast.loading("Deleting SKU Category. Please wait.")
+export async function deleteJobLevel(id: string) {
+  const t = toast.loading("Deleting Job Level. Please wait.")
 
   const { data, error } = await supabase
-    .from("sku_categories")
+    .from("job_levels")
     .delete()
     .eq("id", id)
 
@@ -136,6 +136,6 @@ export async function deleteSkuCategory(id: string) {
     throw error
   }
 
-  toast.success("SKU Category successfully deleted.")
+  toast.success("Job Level successfully deleted.")
   return data
 }

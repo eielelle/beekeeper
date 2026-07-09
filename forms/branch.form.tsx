@@ -9,38 +9,33 @@ import { useMutation, useQuery } from "@tanstack/react-query"
 import { Button } from "@/components/ui/button"
 import { Field, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
 
-import {
-  createSkuCategory,
-  getSkuCategory,
-  updateSkuCategory,
-} from "./queries/sku_category.query"
-import { skuCategorySchema } from "./schemas/sku_category.schema"
+import { createBranch, getBranch, updateBranch } from "./queries/branch.query"
+import { branchSchema } from "./schemas/branch.schema"
 
-export function SkuCategoryForm() {
+export function BranchForm() {
   const params = useParams()
 
   const id = params?.id as string | undefined
   const isEditMode = !!id
 
   // 1. Fetch data if in edit mode
-  const { data: skuCategoryData, isLoading } = useQuery({
-    queryKey: ["sku_categories", id],
-    queryFn: () => getSkuCategory(id!),
+  const { data: branchData, isLoading } = useQuery({
+    queryKey: ["branches", id],
+    queryFn: () => getBranch(id!),
     enabled: isEditMode,
   })
 
   // 2. Handle mutations conditionally
   const mutation = useMutation({
-    mutationFn: (values: z.infer<typeof skuCategorySchema>) => {
+    mutationFn: (values: z.infer<typeof branchSchema>) => {
       if (isEditMode) {
-        return updateSkuCategory({ ...values, id })
+        return updateBranch({ ...values, id })
       }
-      return createSkuCategory(values)
+      return createBranch(values)
     },
     onSuccess: () => {
-      // Clear/reset form fields on successful creation/update
+      // Clear form on successful submission
       form.reset()
     },
   })
@@ -48,11 +43,11 @@ export function SkuCategoryForm() {
   // 3. Initialize Form
   const form = useForm({
     defaultValues: {
-      category_name: skuCategoryData?.category_name ?? "",
-      category_description: skuCategoryData?.category_description ?? "",
+      name: branchData?.name ?? "",
+      code: branchData?.code ?? "",
     },
     validators: {
-      onSubmit: skuCategorySchema,
+      onSubmit: branchSchema,
     },
     onSubmit: async ({ value }) => {
       mutation.mutate(value)
@@ -63,7 +58,7 @@ export function SkuCategoryForm() {
   if (isEditMode && isLoading) {
     return (
       <div className="animate-pulse text-sm text-muted-foreground">
-        Loading category details...
+        Loading branch details...
       </div>
     )
   }
@@ -77,7 +72,7 @@ export function SkuCategoryForm() {
         form.handleSubmit()
       }}
     >
-      <form.Field name="category_name">
+      <form.Field name="name">
         {(field) => {
           const isInvalid =
             field.state.meta.isTouched && !field.state.meta.isValid
@@ -85,7 +80,7 @@ export function SkuCategoryForm() {
           return (
             <Field data-invalid={isInvalid}>
               <FieldLabel htmlFor={field.name}>
-                Category Name
+                Branch Name
                 <span className="font-bold text-red-500">*</span>
               </FieldLabel>
               <Input
@@ -95,7 +90,7 @@ export function SkuCategoryForm() {
                 onBlur={field.handleBlur}
                 onChange={(e) => field.handleChange(e.target.value)}
                 aria-invalid={isInvalid}
-                placeholder="e.g., Beverages"
+                placeholder="e.g., Downtown Main Office"
                 autoComplete="off"
                 disabled={mutation.isPending}
               />
@@ -105,22 +100,25 @@ export function SkuCategoryForm() {
         }}
       </form.Field>
 
-      <form.Field name="category_description">
+      <form.Field name="code">
         {(field) => {
           const isInvalid =
             field.state.meta.isTouched && !field.state.meta.isValid
 
           return (
             <Field data-invalid={isInvalid}>
-              <FieldLabel htmlFor={field.name}>Category Description</FieldLabel>
-              <Textarea
+              <FieldLabel htmlFor={field.name}>
+                Branch Code
+                <span className="font-bold text-red-500">*</span>
+              </FieldLabel>
+              <Input
                 id={field.name}
                 name={field.name}
                 value={field.state.value}
                 onBlur={field.handleBlur}
                 onChange={(e) => field.handleChange(e.target.value)}
                 aria-invalid={isInvalid}
-                placeholder="Enter description details here..."
+                placeholder="e.g., BR-001"
                 autoComplete="off"
                 disabled={mutation.isPending}
               />
@@ -134,8 +132,8 @@ export function SkuCategoryForm() {
         {mutation.isPending
           ? "Saving..."
           : isEditMode
-            ? "Update SKU Category"
-            : "Create SKU Category"}
+            ? "Update Branch"
+            : "Create Branch"}
       </Button>
     </form>
   )
