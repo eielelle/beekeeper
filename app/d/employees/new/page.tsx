@@ -1,3 +1,5 @@
+import { EmployeeForm } from "@/forms/employee.form"
+
 export default function Page() {
-  return <p></p>
+  return <EmployeeForm />
 }
