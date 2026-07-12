@@ -17,10 +17,19 @@ import {
 } from "./queries/sku_brand.query"
 import { skuBrandSchema } from "./schemas/sku_brand.schema"
 
-export function SkuBrandForm() {
+export function SkuBrandForm({
+  editId,
+  onClose,
+}: {
+  editId?: string
+  onClose?: () => void
+}) {
   const params = useParams()
 
-  const id = params?.id as string | undefined
+  let id = params?.id as string | undefined
+  if (editId) {
+    id = editId
+  }
   const isEditMode = !!id
 
   // 1. Fetch data if in edit mode
@@ -39,8 +48,11 @@ export function SkuBrandForm() {
       return createSkuBrand(values)
     },
     onSuccess: () => {
-      // Clear form on successful submission
       form.reset()
+
+      if (onClose) {
+        onClose()
+      }
     },
   })
 
@@ -57,11 +69,10 @@ export function SkuBrandForm() {
     },
   })
 
-  // Handle loading state while fetching existing data
   if (isEditMode && isLoading) {
     return (
       <div className="animate-pulse text-sm text-muted-foreground">
-        Loading brand details...
+        Loading SKU brand details...
       </div>
     )
   }
@@ -93,7 +104,7 @@ export function SkuBrandForm() {
                 onBlur={field.handleBlur}
                 onChange={(e) => field.handleChange(e.target.value)}
                 aria-invalid={isInvalid}
-                placeholder="e.g., Nike"
+                placeholder="e.g., Nike, Samsung, Logitech"
                 autoComplete="off"
                 disabled={mutation.isPending}
               />

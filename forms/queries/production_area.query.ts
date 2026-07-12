@@ -1,33 +1,36 @@
 import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
 
-export type SkuCategoryStoreType = {
+export type ProductionAreaStoreType = {
   id?: string
-  category_name: string
-  category_description?: string
+  area_code: string
+  area_name: string
+  area_description?: string
   org_id?: number
   created_at?: string
 }
 
-export type FetchSkuCategoriesParams = {
+export type FetchProductionAreasParams = {
   pageIndex: number
   pageSize: number
   globalFilter?: string
   sorting?: { id: string; desc: boolean }[]
 }
 
-export async function fetchSkuCategories({
+export async function fetchProductionAreas({
   pageIndex,
   pageSize,
   globalFilter,
   sorting,
-}: FetchSkuCategoriesParams) {
-  const t = toast.loading("Fetching SKU Categories. Please wait.")
+}: FetchProductionAreasParams) {
+  const t = toast.loading("Fetching Production Areas. Please wait.")
 
-  let query = supabase.from("sku_categories").select("*", { count: "exact" })
+  let query = supabase.from("production_areas").select("*", { count: "exact" })
 
   if (globalFilter) {
-    query = query.ilike("category_name", `%${globalFilter}%`)
+    query = query.or(
+      `area_code.ilike.%${globalFilter}%,area_name.ilike.%${globalFilter}%`
+    )
   }
 
   if (sorting && sorting.length > 0) {
@@ -56,11 +59,11 @@ export async function fetchSkuCategories({
   }
 }
 
-export async function getSkuCategory(id: string) {
-  const t = toast.loading("Fetching SKU Category. Please wait.")
+export async function getProductionArea(id: string) {
+  const t = toast.loading("Fetching Production Area. Please wait.")
 
   const { data, error } = await supabase
-    .from("sku_categories")
+    .from("production_areas")
     .select("*")
     .eq("id", id)
     .single()
@@ -75,10 +78,12 @@ export async function getSkuCategory(id: string) {
   return data
 }
 
-export async function createSkuCategory(value: SkuCategoryStoreType) {
-  const t = toast.loading("Creating SKU Category. Please wait.")
+export async function createProductionArea(value: ProductionAreaStoreType) {
+  const t = toast.loading("Creating Production Area. Please wait.")
 
-  const { data, error } = await supabase.from("sku_categories").insert([value])
+  const { data, error } = await supabase
+    .from("production_areas")
+    .insert([value])
 
   toast.dismiss(t)
 
@@ -87,18 +92,18 @@ export async function createSkuCategory(value: SkuCategoryStoreType) {
     throw error
   }
 
-  toast.success("SKU Category successfully created.")
+  toast.success("Production Area successfully created.")
 
   return data
 }
 
-export async function updateSkuCategory(value: SkuCategoryStoreType) {
-  const t = toast.loading("Updating SKU Category. Please wait.")
+export async function updateProductionArea(value: ProductionAreaStoreType) {
+  const t = toast.loading("Updating Production Area. Please wait.")
 
   const { id, ...updates } = value
 
   const { data, error } = await supabase
-    .from("sku_categories")
+    .from("production_areas")
     .update(updates)
     .eq("id", id)
     .select()
@@ -110,16 +115,16 @@ export async function updateSkuCategory(value: SkuCategoryStoreType) {
     throw error
   }
 
-  toast.success("SKU Category successfully updated.")
+  toast.success("Production Area successfully updated.")
 
   return data
 }
 
-export async function deleteSkuCategory(id: string) {
-  const t = toast.loading("Deleting SKU Category. Please wait.")
+export async function deleteProductionArea(id: string) {
+  const t = toast.loading("Deleting Production Area. Please wait.")
 
   const { data, error } = await supabase
-    .from("sku_categories")
+    .from("production_areas")
     .delete()
     .eq("id", id)
 
@@ -130,6 +135,6 @@ export async function deleteSkuCategory(id: string) {
     throw error
   }
 
-  toast.success("SKU Category successfully deleted.")
+  toast.success("Production Area successfully deleted.")
   return data
 }

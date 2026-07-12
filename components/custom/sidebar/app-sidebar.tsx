@@ -38,6 +38,7 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar"
 import { NavSales } from "./nav.sales"
+import { NavInternal } from "./nav-internal"
 
 // This is sample data.
 const data = {
@@ -295,6 +296,37 @@ const data = {
       ],
     },
   ],
+  navInternal: [
+    {
+      title: "Production",
+      url: "#",
+      icon: Factory,
+      isActive: false,
+      items: [
+        {
+          title: "Overview",
+          url: "#",
+        },
+
+        {
+          title: "Reports",
+          url: "#",
+        },
+        {
+          title: "New Report",
+          url: "#",
+        },
+        {
+          title: "Production Summary",
+          url: "#",
+        },
+        {
+          title: "New Production",
+          url: "#",
+        },
+      ],
+    },
+  ],
   projects: [
     {
       name: "Feed",
@@ -311,6 +343,11 @@ const data = {
       url: "/d/administration/employees",
       icon: Users,
     },
+    {
+      name: "Settings",
+      url: "/d/settings",
+      icon: Settings,
+    },
   ],
 }
 
@@ -318,12 +355,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
-        <TeamSwitcher teams={data.teams} />
+        <TeamSwitcher />
       </SidebarHeader>
       <SidebarContent>
         <NavSecondary projects={data.projects} />
         <NavMain items={data.navMain} />
         <NavSales items={data.navSales} />
+        <NavInternal items={data.navInternal} />
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={data.user} />

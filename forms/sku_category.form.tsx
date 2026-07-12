@@ -18,10 +18,19 @@ import {
 } from "./queries/sku_category.query"
 import { skuCategorySchema } from "./schemas/sku_category.schema"
 
-export function SkuCategoryForm() {
+export function SkuCategoryForm({
+  editId,
+  onClose,
+}: {
+  editId?: string
+  onClose?: () => void
+}) {
   const params = useParams()
 
-  const id = params?.id as string | undefined
+  let id = params?.id as string | undefined
+  if (editId) {
+    id = editId
+  }
   const isEditMode = !!id
 
   // 1. Fetch data if in edit mode
@@ -40,8 +49,11 @@ export function SkuCategoryForm() {
       return createSkuCategory(values)
     },
     onSuccess: () => {
-      // Clear/reset form fields on successful creation/update
       form.reset()
+
+      if (onClose) {
+        onClose()
+      }
     },
   })
 
@@ -59,11 +71,10 @@ export function SkuCategoryForm() {
     },
   })
 
-  // Handle loading state while fetching existing data
   if (isEditMode && isLoading) {
     return (
       <div className="animate-pulse text-sm text-muted-foreground">
-        Loading category details...
+        Loading SKU category details...
       </div>
     )
   }
@@ -95,7 +106,7 @@ export function SkuCategoryForm() {
                 onBlur={field.handleBlur}
                 onChange={(e) => field.handleChange(e.target.value)}
                 aria-invalid={isInvalid}
-                placeholder="e.g., Beverages"
+                placeholder="e.g., Electronics, Beverages"
                 autoComplete="off"
                 disabled={mutation.isPending}
               />
@@ -112,7 +123,7 @@ export function SkuCategoryForm() {
 
           return (
             <Field data-invalid={isInvalid}>
-              <FieldLabel htmlFor={field.name}>Category Description</FieldLabel>
+              <FieldLabel htmlFor={field.name}>Description</FieldLabel>
               <Textarea
                 id={field.name}
                 name={field.name}
@@ -120,7 +131,7 @@ export function SkuCategoryForm() {
                 onBlur={field.handleBlur}
                 onChange={(e) => field.handleChange(e.target.value)}
                 aria-invalid={isInvalid}
-                placeholder="Enter description details here..."
+                placeholder="Enter category description details..."
                 autoComplete="off"
                 disabled={mutation.isPending}
               />

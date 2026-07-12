@@ -1,33 +1,45 @@
 import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
 
-export type SkuCategoryStoreType = {
+export type OrganizationStoreType = {
   id?: string
-  category_name: string
-  category_description?: string
-  org_id?: number
+  organization_name: string
+  organization_code: string
   created_at?: string
 }
 
-export type FetchSkuCategoriesParams = {
+export type FetchOrganizationsParams = {
   pageIndex: number
   pageSize: number
   globalFilter?: string
   sorting?: { id: string; desc: boolean }[]
 }
 
-export async function fetchSkuCategories({
+export async function fetchAllOrganizations() {
+  const { data, error } = await supabase.from("organizations").select("*")
+
+  if (error) {
+    toast.error(`ERR: ${error.message}`)
+    throw error
+  }
+
+  return data
+}
+
+export async function fetchOrganizations({
   pageIndex,
   pageSize,
   globalFilter,
   sorting,
-}: FetchSkuCategoriesParams) {
-  const t = toast.loading("Fetching SKU Categories. Please wait.")
+}: FetchOrganizationsParams) {
+  const t = toast.loading("Fetching Organizations. Please wait.")
 
-  let query = supabase.from("sku_categories").select("*", { count: "exact" })
+  let query = supabase.from("organizations").select("*", { count: "exact" })
 
   if (globalFilter) {
-    query = query.ilike("category_name", `%${globalFilter}%`)
+    query = query.or(
+      `organization_name.ilike.%${globalFilter}%,organization_code.ilike.%${globalFilter}%`
+    )
   }
 
   if (sorting && sorting.length > 0) {
@@ -56,11 +68,11 @@ export async function fetchSkuCategories({
   }
 }
 
-export async function getSkuCategory(id: string) {
-  const t = toast.loading("Fetching SKU Category. Please wait.")
+export async function getOrganization(id: string) {
+  const t = toast.loading("Fetching Organization. Please wait.")
 
   const { data, error } = await supabase
-    .from("sku_categories")
+    .from("organizations")
     .select("*")
     .eq("id", id)
     .single()
@@ -75,10 +87,10 @@ export async function getSkuCategory(id: string) {
   return data
 }
 
-export async function createSkuCategory(value: SkuCategoryStoreType) {
-  const t = toast.loading("Creating SKU Category. Please wait.")
+export async function createOrganization(value: OrganizationStoreType) {
+  const t = toast.loading("Creating Organization. Please wait.")
 
-  const { data, error } = await supabase.from("sku_categories").insert([value])
+  const { data, error } = await supabase.from("organizations").insert([value])
 
   toast.dismiss(t)
 
@@ -87,18 +99,18 @@ export async function createSkuCategory(value: SkuCategoryStoreType) {
     throw error
   }
 
-  toast.success("SKU Category successfully created.")
+  toast.success("Organization successfully created.")
 
   return data
 }
 
-export async function updateSkuCategory(value: SkuCategoryStoreType) {
-  const t = toast.loading("Updating SKU Category. Please wait.")
+export async function updateOrganization(value: OrganizationStoreType) {
+  const t = toast.loading("Updating Organization. Please wait.")
 
   const { id, ...updates } = value
 
   const { data, error } = await supabase
-    .from("sku_categories")
+    .from("organizations")
     .update(updates)
     .eq("id", id)
     .select()
@@ -110,16 +122,16 @@ export async function updateSkuCategory(value: SkuCategoryStoreType) {
     throw error
   }
 
-  toast.success("SKU Category successfully updated.")
+  toast.success("Organization successfully updated.")
 
   return data
 }
 
-export async function deleteSkuCategory(id: string) {
-  const t = toast.loading("Deleting SKU Category. Please wait.")
+export async function deleteOrganization(id: string) {
+  const t = toast.loading("Deleting Organization. Please wait.")
 
   const { data, error } = await supabase
-    .from("sku_categories")
+    .from("organizations")
     .delete()
     .eq("id", id)
 
@@ -130,6 +142,6 @@ export async function deleteSkuCategory(id: string) {
     throw error
   }
 
-  toast.success("SKU Category successfully deleted.")
+  toast.success("Organization successfully deleted.")
   return data
 }

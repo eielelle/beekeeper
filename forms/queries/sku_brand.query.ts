@@ -23,24 +23,19 @@ export async function fetchSkuBrands({
 }: FetchSkuBrandsParams) {
   const t = toast.loading("Fetching SKU Brands. Please wait.")
 
-  // 1. Base query setup with exact count for pagination controls
   let query = supabase.from("sku_brands").select("*", { count: "exact" })
 
-  // 2. Server-Side Global Filtering (ILIKE search on brand_name)
   if (globalFilter) {
     query = query.ilike("brand_name", `%${globalFilter}%`)
   }
 
-  // 3. Server-Side Sorting
   if (sorting && sorting.length > 0) {
-    const sort = sorting[0] // Handling single column sorting
+    const sort = sorting[0]
     query = query.order(sort.id, { ascending: !sort.desc })
   } else {
-    // Default fallback sort
     query = query.order("created_at", { ascending: false })
   }
 
-  // 4. Server-Side Pagination Range Calc
   const from = pageIndex * pageSize
   const to = from + pageSize - 1
   query = query.range(from, to)
@@ -54,7 +49,6 @@ export async function fetchSkuBrands({
     throw error
   }
 
-  // Return both data and the total exact count needed by the frontend pagination controls
   return {
     data: data || [],
     rowCount: count || 0,

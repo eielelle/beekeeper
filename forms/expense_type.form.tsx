@@ -9,11 +9,16 @@ import { useMutation, useQuery } from "@tanstack/react-query"
 import { Button } from "@/components/ui/button"
 import { Field, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 
-import { createSkuUom, getSkuUom, updateSkuUom } from "./queries/sku_uom.query"
-import { skuUomSchema } from "./schemas/sku_uom.schema"
+import {
+  createExpenseType,
+  getExpenseType,
+  updateExpenseType,
+} from "./queries/expense_type.query"
+import { expenseTypeSchema } from "./schemas/expense_type.schema"
 
-export function SkuUomForm({
+export function ExpenseTypeForm({
   editId,
   onClose,
 }: {
@@ -29,21 +34,22 @@ export function SkuUomForm({
   const isEditMode = !!id
 
   // 1. Fetch data if in edit mode
-  const { data: skuUomData, isLoading } = useQuery({
-    queryKey: ["sku_uoms", id],
-    queryFn: () => getSkuUom(id!),
+  const { data: expenseTypeData, isLoading } = useQuery({
+    queryKey: ["expense_types", id],
+    queryFn: () => getExpenseType(id!),
     enabled: isEditMode,
   })
 
   // 2. Handle mutations conditionally
   const mutation = useMutation({
-    mutationFn: (values: z.infer<typeof skuUomSchema>) => {
+    mutationFn: (values: z.infer<typeof expenseTypeSchema>) => {
       if (isEditMode) {
-        return updateSkuUom({ ...values, id })
+        return updateExpenseType({ ...values, id })
       }
-      return createSkuUom(values)
+      return createExpenseType(values)
     },
     onSuccess: () => {
+      // Clear/reset form fields on successful creation/update
       form.reset()
 
       if (onClose) {
@@ -55,21 +61,22 @@ export function SkuUomForm({
   // 3. Initialize Form
   const form = useForm({
     defaultValues: {
-      uom_code: skuUomData?.uom_code ?? "",
-      uom_name: skuUomData?.uom_name ?? "",
+      type_name: expenseTypeData?.type_name ?? "",
+      type_description: expenseTypeData?.type_description ?? "",
     },
     validators: {
-      onSubmit: skuUomSchema,
+      onSubmit: expenseTypeSchema,
     },
     onSubmit: async ({ value }) => {
       mutation.mutate(value)
     },
   })
 
+  // Handle loading state while fetching existing data
   if (isEditMode && isLoading) {
     return (
       <div className="animate-pulse text-sm text-muted-foreground">
-        Loading UOM details...
+        Loading expense type details...
       </div>
     )
   }
@@ -83,7 +90,7 @@ export function SkuUomForm({
         form.handleSubmit()
       }}
     >
-      <form.Field name="uom_code">
+      <form.Field name="type_name">
         {(field) => {
           const isInvalid =
             field.state.meta.isTouched && !field.state.meta.isValid
@@ -91,37 +98,7 @@ export function SkuUomForm({
           return (
             <Field data-invalid={isInvalid}>
               <FieldLabel htmlFor={field.name}>
-                UOM Code
-                <span className="font-bold text-red-500">*</span>
-              </FieldLabel>
-              <Input
-                id={field.name}
-                name={field.name}
-                value={field.state.value}
-                onBlur={field.handleBlur}
-                onChange={(e) =>
-                  field.handleChange(e.target.value.toUpperCase())
-                }
-                aria-invalid={isInvalid}
-                placeholder="e.g., PCS, KG, BOX"
-                autoComplete="off"
-                disabled={mutation.isPending}
-              />
-              {isInvalid && <FieldError errors={field.state.meta.errors} />}
-            </Field>
-          )
-        }}
-      </form.Field>
-
-      <form.Field name="uom_name">
-        {(field) => {
-          const isInvalid =
-            field.state.meta.isTouched && !field.state.meta.isValid
-
-          return (
-            <Field data-invalid={isInvalid}>
-              <FieldLabel htmlFor={field.name}>
-                UOM Name
+                Expense Type Name
                 <span className="font-bold text-red-500">*</span>
               </FieldLabel>
               <Input
@@ -131,7 +108,32 @@ export function SkuUomForm({
                 onBlur={field.handleBlur}
                 onChange={(e) => field.handleChange(e.target.value)}
                 aria-invalid={isInvalid}
-                placeholder="e.g., Pieces, Kilograms, Box"
+                placeholder="e.g., Office Supplies"
+                autoComplete="off"
+                disabled={mutation.isPending}
+              />
+              {isInvalid && <FieldError errors={field.state.meta.errors} />}
+            </Field>
+          )
+        }}
+      </form.Field>
+
+      <form.Field name="type_description">
+        {(field) => {
+          const isInvalid =
+            field.state.meta.isTouched && !field.state.meta.isValid
+
+          return (
+            <Field data-invalid={isInvalid}>
+              <FieldLabel htmlFor={field.name}>Description</FieldLabel>
+              <Textarea
+                id={field.name}
+                name={field.name}
+                value={field.state.value}
+                onBlur={field.handleBlur}
+                onChange={(e) => field.handleChange(e.target.value)}
+                aria-invalid={isInvalid}
+                placeholder="Enter description details here..."
                 autoComplete="off"
                 disabled={mutation.isPending}
               />
@@ -145,8 +147,8 @@ export function SkuUomForm({
         {mutation.isPending
           ? "Saving..."
           : isEditMode
-            ? "Update UOM"
-            : "Create UOM"}
+            ? "Update Expense Type"
+            : "Create Expense Type"}
       </Button>
     </form>
   )

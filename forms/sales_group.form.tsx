@@ -10,10 +10,14 @@ import { Button } from "@/components/ui/button"
 import { Field, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 
-import { createSkuUom, getSkuUom, updateSkuUom } from "./queries/sku_uom.query"
-import { skuUomSchema } from "./schemas/sku_uom.schema"
+import {
+  createSalesGroup,
+  getSalesGroup,
+  updateSalesGroup,
+} from "./queries/sales_group.query"
+import { salesGroupSchema } from "./schemas/sales_group.schema"
 
-export function SkuUomForm({
+export function SalesGroupForm({
   editId,
   onClose,
 }: {
@@ -29,19 +33,19 @@ export function SkuUomForm({
   const isEditMode = !!id
 
   // 1. Fetch data if in edit mode
-  const { data: skuUomData, isLoading } = useQuery({
-    queryKey: ["sku_uoms", id],
-    queryFn: () => getSkuUom(id!),
+  const { data: salesGroupData, isLoading } = useQuery({
+    queryKey: ["sales_groups", id],
+    queryFn: () => getSalesGroup(id!),
     enabled: isEditMode,
   })
 
   // 2. Handle mutations conditionally
   const mutation = useMutation({
-    mutationFn: (values: z.infer<typeof skuUomSchema>) => {
+    mutationFn: (values: z.infer<typeof salesGroupSchema>) => {
       if (isEditMode) {
-        return updateSkuUom({ ...values, id })
+        return updateSalesGroup({ ...values, id })
       }
-      return createSkuUom(values)
+      return createSalesGroup(values)
     },
     onSuccess: () => {
       form.reset()
@@ -55,11 +59,10 @@ export function SkuUomForm({
   // 3. Initialize Form
   const form = useForm({
     defaultValues: {
-      uom_code: skuUomData?.uom_code ?? "",
-      uom_name: skuUomData?.uom_name ?? "",
+      name: salesGroupData?.name ?? "",
     },
     validators: {
-      onSubmit: skuUomSchema,
+      onSubmit: salesGroupSchema,
     },
     onSubmit: async ({ value }) => {
       mutation.mutate(value)
@@ -69,7 +72,7 @@ export function SkuUomForm({
   if (isEditMode && isLoading) {
     return (
       <div className="animate-pulse text-sm text-muted-foreground">
-        Loading UOM details...
+        Loading Sales Group details...
       </div>
     )
   }
@@ -83,7 +86,7 @@ export function SkuUomForm({
         form.handleSubmit()
       }}
     >
-      <form.Field name="uom_code">
+      <form.Field name="name">
         {(field) => {
           const isInvalid =
             field.state.meta.isTouched && !field.state.meta.isValid
@@ -91,37 +94,7 @@ export function SkuUomForm({
           return (
             <Field data-invalid={isInvalid}>
               <FieldLabel htmlFor={field.name}>
-                UOM Code
-                <span className="font-bold text-red-500">*</span>
-              </FieldLabel>
-              <Input
-                id={field.name}
-                name={field.name}
-                value={field.state.value}
-                onBlur={field.handleBlur}
-                onChange={(e) =>
-                  field.handleChange(e.target.value.toUpperCase())
-                }
-                aria-invalid={isInvalid}
-                placeholder="e.g., PCS, KG, BOX"
-                autoComplete="off"
-                disabled={mutation.isPending}
-              />
-              {isInvalid && <FieldError errors={field.state.meta.errors} />}
-            </Field>
-          )
-        }}
-      </form.Field>
-
-      <form.Field name="uom_name">
-        {(field) => {
-          const isInvalid =
-            field.state.meta.isTouched && !field.state.meta.isValid
-
-          return (
-            <Field data-invalid={isInvalid}>
-              <FieldLabel htmlFor={field.name}>
-                UOM Name
+                Sales Group Name
                 <span className="font-bold text-red-500">*</span>
               </FieldLabel>
               <Input
@@ -131,7 +104,7 @@ export function SkuUomForm({
                 onBlur={field.handleBlur}
                 onChange={(e) => field.handleChange(e.target.value)}
                 aria-invalid={isInvalid}
-                placeholder="e.g., Pieces, Kilograms, Box"
+                placeholder="e.g., Enterprise Sales, Regional Team A"
                 autoComplete="off"
                 disabled={mutation.isPending}
               />
@@ -145,8 +118,8 @@ export function SkuUomForm({
         {mutation.isPending
           ? "Saving..."
           : isEditMode
-            ? "Update UOM"
-            : "Create UOM"}
+            ? "Update Sales Group"
+            : "Create Sales Group"}
       </Button>
     </form>
   )
