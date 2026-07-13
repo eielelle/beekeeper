@@ -51,6 +51,16 @@ export const settingsNavigation: SettingSection[] = [
     ],
   },
   {
+    id: "item-master-data",
+    title: "Item Master Data",
+    links: [
+      {
+        label: "Manage SKUs",
+        href: "/d/settings/item-master-data/manage-skus",
+      },
+    ],
+  },
+  {
     id: "organizations",
     title: "Company",
     links: [

@@ -137,3 +137,27 @@ export async function deleteProductionLine(id: string) {
   toast.success("Production Line successfully deleted.")
   return data
 }
+
+/**
+ * Lightweight search function without loading toasts, designed for Select/Combobox inputs.
+ */
+export async function searchProductionLines(searchQuery: string = "") {
+  let query = supabase
+    .from("production_lines")
+    .select("id, line_name")
+    .order("line_name", { ascending: true })
+    .limit(20)
+
+  if (searchQuery.trim()) {
+    query = query.ilike("line_name", `%${searchQuery}%`)
+  }
+
+  const { data, error } = await query
+
+  if (error) {
+    console.error("Error searching production lines:", error)
+    return []
+  }
+
+  return data || []
+}

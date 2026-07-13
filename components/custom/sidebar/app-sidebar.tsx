@@ -254,11 +254,11 @@ const data = {
       isActive: false,
       items: [
         {
-          title: "My Expenses",
+          title: "Expenses",
           url: "#",
         },
         {
-          title: "Expenses",
+          title: "Reports",
           url: "#",
         },
       ],
@@ -313,15 +313,11 @@ const data = {
           url: "#",
         },
         {
-          title: "New Report",
-          url: "#",
-        },
-        {
           title: "Production Summary",
           url: "#",
         },
         {
-          title: "New Production",
+          title: "New Production Entry",
           url: "#",
         },
       ],

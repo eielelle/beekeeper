@@ -138,3 +138,29 @@ export async function deleteProductionArea(id: string) {
   toast.success("Production Area successfully deleted.")
   return data
 }
+
+/**
+ * Lightweight search function without loading toasts, designed for Combobox inputs.
+ */
+export async function searchProductionAreas(searchQuery: string = "") {
+  let query = supabase
+    .from("production_areas")
+    .select("id, area_code, area_name")
+    .order("area_name", { ascending: true })
+    .limit(20)
+
+  if (searchQuery.trim()) {
+    query = query.or(
+      `area_code.ilike.%${searchQuery}%,area_name.ilike.%${searchQuery}%`
+    )
+  }
+
+  const { data, error } = await query
+
+  if (error) {
+    console.error("Error searching production areas:", error)
+    return []
+  }
+
+  return data || []
+}
