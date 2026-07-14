@@ -3,8 +3,7 @@
 import * as React from "react"
 import { useForm } from "@tanstack/react-form"
 import * as z from "zod"
-import { useParams } from "next/navigation"
-import { useMutation, useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { Button } from "@/components/ui/button"
 import { Field, FieldError, FieldLabel } from "@/components/ui/field"
@@ -17,34 +16,75 @@ import {
 } from "./queries/employment_status.query"
 import { employmentStatusSchema } from "./schemas/employment_status.schema"
 
-export function EmploymentStatusForm() {
-  const params = useParams()
+interface EmploymentStatusFormProps {
+  editId?: string
+  onClose: () => void
+}
 
-  const id = params?.id as string | undefined
-  const isEditMode = !!id
+export function EmploymentStatusForm({
+  editId,
+  onClose,
+}: EmploymentStatusFormProps) {
+  const isEditMode = Boolean(editId)
 
   // 1. Fetch data if in edit mode
   const { data: employmentStatusData, isLoading } = useQuery({
-    queryKey: ["employment_statuses", id],
-    queryFn: () => getEmploymentStatus(id!),
+    queryKey: ["employment_statuses", editId],
+    queryFn: () => getEmploymentStatus(editId!),
     enabled: isEditMode,
   })
 
-  // 2. Handle mutations conditionally
+  if (isEditMode && (isLoading || !employmentStatusData)) {
+    return (
+      <div className="flex items-center justify-center p-8 text-sm text-muted-foreground">
+        Loading employment status details...
+      </div>
+    )
+  }
+
+  // Key remount forces fresh initialization with defaultValues on open
+  return (
+    <EmploymentStatusFormContent
+      key={editId ?? "create"}
+      editId={editId}
+      employmentStatusData={employmentStatusData}
+      onClose={onClose}
+    />
+  )
+}
+
+interface EmploymentStatusFormContentProps extends EmploymentStatusFormProps {
+  employmentStatusData?: { name: string }
+}
+
+function EmploymentStatusFormContent({
+  editId,
+  employmentStatusData,
+  onClose,
+}: EmploymentStatusFormContentProps) {
+  const queryClient = useQueryClient()
+  const isEditMode = Boolean(editId)
+
+  // Handle mutations
   const mutation = useMutation({
     mutationFn: (values: z.infer<typeof employmentStatusSchema>) => {
-      if (isEditMode) {
-        return updateEmploymentStatus({ ...values, id })
+      if (isEditMode && editId) {
+        return updateEmploymentStatus({ ...values, id: editId })
       }
       return createEmploymentStatus(values)
     },
     onSuccess: () => {
-      // Clear form on successful submission
-      form.reset()
+      queryClient.invalidateQueries({ queryKey: ["employment_statuses"] })
+      if (editId) {
+        queryClient.invalidateQueries({
+          queryKey: ["employment_statuses", editId],
+        })
+      }
+      onClose()
     },
   })
 
-  // 3. Initialize Form
+  // Initialize Form
   const form = useForm({
     defaultValues: {
       name: employmentStatusData?.name ?? "",
@@ -53,18 +93,9 @@ export function EmploymentStatusForm() {
       onSubmit: employmentStatusSchema,
     },
     onSubmit: async ({ value }) => {
-      mutation.mutate(value)
+      await mutation.mutateAsync(value)
     },
   })
-
-  // Handle loading state while fetching existing data
-  if (isEditMode && isLoading) {
-    return (
-      <div className="animate-pulse text-sm text-muted-foreground">
-        Loading employment status details...
-      </div>
-    )
-  }
 
   return (
     <form
@@ -93,7 +124,7 @@ export function EmploymentStatusForm() {
                 onBlur={field.handleBlur}
                 onChange={(e) => field.handleChange(e.target.value)}
                 aria-invalid={isInvalid}
-                placeholder="e.g., Full-time, Probationary, Contractual"
+                placeholder="e.g., Active, Suspended, Terminated"
                 autoComplete="off"
                 disabled={mutation.isPending}
               />
@@ -103,13 +134,23 @@ export function EmploymentStatusForm() {
         }}
       </form.Field>
 
-      <Button type="submit" disabled={mutation.isPending}>
-        {mutation.isPending
-          ? "Saving..."
-          : isEditMode
-            ? "Update Employment Status"
-            : "Create Employment Status"}
-      </Button>
+      <div className="flex justify-end gap-2 pt-4">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onClose}
+          disabled={mutation.isPending}
+        >
+          Cancel
+        </Button>
+        <Button type="submit" disabled={mutation.isPending}>
+          {mutation.isPending
+            ? "Saving..."
+            : isEditMode
+              ? "Update Employment Status"
+              : "Create Employment Status"}
+        </Button>
+      </div>
     </form>
   )
 }

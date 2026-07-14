@@ -6,16 +6,16 @@ import { ColumnDef, SortingState, PaginationState } from "@tanstack/react-table"
 import { ArrowUpDown } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { DataTable } from "@/components/custom/data-table/table"
-import {
-  deleteOutlet,
-  fetchOutlets,
-  OutletStoreType,
-} from "@/forms/queries/outlet.query"
-import { OutletForm } from "@/forms/outlet.form"
 
-export default function Page() {
+import { DepartmentForm } from "@/forms/department.form"
+import {
+  deleteDepartment,
+  fetchDepartments,
+  DepartmentType,
+} from "@/forms/queries/department.query"
+
+export default function DepartmentsPage() {
   const queryClient = useQueryClient()
 
   // --- Table Control States ---
@@ -26,17 +26,17 @@ export default function Page() {
   })
   const [sorting, setSorting] = React.useState<SortingState>([])
 
-  // --- Supabase Query ---
+  // --- Fetch Query ---
   const { data, isLoading } = useQuery({
     queryKey: [
-      "outlets",
+      "departments",
       pagination.pageIndex,
       pagination.pageSize,
       globalFilter,
       sorting,
     ],
     queryFn: () =>
-      fetchOutlets({
+      fetchDepartments({
         pageIndex: pagination.pageIndex,
         pageSize: pagination.pageSize,
         globalFilter,
@@ -46,28 +46,27 @@ export default function Page() {
 
   // --- Delete Mutation ---
   const deleteMutation = useMutation({
-    mutationFn: (id: string | number) => deleteOutlet(id.toString()),
+    mutationFn: (id: string | number) => deleteDepartment(id.toString()),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["outlets"] })
+      queryClient.invalidateQueries({ queryKey: ["departments"] })
     },
   })
 
   // --- Table Columns ---
-  const columns = React.useMemo<ColumnDef<OutletStoreType>[]>(
+  const columns = React.useMemo<ColumnDef<DepartmentType>[]>(
     () => [
       {
-        accessorKey: "outlet_code",
+        accessorKey: "code",
         header: ({ column }) => (
           <Button
             variant="ghost"
             size="sm"
             className="-ml-3 h-8"
             onClick={() =>
-              setSorting([
+              setSorting((prev) => [
                 {
-                  id: "outlet_code",
-                  desc:
-                    sorting[0]?.id === "outlet_code" ? !sorting[0].desc : false,
+                  id: "code",
+                  desc: prev[0]?.id === "code" ? !prev[0].desc : false,
                 },
               ])
             }
@@ -78,57 +77,32 @@ export default function Page() {
         ),
         cell: ({ row }) => (
           <span className="font-mono font-semibold">
-            {row.getValue("outlet_code")}
+            {row.getValue("code")}
           </span>
         ),
       },
       {
-        accessorKey: "outlet_name",
+        accessorKey: "name",
         header: ({ column }) => (
           <Button
             variant="ghost"
             size="sm"
             className="-ml-3 h-8"
             onClick={() =>
-              setSorting([
+              setSorting((prev) => [
                 {
-                  id: "outlet_name",
-                  desc:
-                    sorting[0]?.id === "outlet_name" ? !sorting[0].desc : false,
+                  id: "name",
+                  desc: prev[0]?.id === "name" ? !prev[0].desc : false,
                 },
               ])
             }
           >
-            Outlet Name
+            Department Name
             <ArrowUpDown className="ml-2 h-3.5 w-3.5" />
           </Button>
         ),
         cell: ({ row }) => (
-          <div className="flex flex-col">
-            <span className="font-medium">{row.getValue("outlet_name")}</span>
-          </div>
-        ),
-      },
-      {
-        accessorKey: "is_distributor",
-        header: "Type",
-        cell: ({ row }) => (
-          <Badge
-            variant={row.getValue("is_distributor") ? "default" : "secondary"}
-          >
-            {row.getValue("is_distributor") ? "Distributor" : "Outlet"}
-          </Badge>
-        ),
-      },
-      {
-        accessorKey: "is_active",
-        header: "Status",
-        cell: ({ row }) => (
-          <Badge
-            variant={row.getValue("is_active") ? "outline" : "destructive"}
-          >
-            {row.getValue("is_active") ? "Active" : "Inactive"}
-          </Badge>
+          <span className="font-medium">{row.getValue("name")}</span>
         ),
       },
       {
@@ -140,35 +114,38 @@ export default function Page() {
         },
       },
     ],
-    [sorting]
+    []
   )
 
   return (
     <DataTable
-      title="Outlets"
-      description="Manage sales outlets, distributors, and location mapping"
-      entityName="Outlet"
+      title="Departments"
+      description="Manage company departments and organization units"
+      entityName="Department"
       columns={columns}
       data={data?.data ?? []}
       rowCount={data?.rowCount ?? 0}
       isLoading={isLoading}
-      searchPlaceholder="Search outlets by code or name..."
+      searchPlaceholder="Search departments by code or name..."
       globalFilter={globalFilter}
-      onSearchChange={setGlobalFilter}
+      onSearchChange={(val) => {
+        setGlobalFilter(val)
+        setPagination((prev) => ({ ...prev, pageIndex: 0 }))
+      }}
       pagination={pagination}
       onPaginationChange={setPagination}
       sorting={sorting}
       onSortingChange={setSorting}
       renderForm={({ id, onClose }) => (
         <div className="max-h-[80vh] overflow-y-auto pr-1">
-          <OutletForm editId={id?.toString()} onClose={onClose} />
+          <DepartmentForm editId={id?.toString()} onClose={onClose} />
         </div>
       )}
       onDelete={async (id) => {
         await deleteMutation.mutateAsync(id)
       }}
       isDeleting={deleteMutation.isPending}
-      getItemDisplayName={(item) => `${item.outlet_code} (${item.outlet_name})`}
+      getItemDisplayName={(item) => `${item.code} (${item.name})`}
     />
   )
 }

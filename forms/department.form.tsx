@@ -3,8 +3,7 @@
 import * as React from "react"
 import { useForm } from "@tanstack/react-form"
 import * as z from "zod"
-import { useParams } from "next/navigation"
-import { useMutation, useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { Button } from "@/components/ui/button"
 import { Field, FieldError, FieldLabel } from "@/components/ui/field"
@@ -17,34 +16,70 @@ import {
 } from "./queries/department.query"
 import { departmentSchema } from "./schemas/department.schema"
 
-export function DepartmentForm() {
-  const params = useParams()
+interface DepartmentFormProps {
+  editId?: string
+  onClose: () => void
+}
 
-  const id = params?.id as string | undefined
-  const isEditMode = !!id
+export function DepartmentForm({ editId, onClose }: DepartmentFormProps) {
+  const isEditMode = Boolean(editId)
 
   // 1. Fetch data if in edit mode
   const { data: departmentData, isLoading } = useQuery({
-    queryKey: ["departments", id],
-    queryFn: () => getDepartment(id!),
+    queryKey: ["departments", editId],
+    queryFn: () => getDepartment(editId!),
     enabled: isEditMode,
   })
 
-  // 2. Handle mutations conditionally
+  if (isEditMode && (isLoading || !departmentData)) {
+    return (
+      <div className="flex items-center justify-center p-8 text-sm text-muted-foreground">
+        Loading department details...
+      </div>
+    )
+  }
+
+  // Key remount forces fresh initialization with defaultValues on open
+  return (
+    <DepartmentFormContent
+      key={editId ?? "create"}
+      editId={editId}
+      departmentData={departmentData}
+      onClose={onClose}
+    />
+  )
+}
+
+interface DepartmentFormContentProps extends DepartmentFormProps {
+  departmentData?: { name: string; code: string }
+}
+
+function DepartmentFormContent({
+  editId,
+  departmentData,
+  onClose,
+}: DepartmentFormContentProps) {
+  const queryClient = useQueryClient()
+  const isEditMode = Boolean(editId)
+
+  // Handle mutations
   const mutation = useMutation({
     mutationFn: (values: z.infer<typeof departmentSchema>) => {
-      if (isEditMode) {
-        return updateDepartment({ ...values, id })
+      if (isEditMode && editId) {
+        return updateDepartment({ ...values, id: editId })
       }
       return createDepartment(values)
     },
     onSuccess: () => {
-      // Clear form on successful submission
-      form.reset()
+      queryClient.invalidateQueries({ queryKey: ["departments"] })
+      if (editId) {
+        queryClient.invalidateQueries({ queryKey: ["departments", editId] })
+      }
+      onClose()
     },
   })
 
-  // 3. Initialize Form
+  // Initialize Form
   const form = useForm({
     defaultValues: {
       name: departmentData?.name ?? "",
@@ -54,18 +89,9 @@ export function DepartmentForm() {
       onSubmit: departmentSchema,
     },
     onSubmit: async ({ value }) => {
-      mutation.mutate(value)
+      await mutation.mutateAsync(value)
     },
   })
-
-  // Handle loading state while fetching existing data
-  if (isEditMode && isLoading) {
-    return (
-      <div className="animate-pulse text-sm text-muted-foreground">
-        Loading department details...
-      </div>
-    )
-  }
 
   return (
     <form
@@ -132,13 +158,23 @@ export function DepartmentForm() {
         }}
       </form.Field>
 
-      <Button type="submit" disabled={mutation.isPending}>
-        {mutation.isPending
-          ? "Saving..."
-          : isEditMode
-            ? "Update Department"
-            : "Create Department"}
-      </Button>
+      <div className="flex justify-end gap-2 pt-4">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onClose}
+          disabled={mutation.isPending}
+        >
+          Cancel
+        </Button>
+        <Button type="submit" disabled={mutation.isPending}>
+          {mutation.isPending
+            ? "Saving..."
+            : isEditMode
+              ? "Update Department"
+              : "Create Department"}
+        </Button>
+      </div>
     </form>
   )
 }

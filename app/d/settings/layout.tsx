@@ -38,6 +38,7 @@ export const settingsNavigation: SettingSection[] = [
       { label: "Outlets", href: "/settings/account" },
       { label: "Expenses", href: "/d/settings/types/expenses/types" },
       { label: "Production", href: "/d/settings/types/production/areas" },
+      { label: "Employees", href: "/d/settings/types/employees/types" },
     ],
   },
   {
@@ -51,13 +52,33 @@ export const settingsNavigation: SettingSection[] = [
     ],
   },
   {
-    id: "item-master-data",
-    title: "Item Master Data",
+    id: "master-data",
+    title: "Master Data",
     links: [
       {
         label: "Manage SKUs",
-        href: "/d/settings/item-master-data/manage-skus",
+        href: "/d/settings/master-data/manage-skus",
       },
+      {
+        label: "Manage Departments",
+        href: "/d/settings/master-data/manage-departments",
+      },
+      {
+        label: "Manage Job Positions",
+        href: "/d/settings/master-data/manage-job-positions",
+      },
+    ],
+  },
+  {
+    id: "access-management",
+    title: "Access Management",
+    links: [
+      { label: "Approval Workflows", href: "/settings/acddaount" },
+      {
+        label: "Roles",
+        href: "/d/settings/organizations/manage",
+      },
+      { label: "Permissions", href: "/settings/account" },
     ],
   },
   {

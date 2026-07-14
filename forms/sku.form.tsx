@@ -30,21 +30,20 @@ interface SkuFormProps {
 }
 
 export function SkuForm({ editId, onClose }: SkuFormProps) {
-  const queryClient = useQueryClient()
   const isEditMode = Boolean(editId)
 
   // --- Lookups Queries ---
-  const { data: categories = [] } = useQuery({
+  const { data: categories = [], isLoading: isLoadingCategories } = useQuery({
     queryKey: ["sku-categories-lookup"],
     queryFn: fetchCategoriesLookup,
   })
 
-  const { data: brands = [] } = useQuery({
+  const { data: brands = [], isLoading: isLoadingBrands } = useQuery({
     queryKey: ["brands-lookup"],
     queryFn: fetchBrandsLookup,
   })
 
-  const { data: uoms = [] } = useQuery({
+  const { data: uoms = [], isLoading: isLoadingUoms } = useQuery({
     queryKey: ["uoms-lookup"],
     queryFn: fetchUomsLookup,
   })
@@ -55,6 +54,53 @@ export function SkuForm({ editId, onClose }: SkuFormProps) {
     queryFn: () => fetchSkuById(editId!),
     enabled: isEditMode,
   })
+
+  // Wait until required data is fetched
+  const isLoadingData =
+    (isEditMode && (isLoadingSku || !skuData)) ||
+    isLoadingCategories ||
+    isLoadingBrands ||
+    isLoadingUoms
+
+  if (isLoadingData) {
+    return (
+      <div className="flex items-center justify-center p-8 text-sm text-muted-foreground">
+        Loading SKU details...
+      </div>
+    )
+  }
+
+  // Remount inner form when editId or skuData changes to ensure defaultValues hit on first render
+  return (
+    <SkuFormContent
+      key={editId ?? "create"}
+      editId={editId}
+      skuData={skuData}
+      categories={categories}
+      brands={brands}
+      uoms={uoms}
+      onClose={onClose}
+    />
+  )
+}
+
+interface SkuFormContentProps extends SkuFormProps {
+  skuData?: any
+  categories: any[]
+  brands: any[]
+  uoms: any[]
+}
+
+function SkuFormContent({
+  editId,
+  skuData,
+  categories,
+  brands,
+  uoms,
+  onClose,
+}: SkuFormContentProps) {
+  const queryClient = useQueryClient()
+  const isEditMode = Boolean(editId)
 
   // --- Mutation ---
   const mutation = useMutation({
@@ -73,7 +119,7 @@ export function SkuForm({ editId, onClose }: SkuFormProps) {
     },
   })
 
-  // --- Form Setup ---
+  // --- Form Setup with fully initialized defaultValues ---
   const form = useForm({
     defaultValues: {
       sku_code: skuData?.sku_code ?? "",
@@ -99,30 +145,6 @@ export function SkuForm({ editId, onClose }: SkuFormProps) {
     },
   })
 
-  // Synchronize form when skuData resolves (fixes first-click edit issue)
-  React.useEffect(() => {
-    if (skuData) {
-      form.reset({
-        sku_code: skuData.sku_code ?? "",
-        item_name: skuData.item_name ?? "",
-        barcode: skuData.barcode ?? "",
-        sku_category_id: skuData.sku_category_id
-          ? String(skuData.sku_category_id)
-          : "",
-        brand_id: skuData.brand_id ? String(skuData.brand_id) : "",
-        sku_uom_id: skuData.sku_uom_id ? String(skuData.sku_uom_id) : "",
-      })
-    }
-  }, [skuData, form])
-
-  if (isEditMode && isLoadingSku) {
-    return (
-      <div className="flex items-center justify-center p-8 text-sm text-muted-foreground">
-        Loading SKU details...
-      </div>
-    )
-  }
-
   return (
     <form
       onSubmit={(e) => {
@@ -133,13 +155,7 @@ export function SkuForm({ editId, onClose }: SkuFormProps) {
       className="space-y-4"
     >
       {/* SKU Code */}
-      <form.Field
-        name="sku_code"
-        validators={{
-          onChange: ({ value }) =>
-            !value ? "SKU Code is required" : undefined,
-        }}
-      >
+      <form.Field name="sku_code">
         {(field) => {
           const isInvalid =
             field.state.meta.isTouched && !field.state.meta.isValid
@@ -154,20 +170,14 @@ export function SkuForm({ editId, onClose }: SkuFormProps) {
                 placeholder="e.g. SKU-10001"
                 disabled={mutation.isPending}
               />
-              {/* {isInvalid && <FieldError errors={field.state.meta.errors} />} */}
+              {isInvalid && <FieldError errors={field.state.meta.errors} />}
             </Field>
           )
         }}
       </form.Field>
 
       {/* Item Name */}
-      <form.Field
-        name="item_name"
-        validators={{
-          onChange: ({ value }) =>
-            !value ? "Item Name is required" : undefined,
-        }}
-      >
+      <form.Field name="item_name">
         {(field) => {
           const isInvalid =
             field.state.meta.isTouched && !field.state.meta.isValid
@@ -182,7 +192,7 @@ export function SkuForm({ editId, onClose }: SkuFormProps) {
                 placeholder="Enter item name"
                 disabled={mutation.isPending}
               />
-              {/* {isInvalid && <FieldError errors={field.state.meta.errors} />} */}
+              {isInvalid && <FieldError errors={field.state.meta.errors} />}
             </Field>
           )
         }}
@@ -212,7 +222,9 @@ export function SkuForm({ editId, onClose }: SkuFormProps) {
             <Field data-invalid={isInvalid}>
               <FieldLabel>Category</FieldLabel>
               <Select
-                value={field.state.value ? String(field.state.value) : ""}
+                value={
+                  field.state.value ? String(field.state.value) : undefined
+                }
                 onValueChange={(val) => field.handleChange(val)}
                 disabled={mutation.isPending}
               >
@@ -242,7 +254,9 @@ export function SkuForm({ editId, onClose }: SkuFormProps) {
             <Field data-invalid={isInvalid}>
               <FieldLabel>Brand</FieldLabel>
               <Select
-                value={field.state.value ? String(field.state.value) : ""}
+                value={
+                  field.state.value ? String(field.state.value) : undefined
+                }
                 onValueChange={(val) => field.handleChange(val)}
                 disabled={mutation.isPending}
               >
@@ -272,7 +286,9 @@ export function SkuForm({ editId, onClose }: SkuFormProps) {
             <Field data-invalid={isInvalid}>
               <FieldLabel>UOM</FieldLabel>
               <Select
-                value={field.state.value ? String(field.state.value) : ""}
+                value={
+                  field.state.value ? String(field.state.value) : undefined
+                }
                 onValueChange={(val) => field.handleChange(val)}
                 disabled={mutation.isPending}
               >

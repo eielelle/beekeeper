@@ -6,14 +6,13 @@ import { ColumnDef, SortingState, PaginationState } from "@tanstack/react-table"
 import { ArrowUpDown } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { DataTable } from "@/components/custom/data-table/table"
 import {
-  deleteOutlet,
-  fetchOutlets,
-  OutletStoreType,
-} from "@/forms/queries/outlet.query"
-import { OutletForm } from "@/forms/outlet.form"
+  deleteEmployee,
+  fetchEmployees,
+  EmployeeStoreType,
+} from "@/forms/queries/employee.query"
+import { EmployeeForm } from "@/forms/employee.form"
 
 export default function Page() {
   const queryClient = useQueryClient()
@@ -29,14 +28,14 @@ export default function Page() {
   // --- Supabase Query ---
   const { data, isLoading } = useQuery({
     queryKey: [
-      "outlets",
+      "employees",
       pagination.pageIndex,
       pagination.pageSize,
       globalFilter,
       sorting,
     ],
     queryFn: () =>
-      fetchOutlets({
+      fetchEmployees({
         pageIndex: pagination.pageIndex,
         pageSize: pagination.pageSize,
         globalFilter,
@@ -46,17 +45,17 @@ export default function Page() {
 
   // --- Delete Mutation ---
   const deleteMutation = useMutation({
-    mutationFn: (id: string | number) => deleteOutlet(id.toString()),
+    mutationFn: (id: string | number) => deleteEmployee(id.toString()),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["outlets"] })
+      queryClient.invalidateQueries({ queryKey: ["employees"] })
     },
   })
 
   // --- Table Columns ---
-  const columns = React.useMemo<ColumnDef<OutletStoreType>[]>(
+  const columns = React.useMemo<ColumnDef<EmployeeStoreType>[]>(
     () => [
       {
-        accessorKey: "outlet_code",
+        accessorKey: "employee_no",
         header: ({ column }) => (
           <Button
             variant="ghost"
@@ -65,25 +64,25 @@ export default function Page() {
             onClick={() =>
               setSorting([
                 {
-                  id: "outlet_code",
+                  id: "employee_no",
                   desc:
-                    sorting[0]?.id === "outlet_code" ? !sorting[0].desc : false,
+                    sorting[0]?.id === "employee_no" ? !sorting[0].desc : false,
                 },
               ])
             }
           >
-            Code
+            Employee No.
             <ArrowUpDown className="ml-2 h-3.5 w-3.5" />
           </Button>
         ),
         cell: ({ row }) => (
           <span className="font-mono font-semibold">
-            {row.getValue("outlet_code")}
+            {row.getValue("employee_no")}
           </span>
         ),
       },
       {
-        accessorKey: "outlet_name",
+        accessorKey: "first_name",
         header: ({ column }) => (
           <Button
             variant="ghost"
@@ -92,44 +91,37 @@ export default function Page() {
             onClick={() =>
               setSorting([
                 {
-                  id: "outlet_name",
+                  id: "first_name",
                   desc:
-                    sorting[0]?.id === "outlet_name" ? !sorting[0].desc : false,
+                    sorting[0]?.id === "first_name" ? !sorting[0].desc : false,
                 },
               ])
             }
           >
-            Outlet Name
+            Name
             <ArrowUpDown className="ml-2 h-3.5 w-3.5" />
           </Button>
         ),
-        cell: ({ row }) => (
-          <div className="flex flex-col">
-            <span className="font-medium">{row.getValue("outlet_name")}</span>
-          </div>
-        ),
+        cell: ({ row }) => {
+          const first = row.original.first_name || ""
+          const middle = row.original.middle_name
+            ? ` ${row.original.middle_name.charAt(0)}.`
+            : ""
+          const last = row.original.last_name || ""
+          return (
+            <span className="font-medium">{`${first}${middle} ${last}`}</span>
+          )
+        },
       },
       {
-        accessorKey: "is_distributor",
-        header: "Type",
-        cell: ({ row }) => (
-          <Badge
-            variant={row.getValue("is_distributor") ? "default" : "secondary"}
-          >
-            {row.getValue("is_distributor") ? "Distributor" : "Outlet"}
-          </Badge>
-        ),
+        accessorKey: "email",
+        header: "Email",
+        cell: ({ row }) => <span>{row.getValue("email") || "—"}</span>,
       },
       {
-        accessorKey: "is_active",
-        header: "Status",
-        cell: ({ row }) => (
-          <Badge
-            variant={row.getValue("is_active") ? "outline" : "destructive"}
-          >
-            {row.getValue("is_active") ? "Active" : "Inactive"}
-          </Badge>
-        ),
+        accessorKey: "phone",
+        header: "Phone",
+        cell: ({ row }) => <span>{row.getValue("phone") || "—"}</span>,
       },
       {
         accessorKey: "created_at",
@@ -145,14 +137,14 @@ export default function Page() {
 
   return (
     <DataTable
-      title="Outlets"
-      description="Manage sales outlets, distributors, and location mapping"
-      entityName="Outlet"
+      title="Employees"
+      description="Manage employee records and contact details"
+      entityName="Employee"
       columns={columns}
       data={data?.data ?? []}
       rowCount={data?.rowCount ?? 0}
       isLoading={isLoading}
-      searchPlaceholder="Search outlets by code or name..."
+      searchPlaceholder="Search employees by ID, name, or email..."
       globalFilter={globalFilter}
       onSearchChange={setGlobalFilter}
       pagination={pagination}
@@ -161,14 +153,16 @@ export default function Page() {
       onSortingChange={setSorting}
       renderForm={({ id, onClose }) => (
         <div className="max-h-[80vh] overflow-y-auto pr-1">
-          <OutletForm editId={id?.toString()} onClose={onClose} />
+          <EmployeeForm editId={id?.toString()} onClose={onClose} />
         </div>
       )}
       onDelete={async (id) => {
         await deleteMutation.mutateAsync(id)
       }}
       isDeleting={deleteMutation.isPending}
-      getItemDisplayName={(item) => `${item.outlet_code} (${item.outlet_name})`}
+      getItemDisplayName={(item) =>
+        `${item.employee_no} (${item.first_name} ${item.last_name})`
+      }
     />
   )
 }

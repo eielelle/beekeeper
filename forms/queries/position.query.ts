@@ -1,7 +1,7 @@
 import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
 
-export type PositionStoreType = {
+export type PositionType = {
   id?: string
   title: string
   code?: string
@@ -83,7 +83,7 @@ export async function getPosition(id: string) {
   return data
 }
 
-export async function createPosition(value: PositionStoreType) {
+export async function createPosition(value: PositionType) {
   const t = toast.loading("Creating Position. Please wait.")
 
   const { data, error } = await supabase.from("positions").insert([value])
@@ -100,7 +100,7 @@ export async function createPosition(value: PositionStoreType) {
   return data
 }
 
-export async function updatePosition(value: PositionStoreType) {
+export async function updatePosition(value: PositionType) {
   const t = toast.loading("Updating Position. Please wait.")
 
   const { id, ...updates } = value

@@ -3,8 +3,7 @@
 import * as React from "react"
 import { useForm } from "@tanstack/react-form"
 import * as z from "zod"
-import { useParams } from "next/navigation"
-import { useMutation, useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { Button } from "@/components/ui/button"
 import { Field, FieldError, FieldLabel } from "@/components/ui/field"
@@ -17,34 +16,75 @@ import {
 } from "./queries/employment_type.query"
 import { employmentTypeSchema } from "./schemas/employment_type.schema"
 
-export function EmploymentTypeForm() {
-  const params = useParams()
+interface EmploymentTypeFormProps {
+  editId?: string
+  onClose: () => void
+}
 
-  const id = params?.id as string | undefined
-  const isEditMode = !!id
+export function EmploymentTypeForm({
+  editId,
+  onClose,
+}: EmploymentTypeFormProps) {
+  const isEditMode = Boolean(editId)
 
   // 1. Fetch data if in edit mode
   const { data: employmentTypeData, isLoading } = useQuery({
-    queryKey: ["employment_types", id],
-    queryFn: () => getEmploymentType(id!),
+    queryKey: ["employment_types", editId],
+    queryFn: () => getEmploymentType(editId!),
     enabled: isEditMode,
   })
 
-  // 2. Handle mutations conditionally
+  if (isEditMode && (isLoading || !employmentTypeData)) {
+    return (
+      <div className="flex items-center justify-center p-8 text-sm text-muted-foreground">
+        Loading employment type details...
+      </div>
+    )
+  }
+
+  // Key remount forces fresh initialization with defaultValues on open
+  return (
+    <EmploymentTypeFormContent
+      key={editId ?? "create"}
+      editId={editId}
+      employmentTypeData={employmentTypeData}
+      onClose={onClose}
+    />
+  )
+}
+
+interface EmploymentTypeFormContentProps extends EmploymentTypeFormProps {
+  employmentTypeData?: { name: string }
+}
+
+function EmploymentTypeFormContent({
+  editId,
+  employmentTypeData,
+  onClose,
+}: EmploymentTypeFormContentProps) {
+  const queryClient = useQueryClient()
+  const isEditMode = Boolean(editId)
+
+  // Handle mutations
   const mutation = useMutation({
     mutationFn: (values: z.infer<typeof employmentTypeSchema>) => {
-      if (isEditMode) {
-        return updateEmploymentType({ ...values, id })
+      if (isEditMode && editId) {
+        return updateEmploymentType({ ...values, id: editId })
       }
       return createEmploymentType(values)
     },
     onSuccess: () => {
-      // Clear form on successful submission
-      form.reset()
+      queryClient.invalidateQueries({ queryKey: ["employment_types"] })
+      if (editId) {
+        queryClient.invalidateQueries({
+          queryKey: ["employment_types", editId],
+        })
+      }
+      onClose()
     },
   })
 
-  // 3. Initialize Form
+  // Initialize Form
   const form = useForm({
     defaultValues: {
       name: employmentTypeData?.name ?? "",
@@ -53,18 +93,9 @@ export function EmploymentTypeForm() {
       onSubmit: employmentTypeSchema,
     },
     onSubmit: async ({ value }) => {
-      mutation.mutate(value)
+      await mutation.mutateAsync(value)
     },
   })
-
-  // Handle loading state while fetching existing data
-  if (isEditMode && isLoading) {
-    return (
-      <div className="animate-pulse text-sm text-muted-foreground">
-        Loading employment type details...
-      </div>
-    )
-  }
 
   return (
     <form
@@ -103,13 +134,23 @@ export function EmploymentTypeForm() {
         }}
       </form.Field>
 
-      <Button type="submit" disabled={mutation.isPending}>
-        {mutation.isPending
-          ? "Saving..."
-          : isEditMode
-            ? "Update Employment Type"
-            : "Create Employment Type"}
-      </Button>
+      <div className="flex justify-end gap-2 pt-4">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onClose}
+          disabled={mutation.isPending}
+        >
+          Cancel
+        </Button>
+        <Button type="submit" disabled={mutation.isPending}>
+          {mutation.isPending
+            ? "Saving..."
+            : isEditMode
+              ? "Update Employment Type"
+              : "Create Employment Type"}
+        </Button>
+      </div>
     </form>
   )
 }

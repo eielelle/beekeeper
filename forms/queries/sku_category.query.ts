@@ -95,7 +95,8 @@ export async function createSkuCategory(value: SkuCategoryStoreType) {
 export async function updateSkuCategory(value: SkuCategoryStoreType) {
   const t = toast.loading("Updating SKU Category. Please wait.")
 
-  const { id, ...updates } = value
+  // Strip read-only or system keys from the payload
+  const { id, created_at, org_id, ...updates } = value
 
   const { data, error } = await supabase
     .from("sku_categories")

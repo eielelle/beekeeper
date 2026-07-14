@@ -185,6 +185,62 @@ export function OutletForm({
     enabled: isEditMode,
   })
 
+  useEffect(() => {
+    if (!outletData || regionsData.length === 0) return
+
+    async function initialize() {
+      // load province list
+      const regionCode = regionCodeMap.get(outletData.region)
+
+      if (regionCode) {
+        const provs = await provinces(regionCode)
+        setProvinces(provs)
+
+        // load city list
+        const provinceCode = provs.find(
+          (p) => p.province_name === outletData.province
+        )?.province_code
+
+        if (provinceCode) {
+          const cityList = await cities(provinceCode)
+          setCities(cityList)
+
+          // load barangays
+          const cityCode = cityList.find(
+            (c) => c.city_name === outletData.city
+          )?.city_code
+
+          if (cityCode) {
+            const brgys = await barangays(cityCode)
+            setBarangays(brgys)
+          }
+        }
+      }
+
+      // NOW populate form
+      form.reset({
+        outlet_code: outletData.outlet_code,
+        outlet_name: outletData.outlet_name,
+        sales_group_id: outletData.sales_group_id,
+        address: outletData.address,
+        region: outletData.region,
+        province: outletData.province,
+        city: outletData.city,
+        barangay: outletData.barangay,
+        distributor_id: outletData.distributor_id,
+        is_distributor: outletData.is_distributor,
+        is_active: outletData.is_active,
+        lat: outletData.lat,
+        long: outletData.long,
+        geofence_radius: outletData.geofenceRadius,
+      })
+
+      setGeofenceRadius(outletData.geofenceRadius)
+    }
+
+    initialize()
+  }, [outletData, regionsData])
+
   const mutation = useMutation({
     mutationFn: (values: z.infer<typeof outletSchema>) => {
       if (isEditMode) {

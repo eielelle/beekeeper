@@ -3,8 +3,7 @@
 import * as React from "react"
 import { useForm } from "@tanstack/react-form"
 import * as z from "zod"
-import { useParams } from "next/navigation"
-import { useMutation, useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { Button } from "@/components/ui/button"
 import { Field, FieldError, FieldLabel } from "@/components/ui/field"
@@ -17,34 +16,70 @@ import {
 } from "./queries/position.query"
 import { positionSchema } from "./schemas/position.schema"
 
-export function PositionForm() {
-  const params = useParams()
+interface PositionFormProps {
+  editId?: string
+  onClose: () => void
+}
 
-  const id = params?.id as string | undefined
-  const isEditMode = !!id
+export function PositionForm({ editId, onClose }: PositionFormProps) {
+  const isEditMode = Boolean(editId)
 
   // 1. Fetch data if in edit mode
   const { data: positionData, isLoading } = useQuery({
-    queryKey: ["positions", id],
-    queryFn: () => getPosition(id!),
+    queryKey: ["positions", editId],
+    queryFn: () => getPosition(editId!),
     enabled: isEditMode,
   })
 
-  // 2. Handle mutations conditionally
+  if (isEditMode && (isLoading || !positionData)) {
+    return (
+      <div className="flex items-center justify-center p-8 text-sm text-muted-foreground">
+        Loading position details...
+      </div>
+    )
+  }
+
+  // Key remount forces fresh initialization with defaultValues on open
+  return (
+    <PositionFormContent
+      key={editId ?? "create"}
+      editId={editId}
+      positionData={positionData}
+      onClose={onClose}
+    />
+  )
+}
+
+interface PositionFormContentProps extends PositionFormProps {
+  positionData?: { title: string; code: string }
+}
+
+function PositionFormContent({
+  editId,
+  positionData,
+  onClose,
+}: PositionFormContentProps) {
+  const queryClient = useQueryClient()
+  const isEditMode = Boolean(editId)
+
+  // Handle mutations
   const mutation = useMutation({
     mutationFn: (values: z.infer<typeof positionSchema>) => {
-      if (isEditMode) {
-        return updatePosition({ ...values, id })
+      if (isEditMode && editId) {
+        return updatePosition({ ...values, id: editId })
       }
       return createPosition(values)
     },
     onSuccess: () => {
-      // Clear form on successful submission
-      form.reset()
+      queryClient.invalidateQueries({ queryKey: ["positions"] })
+      if (editId) {
+        queryClient.invalidateQueries({ queryKey: ["positions", editId] })
+      }
+      onClose()
     },
   })
 
-  // 3. Initialize Form
+  // Initialize Form
   const form = useForm({
     defaultValues: {
       title: positionData?.title ?? "",
@@ -54,18 +89,9 @@ export function PositionForm() {
       onSubmit: positionSchema,
     },
     onSubmit: async ({ value }) => {
-      mutation.mutate(value)
+      await mutation.mutateAsync(value)
     },
   })
-
-  // Handle loading state while fetching existing data
-  if (isEditMode && isLoading) {
-    return (
-      <div className="animate-pulse text-sm text-muted-foreground">
-        Loading position details...
-      </div>
-    )
-  }
 
   return (
     <form
@@ -129,13 +155,23 @@ export function PositionForm() {
         }}
       </form.Field>
 
-      <Button type="submit" disabled={mutation.isPending}>
-        {mutation.isPending
-          ? "Saving..."
-          : isEditMode
-            ? "Update Position"
-            : "Create Position"}
-      </Button>
+      <div className="flex justify-end gap-2 pt-4">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onClose}
+          disabled={mutation.isPending}
+        >
+          Cancel
+        </Button>
+        <Button type="submit" disabled={mutation.isPending}>
+          {mutation.isPending
+            ? "Saving..."
+            : isEditMode
+              ? "Update Position"
+              : "Create Position"}
+        </Button>
+      </div>
     </form>
   )
 }

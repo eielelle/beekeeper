@@ -1,7 +1,7 @@
 import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
 
-export type DepartmentStoreType = {
+export type DepartmentType = {
   id?: string
   name: string
   code: string
@@ -83,7 +83,7 @@ export async function getDepartment(id: string) {
   return data
 }
 
-export async function createDepartment(value: DepartmentStoreType) {
+export async function createDepartment(value: DepartmentType) {
   const t = toast.loading("Creating Department. Please wait.")
 
   const { data, error } = await supabase.from("departments").insert([value])
@@ -100,7 +100,7 @@ export async function createDepartment(value: DepartmentStoreType) {
   return data
 }
 
-export async function updateDepartment(value: DepartmentStoreType) {
+export async function updateDepartment(value: DepartmentType) {
   const t = toast.loading("Updating Department. Please wait.")
 
   const { id, ...updates } = value

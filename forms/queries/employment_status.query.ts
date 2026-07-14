@@ -1,7 +1,7 @@
 import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
 
-export type EmploymentStatusStoreType = {
+export type EmploymentStatusType = {
   id?: string
   name: string
   org_id?: number
@@ -82,7 +82,7 @@ export async function getEmploymentStatus(id: string) {
   return data
 }
 
-export async function createEmploymentStatus(value: EmploymentStatusStoreType) {
+export async function createEmploymentStatus(value: EmploymentStatusType) {
   const t = toast.loading("Creating Employment Status. Please wait.")
 
   const { data, error } = await supabase
@@ -101,7 +101,7 @@ export async function createEmploymentStatus(value: EmploymentStatusStoreType) {
   return data
 }
 
-export async function updateEmploymentStatus(value: EmploymentStatusStoreType) {
+export async function updateEmploymentStatus(value: EmploymentStatusType) {
   const t = toast.loading("Updating Employment Status. Please wait.")
 
   const { id, ...updates } = value

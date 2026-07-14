@@ -3,11 +3,13 @@ import { toast } from "sonner"
 
 export type EmployeeStoreType = {
   id?: string
-  created_at?: string
-  org_id?: number
+  employee_no: string
   first_name: string
+  middle_name?: string
   last_name: string
-  gender: string
+  email?: string
+  phone?: string
+  created_at?: string
 }
 
 export type FetchEmployeesParams = {
@@ -25,26 +27,21 @@ export async function fetchEmployees({
 }: FetchEmployeesParams) {
   const t = toast.loading("Fetching Employees. Please wait.")
 
-  // 1. Base query setup with exact count for pagination controls
   let query = supabase.from("employees").select("*", { count: "exact" })
 
-  // 2. Server-Side Global Filtering (ILIKE search on first_name OR last_name)
   if (globalFilter) {
     query = query.or(
-      `first_name.ilike.%${globalFilter}%,last_name.ilike.%${globalFilter}%`
+      `employee_no.ilike.%${globalFilter}%,first_name.ilike.%${globalFilter}%,last_name.ilike.%${globalFilter}%,email.ilike.%${globalFilter}%`
     )
   }
 
-  // 3. Server-Side Sorting
   if (sorting && sorting.length > 0) {
-    const sort = sorting[0] // Handling single column sorting
+    const sort = sorting[0]
     query = query.order(sort.id, { ascending: !sort.desc })
   } else {
-    // Default fallback sort
     query = query.order("created_at", { ascending: false })
   }
 
-  // 4. Server-Side Pagination Range Calc
   const from = pageIndex * pageSize
   const to = from + pageSize - 1
   query = query.range(from, to)
@@ -65,7 +62,7 @@ export async function fetchEmployees({
 }
 
 export async function getEmployee(id: string) {
-  const t = toast.loading("Fetching Employee details. Please wait.")
+  const t = toast.loading("Fetching Employee. Please wait.")
 
   const { data, error } = await supabase
     .from("employees")
@@ -84,7 +81,7 @@ export async function getEmployee(id: string) {
 }
 
 export async function createEmployee(value: EmployeeStoreType) {
-  const t = toast.loading("Adding Employee. Please wait.")
+  const t = toast.loading("Creating Employee. Please wait.")
 
   const { data, error } = await supabase.from("employees").insert([value])
 
@@ -95,7 +92,8 @@ export async function createEmployee(value: EmployeeStoreType) {
     throw error
   }
 
-  toast.success("Employee successfully added.")
+  toast.success("Employee successfully created.")
+
   return data
 }
 
@@ -118,11 +116,12 @@ export async function updateEmployee(value: EmployeeStoreType) {
   }
 
   toast.success("Employee successfully updated.")
+
   return data
 }
 
 export async function deleteEmployee(id: string) {
-  const t = toast.loading("Removing Employee. Please wait.")
+  const t = toast.loading("Deleting Employee. Please wait.")
 
   const { data, error } = await supabase.from("employees").delete().eq("id", id)
 
@@ -133,6 +132,6 @@ export async function deleteEmployee(id: string) {
     throw error
   }
 
-  toast.success("Employee successfully removed.")
+  toast.success("Employee successfully deleted.")
   return data
 }

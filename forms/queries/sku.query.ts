@@ -12,6 +12,7 @@ export type SkuStoreType = {
   sku_category_id?: string | number | null
   brand_id?: string | number | null
   sku_uom_id?: string | number | null
+  uom?: string // Flattened UOM helper property
   // Exact relation shapes based on your query files
   sku_categories?: { id?: number; category_name: string } | null
   sku_brands?: { id?: number; brand_name: string } | null
@@ -27,7 +28,7 @@ export type FetchSkusParams = {
 
 export type SkuFormValues = Omit<
   SkuStoreType,
-  "id" | "created_at" | "sku_categories" | "sku_brands" | "sku_uoms"
+  "id" | "created_at" | "sku_categories" | "sku_brands" | "sku_uoms" | "uom"
 >
 
 // --- Fetch All SKUs (Paginated & Sorted) ---
@@ -71,8 +72,13 @@ export async function fetchSkus({
     throw error
   }
 
+  const formattedData: SkuStoreType[] = (data || []).map((item: any) => ({
+    ...item,
+    uom: item.sku_uoms?.uom_code ?? "",
+  }))
+
   return {
-    data: (data as SkuStoreType[]) || [],
+    data: formattedData,
     rowCount: count || 0,
   }
 }
@@ -81,7 +87,14 @@ export async function fetchSkus({
 export async function getSku(id: string) {
   const { data, error } = await supabase
     .from("skus")
-    .select("*")
+    .select(
+      `
+      *,
+      sku_categories ( id, category_name ),
+      sku_brands ( id, brand_name ),
+      sku_uoms ( id, uom_code, uom_name )
+    `
+    )
     .eq("id", id)
     .single()
 
@@ -90,7 +103,10 @@ export async function getSku(id: string) {
     throw error
   }
 
-  return data as SkuStoreType
+  return {
+    ...data,
+    uom: data.sku_uoms?.uom_code ?? "",
+  } as SkuStoreType
 }
 
 // Alias for getSku to support SkuForm imports
@@ -130,6 +146,7 @@ export async function updateSku(
       sku_categories,
       sku_brands,
       sku_uoms,
+      uom,
       ...rest
     } = idOrValue
     id = valId!
@@ -214,6 +231,42 @@ export async function fetchSkuUomsOptions() {
   }
 
   return data || []
+}
+
+// --- Search SKUs (Used for Comboboxes/Lookups) ---
+export async function searchSkus(queryText: string = "", limit = 20) {
+  let query = supabase
+    .from("skus")
+    .select(
+      `
+      id,
+      sku_code,
+      item_name,
+      barcode,
+      sku_uoms ( uom_code )
+    `
+    )
+    .order("sku_code", { ascending: true })
+    .limit(limit)
+
+  if (queryText.trim()) {
+    query = query.or(
+      `sku_code.ilike.%${queryText.trim()}%,item_name.ilike.%${queryText.trim()}%,barcode.ilike.%${queryText.trim()}%`
+    )
+  }
+
+  const { data, error } = await query
+
+  if (error) {
+    toast.error(`ERR: ${error.message}`)
+    throw error
+  }
+
+  // Format response so item.uom contains the uom_code string
+  return ((data as any[]) || []).map((item) => ({
+    ...item,
+    uom: item.sku_uoms?.uom_code ?? "",
+  })) as SkuStoreType[]
 }
 
 // Aliases to match SkuForm imports
