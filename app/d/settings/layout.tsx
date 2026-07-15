@@ -39,6 +39,7 @@ export const settingsNavigation: SettingSection[] = [
       { label: "Expenses", href: "/d/settings/types/expenses/types" },
       { label: "Production", href: "/d/settings/types/production/areas" },
       { label: "Employees", href: "/d/settings/types/employees/types" },
+      { label: "Visits", href: "/d/settings/types/visits/types" },
     ],
   },
   {
