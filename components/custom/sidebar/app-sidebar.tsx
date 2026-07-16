@@ -22,6 +22,7 @@ import {
   Settings,
   Settings2,
   ShoppingBag,
+  Sparkles,
   SquareTerminal,
   Users,
 } from "lucide-react"
@@ -65,18 +66,6 @@ const data = {
     },
   ],
   navMain: [
-    {
-      title: "Recruitment",
-      url: "#",
-      icon: Factory,
-      isActive: false,
-      items: [
-        {
-          title: "WIP",
-          url: "#",
-        },
-      ],
-    },
     {
       title: "Employees",
       url: "#",
@@ -134,38 +123,6 @@ const data = {
       ],
     },
     {
-      title: "Payroll",
-      url: "#",
-      icon: Factory,
-      isActive: false,
-      items: [
-        {
-          title: "Dashboard",
-          url: "#",
-        },
-        {
-          title: "Allowances",
-          url: "#",
-        },
-        {
-          title: "Deductions",
-          url: "#",
-        },
-        {
-          title: "Payslips",
-          url: "#",
-        },
-        {
-          title: "Loans / Advance Salary",
-          url: "#",
-        },
-        {
-          title: "Deductions",
-          url: "#",
-        },
-      ],
-    },
-    {
       title: "Performance",
       url: "#",
       icon: Factory,
@@ -179,22 +136,6 @@ const data = {
     },
     {
       title: "Help Desk",
-      url: "#",
-      icon: Factory,
-      isActive: false,
-      items: [
-        {
-          title: "My Tickets",
-          url: "#",
-        },
-        {
-          title: "Tickets",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Administration",
       url: "#",
       icon: Factory,
       isActive: false,
@@ -334,14 +275,9 @@ const data = {
       icon: Home,
     },
     {
-      name: "Tracking",
+      name: "AI",
       url: "#",
-      icon: LineChart,
-    },
-    {
-      name: "Employees",
-      url: "/d/administration/employees",
-      icon: Users,
+      icon: Sparkles,
     },
     {
       name: "Settings",
