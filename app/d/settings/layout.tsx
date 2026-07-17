@@ -83,6 +83,11 @@ export const settingsNavigation: SettingSection[] = [
     ],
   },
   {
+    id: "security-audit",
+    title: "Security and Audit",
+    links: [{ label: "Activity Logs", href: "/settingsfafafafa" }],
+  },
+  {
     id: "organizations",
     title: "Company",
     links: [

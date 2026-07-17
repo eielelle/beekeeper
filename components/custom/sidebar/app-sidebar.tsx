@@ -7,24 +7,34 @@ import {
   BookOpen,
   Bot,
   Calendar,
+  Calendar1,
+  CalendarCheck,
+  CalendarMinus,
+  Clock1,
   Coins,
   Command,
   Database,
   Factory,
+  Files,
   Frame,
   GalleryVerticalEnd,
+  Headset,
   Home,
   LineChart,
   Map,
   MapPin,
+  Megaphone,
   Package,
+  Package2,
   PieChart,
   Settings,
   Settings2,
   ShoppingBag,
   Sparkles,
   SquareTerminal,
+  Store,
   Users,
+  Users2,
 } from "lucide-react"
 
 import { NavMain } from "./nav-main"
@@ -40,6 +50,7 @@ import {
 } from "@/components/ui/sidebar"
 import { NavSales } from "./nav.sales"
 import { NavInternal } from "./nav-internal"
+import { Badge } from "@/components/ui/badge"
 
 // This is sample data.
 const data = {
@@ -69,7 +80,7 @@ const data = {
     {
       title: "Employees",
       url: "#",
-      icon: Factory,
+      icon: Users2,
       isActive: false,
       items: [
         {
@@ -89,7 +100,7 @@ const data = {
     {
       title: "Attendances",
       url: "#",
-      icon: Factory,
+      icon: Clock1,
       isActive: false,
       items: [
         {
@@ -109,7 +120,7 @@ const data = {
     {
       title: "Leaves",
       url: "#",
-      icon: Factory,
+      icon: Calendar1,
       isActive: false,
       items: [
         {
@@ -125,27 +136,11 @@ const data = {
     {
       title: "Performance",
       url: "#",
-      icon: Factory,
+      icon: LineChart,
       isActive: false,
       items: [
         {
           title: "KPI Tracking",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Help Desk",
-      url: "#",
-      icon: Factory,
-      isActive: false,
-      items: [
-        {
-          title: "My Tickets",
-          url: "#",
-        },
-        {
-          title: "Tickets",
           url: "#",
         },
       ],
@@ -155,7 +150,7 @@ const data = {
     {
       title: "Inventory",
       url: "#",
-      icon: Factory,
+      icon: Package2,
       isActive: false,
       items: [
         {
@@ -175,7 +170,7 @@ const data = {
     {
       title: "Visits",
       url: "#",
-      icon: Factory,
+      icon: MapPin,
       isActive: false,
       items: [
         {
@@ -195,7 +190,7 @@ const data = {
     {
       title: "Expenses",
       url: "#",
-      icon: Factory,
+      icon: Coins,
       isActive: false,
       items: [
         {
@@ -211,7 +206,7 @@ const data = {
     {
       title: "Outlets",
       url: "#",
-      icon: Factory,
+      icon: Store,
       isActive: false,
       items: [
         {
@@ -227,7 +222,7 @@ const data = {
     {
       title: "Reports",
       url: "#",
-      icon: Factory,
+      icon: Files,
       isActive: false,
       items: [
         {
@@ -267,22 +262,41 @@ const data = {
         },
       ],
     },
+    {
+      title: "Help Desk",
+      url: "#",
+      icon: Headset,
+      isActive: false,
+      items: [
+        {
+          title: "My Tickets",
+          url: "#",
+        },
+        {
+          title: "Tickets",
+          url: "#",
+        },
+      ],
+    },
   ],
   projects: [
     {
       name: "Feed",
       url: "#",
       icon: Home,
+      component: null,
     },
     {
       name: "AI",
       url: "#",
       icon: Sparkles,
+      component: <Badge>Beta</Badge>,
     },
     {
-      name: "Settings",
-      url: "/d/settings",
-      icon: Settings,
+      name: "Announcements",
+      url: "/d/announcements",
+      icon: Megaphone,
+      component: null,
     },
   ],
 }

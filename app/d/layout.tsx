@@ -29,9 +29,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
           <SidebarTrigger className="-ml-1" />
 
-          <Separator orientation="vertical" className="mx-2 h-4" />
-
-          <AppBreadcrumb />
+          <span className="text-xs">beekeeper</span>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild className="ml-auto">
@@ -55,7 +53,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           </DropdownMenu>
         </header>
 
-        <main className="flex flex-1 flex-col gap-4 p-4">{children}</main>
+        <main className="flex flex-1 flex-col gap-4 p-4">
+          <AppBreadcrumb />
+          {children}
+        </main>
       </SidebarInset>
     </SidebarProvider>
   )

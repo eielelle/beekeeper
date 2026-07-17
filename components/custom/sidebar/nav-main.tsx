@@ -34,7 +34,7 @@ export function NavMain({
 }) {
   return (
     <SidebarGroup>
-      <SidebarGroupLabel>HRIS</SidebarGroupLabel>
+      <SidebarGroupLabel>Employee Management</SidebarGroupLabel>
       <SidebarMenu>
         {items.map((item) => (
           <Collapsible

@@ -25,6 +25,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import Link from "next/link"
+import { ReactNode } from "react"
 
 export function NavSecondary({
   projects,
@@ -33,6 +34,7 @@ export function NavSecondary({
     name: string
     url: string
     icon: LucideIcon
+    component: ReactNode
   }[]
 }) {
   return (
@@ -45,6 +47,7 @@ export function NavSecondary({
               <Link href={item.url}>
                 <item.icon />
                 <span>{item.name}</span>
+                {item.component}
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

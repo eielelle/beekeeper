@@ -243,7 +243,7 @@ export async function searchSkus(queryText: string = "", limit = 20) {
       sku_code,
       item_name,
       barcode,
-      sku_uoms ( uom_code )
+      sku_uoms ( uom_code, uom_name )
     `
     )
     .order("sku_code", { ascending: true })
