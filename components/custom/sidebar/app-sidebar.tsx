@@ -158,11 +158,23 @@ const data = {
           url: "#",
         },
         {
+          title: "My Bad Orders",
+          url: "#",
+        },
+        {
+          title: "My Sales-to-Trade",
+          url: "#",
+        },
+        {
           title: "Inventory",
           url: "#",
         },
         {
-          title: "Returns",
+          title: "Bad Orders",
+          url: "#",
+        },
+        {
+          title: "Sales-to-Trade",
           url: "#",
         },
       ],
@@ -215,6 +227,10 @@ const data = {
         },
         {
           title: "Outlets",
+          url: "/d/outlets",
+        },
+        {
+          title: "Outlet Assignment",
           url: "#",
         },
       ],

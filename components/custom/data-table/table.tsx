@@ -338,7 +338,7 @@ export function DataTable<TData extends { id?: string | number }>({
 
       {/* Embedded Add / Edit Form Dialog */}
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md lg:max-w-xl">
           <DialogHeader>
             <DialogTitle>
               {editingId ? `Edit ${entityName}` : `Add ${entityName}`}

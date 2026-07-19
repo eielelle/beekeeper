@@ -19,6 +19,8 @@ export type OutletStoreType = {
   geofence_radius: number
   org_id?: number
   created_at?: string
+  // Added to handle the self-joined distributor data for the UI
+  distributor?: { outlet_name: string } | null
 }
 
 export type FetchOutletsParams = {
@@ -26,6 +28,9 @@ export type FetchOutletsParams = {
   pageSize: number
   globalFilter?: string
   sorting?: { id: string; desc: boolean }[]
+  // New filter options
+  distributorFilter?: string
+  dateRange?: { from?: string; to?: string }
 }
 
 export async function fetchOutlets({
@@ -33,17 +38,46 @@ export async function fetchOutlets({
   pageSize,
   globalFilter,
   sorting,
+  distributorFilter,
+  dateRange,
 }: FetchOutletsParams) {
   const t = toast.loading("Fetching Outlets. Please wait.")
 
-  let query = supabase.from("outlets").select("*", { count: "exact" })
+  // Added a join to pull the name of the distributor from the same table via distributor_id
+  let query = supabase
+    .from("outlets")
+    // Use the column name directly to target the parent record
+    .select("*, distributor:distributor_id(outlet_name)", { count: "exact" })
 
+  // Global search filtering
   if (globalFilter) {
     query = query.or(
       `outlet_name.ilike.%${globalFilter}%,outlet_code.ilike.%${globalFilter}%,alt_outlet_name.ilike.%${globalFilter}%`
     )
   }
 
+  // Handle Distributor Dropdown Filter logic
+  if (distributorFilter) {
+    if (distributorFilter === "distributors") {
+      query = query.eq("is_distributor", true)
+    } else if (distributorFilter === "no_distributor") {
+      query = query.eq("is_distributor", false).is("distributor_id", null)
+    } else if (distributorFilter === "has_distributor") {
+      query = query
+        .eq("is_distributor", false)
+        .not("distributor_id", "is", null)
+    }
+  }
+
+  // Handle Created At Date Range Filters
+  if (dateRange?.from) {
+    query = query.gte("created_at", dateRange.from)
+  }
+  if (dateRange?.to) {
+    query = query.lte("created_at", dateRange.to)
+  }
+
+  // Sorting logic
   if (sorting && sorting.length > 0) {
     const sort = sorting[0]
     query = query.order(sort.id, { ascending: !sort.desc })
@@ -51,6 +85,7 @@ export async function fetchOutlets({
     query = query.order("created_at", { ascending: false })
   }
 
+  // Pagination logic
   const from = pageIndex * pageSize
   const to = from + pageSize - 1
   query = query.range(from, to)

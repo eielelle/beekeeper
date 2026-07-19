@@ -1,5 +1,5 @@
 // middleware.ts
-import { createServerClient } from "@supabase/ssr"
+import { createClient } from "@/lib/supabase-server"
 import { NextResponse, type NextRequest } from "next/server"
 
 export async function middleware(request: NextRequest) {
@@ -7,25 +7,20 @@ export async function middleware(request: NextRequest) {
     request,
   })
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll()
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            response.cookies.set(name, value, options)
-          })
-        },
-      },
-    }
-  )
+  // Refresh the auth session and get the current user
 
-  // IMPORTANT: refresh session
-  await supabase.auth.getUser()
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  // Protect all /d/* routes
+  if (request.nextUrl.pathname.startsWith("/d") && !user) {
+    const url = request.nextUrl.clone()
+    url.pathname = "/a/signin" // change to your login route
+    return NextResponse.redirect(url)
+  }
 
   return response
 }

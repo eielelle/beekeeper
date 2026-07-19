@@ -19,11 +19,15 @@ import { Input } from "@/components/ui/input"
 import { supabase } from "@/lib/supabase"
 import { useState } from "react"
 import { toast } from "sonner"
+import { redirect } from "next/navigation"
+import { useRouter } from "next/navigation"
 
 export function LoginForm() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
+
+  const router = useRouter()
 
   async function signin() {
     setLoading(true)
@@ -35,11 +39,13 @@ export function LoginForm() {
       })
 
       if (error) {
-        toast.error("Something went wrong.")
+        toast.error(error.message)
       } else {
         toast.success("Sign in successful")
+        router.replace("/d/home")
       }
     } catch (error) {
+      console.log(error)
       toast.error("Sign in failed.")
     }
 
