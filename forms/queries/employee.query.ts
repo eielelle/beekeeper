@@ -9,6 +9,10 @@ export type EmployeeStoreType = {
   last_name: string
   email?: string
   phone?: string
+  gender?: string
+  employment_start?: string
+  birthdate?: string
+  is_superuser?: boolean // <-- Added
   created_at?: string
 }
 
@@ -25,8 +29,6 @@ export async function fetchEmployees({
   globalFilter,
   sorting,
 }: FetchEmployeesParams) {
-  const t = toast.loading("Fetching Employees. Please wait.")
-
   let query = supabase.from("employees").select("*", { count: "exact" })
 
   if (globalFilter) {
@@ -48,8 +50,6 @@ export async function fetchEmployees({
 
   const { data, error, count } = await query
 
-  toast.dismiss(t)
-
   if (error) {
     toast.error(`ERR: ${error.message}`)
     throw error
@@ -62,15 +62,11 @@ export async function fetchEmployees({
 }
 
 export async function getEmployee(id: string) {
-  const t = toast.loading("Fetching Employee. Please wait.")
-
   const { data, error } = await supabase
     .from("employees")
     .select("*")
     .eq("id", id)
     .single()
-
-  toast.dismiss(t)
 
   if (error) {
     toast.error(`ERR: ${error.message}`)
@@ -79,6 +75,33 @@ export async function getEmployee(id: string) {
 
   return data
 }
+
+// Used securely by the My Outlets page
+export async function getCurrentEmployeeId() {
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    throw new Error("User is not authenticated.")
+  }
+
+  // Look up securely by the Auth ID, not the email string
+  const { data: employee, error: empError } = await supabase
+    .from("employees")
+    .select("id")
+    .eq("user_id", user.id) // <-- CHANGED FROM 'email' TO 'user_id'
+    .single()
+
+  if (empError || !employee) {
+    throw new Error("No employee record found for this account.")
+  }
+
+  return String(employee.id)
+}
+
+// --- MUTATIONS ---
 
 export async function createEmployee(value: EmployeeStoreType) {
   const t = toast.loading("Creating Employee. Please wait.")
@@ -134,4 +157,28 @@ export async function deleteEmployee(id: string) {
 
   toast.success("Employee successfully deleted.")
   return data
+}
+
+export async function searchEmployeeOptions(searchTerm: string) {
+  let query = supabase
+    .from("employees")
+    .select("id, first_name, last_name, employee_no")
+
+  if (searchTerm) {
+    query = query.or(
+      `first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,employee_no.ilike.%${searchTerm}%`
+    )
+  }
+
+  const { data, error } = await query.limit(20)
+
+  if (error) {
+    toast.error(`ERR: ${error.message}`)
+    return []
+  }
+
+  return (data || []).map((item) => ({
+    value: String(item.id),
+    label: `${item.first_name} ${item.last_name} (${item.employee_no})`,
+  }))
 }

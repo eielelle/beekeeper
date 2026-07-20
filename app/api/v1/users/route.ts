@@ -1,176 +1,123 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase-server"
 import { supabaseAdmin } from "@/lib/supabase-admin"
-import { cookies, headers } from "next/headers"
 
 export async function POST(req: Request) {
   try {
     const supabase = await createClient()
 
-    // Get logged-in user
+    // 1. Get logged-in Auth User
     const {
       data: { user },
       error: authError,
     } = await supabase.auth.getUser()
 
-    console.log(user)
-    const cookieStore = await cookies()
-    const headerStore = await headers()
-
-    console.log("COOKIES:", cookieStore.getAll())
-    console.log("COOKIE HEADER:", headerStore.get("cookie"))
-
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Get creator profile including company
-    const { data: creatorProfile, error: profileCheckError } = await supabase
-      .from("profiles")
-      .select("superuser, company_id")
-      .eq("user_id", user.id)
+    // 2. Check if creator is authorized (Now checking securely by user_id!)
+    const { data: creatorEmployee, error: employeeCheckError } = await supabase
+      .from("employees")
+      .select("is_superuser, org_id")
+      .eq("user_id", user.id) // <-- SECURE LOOKUP
       .single()
 
     if (
-      profileCheckError ||
-      !creatorProfile ||
-      creatorProfile.superuser !== true
+      employeeCheckError ||
+      !creatorEmployee ||
+      creatorEmployee.is_superuser !== true
     ) {
       return NextResponse.json(
-        {
-          error: "Only superusers can create users",
-        },
-        {
-          status: 403,
-        }
+        { error: "Only superusers can create users" },
+        { status: 403 }
       )
     }
 
-    if (!creatorProfile.company_id) {
+    if (!creatorEmployee.org_id) {
       return NextResponse.json(
-        {
-          error: "Creator has no company assigned",
-        },
-        {
-          status: 400,
-        }
+        { error: "Creator has no organization assigned" },
+        { status: 400 }
       )
     }
 
     const body = await req.json()
 
+    // 3. Extract fields
     const {
       employee_no,
       first_name,
+      middle_name,
       last_name,
       email,
       phone,
-      gender,
-      team_id,
-      agency_id,
-      employment_start,
-      employment_end,
       password,
+      gender,
+      birthdate,
+      employment_start,
+      is_superuser,
     } = body
 
-    if (!employee_no || !email || !password || !gender || !employment_start) {
+    if (!employee_no || !first_name || !last_name || !email || !password) {
       return NextResponse.json(
-        {
-          error: "Missing required fields",
-        },
-        {
-          status: 400,
-        }
+        { error: "Missing required fields" },
+        { status: 400 }
       )
     }
 
-    // Create auth account
+    // 4. Create the Supabase Auth Account
     const { data: authUser, error: authErrorCreate } =
       await supabaseAdmin.auth.admin.createUser({
         email,
-
         password,
-
         email_confirm: true,
       })
 
     if (authErrorCreate) {
       return NextResponse.json(
-        {
-          error: authErrorCreate.message,
-        },
-        {
-          status: 400,
-        }
+        { error: authErrorCreate.message },
+        { status: 400 }
       )
     }
 
-    // Create profile using creator company_id
-    const { data: profile, error: profileError } = await supabaseAdmin
-      .from("profiles")
+    // 5. Insert into the `employees` table WITH the user_id
+    const { data: employee, error: employeeError } = await supabaseAdmin
+      .from("employees")
       .insert({
-        user_id: authUser.user.id,
-
+        user_id: authUser.user.id, // <-- LINKING THE ACCOUNTS
         employee_no,
-
         first_name,
-
+        middle_name,
         last_name,
-
         email,
-
         phone,
-
         gender,
-
-        team_id,
-
-        agency_id,
-
+        birthdate,
         employment_start,
-
-        employment_end,
-
-        // automatically inherited
-        company_id: creatorProfile.company_id,
-
-        superuser: false,
+        is_superuser: is_superuser || false,
+        org_id: creatorEmployee.org_id,
       })
       .select()
       .single()
 
-    if (profileError) {
+    // 6. Rollback if DB insert fails
+    if (employeeError) {
       await supabaseAdmin.auth.admin.deleteUser(authUser.user.id)
-
       return NextResponse.json(
-        {
-          error: profileError.message,
-        },
-        {
-          status: 400,
-        }
+        { error: employeeError.message },
+        { status: 400 }
       )
     }
 
     return NextResponse.json(
-      {
-        message: "User created successfully",
-        profile,
-      },
-      {
-        status: 201,
-      }
+      { message: "User created successfully", employee },
+      { status: 201 }
     )
   } catch (error) {
     console.error(error)
-
     return NextResponse.json(
-      {
-        error: "Internal server error",
-      },
-      {
-        status: 500,
-      }
+      { error: "Internal server error" },
+      { status: 500 }
     )
   }
 }

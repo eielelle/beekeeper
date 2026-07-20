@@ -31,6 +31,9 @@ export type FetchOutletsParams = {
   // New filter options
   distributorFilter?: string
   dateRange?: { from?: string; to?: string }
+  region?: string
+  province?: string
+  city?: string
 }
 
 export async function fetchOutlets({
@@ -40,6 +43,9 @@ export async function fetchOutlets({
   sorting,
   distributorFilter,
   dateRange,
+  region,
+  province,
+  city,
 }: FetchOutletsParams) {
   const t = toast.loading("Fetching Outlets. Please wait.")
 
@@ -52,7 +58,7 @@ export async function fetchOutlets({
   // Global search filtering
   if (globalFilter) {
     query = query.or(
-      `outlet_name.ilike.%${globalFilter}%,outlet_code.ilike.%${globalFilter}%,alt_outlet_name.ilike.%${globalFilter}%`
+      `outlet_name.ilike.%${globalFilter}%,outlet_code.ilike.%${globalFilter}%`
     )
   }
 
@@ -84,6 +90,10 @@ export async function fetchOutlets({
   } else {
     query = query.order("created_at", { ascending: false })
   }
+
+  if (region) query = query.eq("region", region)
+  if (province) query = query.eq("province", province)
+  if (city) query = query.eq("city", city)
 
   // Pagination logic
   const from = pageIndex * pageSize
@@ -217,4 +227,36 @@ export async function searchDistributorOptions(searchTerm: string) {
     value: String(item.id),
     label: item.outlet_name,
   }))
+}
+
+// Add this to your imports if you don't already have it
+// import { createClient } from "@/utils/supabase/client" (or however your supabase client is configured)
+
+export const fetchOutletStats = async () => {
+  const [totalRes, distRes, activeRes, inactiveRes] = await Promise.all([
+    // Count all records (or add .eq('is_distributor', false) if you only want standard outlets)
+    supabase.from("outlets").select("*", { count: "exact", head: true }),
+    // Count distributors
+    supabase
+      .from("outlets")
+      .select("*", { count: "exact", head: true })
+      .eq("is_distributor", true),
+    // Count active
+    supabase
+      .from("outlets")
+      .select("*", { count: "exact", head: true })
+      .eq("is_active", true),
+    // Count inactive
+    supabase
+      .from("outlets")
+      .select("*", { count: "exact", head: true })
+      .eq("is_active", false),
+  ])
+
+  return {
+    outlets: totalRes.count ?? 0,
+    distributors: distRes.count ?? 0,
+    active: activeRes.count ?? 0,
+    inactive: inactiveRes.count ?? 0,
+  }
 }

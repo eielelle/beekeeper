@@ -85,15 +85,7 @@ const data = {
       items: [
         {
           title: "Employee Directory",
-          url: "#",
-        },
-        {
-          title: "Onboarding",
-          url: "/d/production/new",
-        },
-        {
-          title: "Offboarding",
-          url: "/d/production/new",
+          url: "/d/employees",
         },
       ],
     },

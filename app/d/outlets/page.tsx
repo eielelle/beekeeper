@@ -8,28 +8,58 @@ import {
   PaginationState,
   Updater,
 } from "@tanstack/react-table"
-import { ArrowUpDown } from "lucide-react"
+import {
+  ArrowUpDown,
+  TrendingUp,
+  Store,
+  Truck,
+  CheckCircle2,
+  XCircle,
+} from "lucide-react"
 import { useRouter, usePathname, useSearchParams } from "next/navigation"
 
-import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
 
 import { DataTable } from "@/components/custom/data-table/table"
 import {
+  DynamicFilter,
+  FilterField,
+} from "@/components/custom/filter/dynamic-filter"
+import {
   deleteOutlet,
   fetchOutlets,
+  fetchOutletStats,
   OutletStoreType,
 } from "@/forms/queries/outlet.query"
 import { OutletForm } from "@/forms/outlet.form"
+
+// Define the fields configuration for your DynamicFilter
+const filterFields: FilterField[] = [
+  {
+    id: "type",
+    label: "Outlet Type",
+    type: "select",
+    options: [
+      { label: "Distributors", value: "distributors" },
+      { label: "Outlets with no Distributor", value: "no_distributor" },
+      { label: "Outlets with Distributor", value: "has_distributor" },
+    ],
+    placeholder: "Filter by type",
+  },
+  {
+    id: "dateFrom",
+    label: "Date From",
+    type: "date",
+  },
+  {
+    id: "dateTo",
+    label: "Date To",
+    type: "date",
+  },
+]
 
 export default function Page() {
   const queryClient = useQueryClient()
@@ -57,7 +87,6 @@ export default function Page() {
       params.set("page", newPagination.pageIndex.toString())
       params.set("size", newPagination.pageSize.toString())
 
-      // Update URL without scrolling to the top
       router.push(`${pathname}?${params.toString()}`, { scroll: false })
     },
     [pagination, searchParams, pathname, router]
@@ -67,12 +96,31 @@ export default function Page() {
   const [globalFilter, setGlobalFilter] = React.useState("")
   const [sorting, setSorting] = React.useState<SortingState>([])
 
-  // --- New Filter States ---
-  const [distributorFilter, setDistributorFilter] = React.useState("all")
-  const [dateFrom, setDateFrom] = React.useState<string>("")
-  const [dateTo, setDateTo] = React.useState<string>("")
+  // --- Unified Filter State for DynamicFilter ---
+  const [filterValues, setFilterValues] = React.useState<
+    Record<string, string>
+  >({})
 
-  // --- Supabase Query ---
+  const handleApplyFilters = (newValues: Record<string, string>) => {
+    setFilterValues(newValues)
+    setPagination((prev) => ({ ...prev, pageIndex: 0 }))
+  }
+
+  const handleClearFilters = () => {
+    setFilterValues({})
+    setPagination((prev) => ({ ...prev, pageIndex: 0 }))
+  }
+
+  // Extract variables for the query payload
+  // The DynamicFilter returns " " for the 'All' option on selects, so we fallback to "all" for the DB query
+  const distributorFilter =
+    filterValues.type && filterValues.type.trim() !== ""
+      ? filterValues.type
+      : "all"
+  const dateFrom = filterValues.dateFrom || ""
+  const dateTo = filterValues.dateTo || ""
+
+  // --- Supabase Query: Table Data ---
   const { data, isLoading } = useQuery({
     queryKey: [
       "outlets",
@@ -99,6 +147,12 @@ export default function Page() {
               }
             : undefined,
       }),
+  })
+
+  // --- Supabase Query: Stats ---
+  const { data: statsData, isLoading: isLoadingStats } = useQuery({
+    queryKey: ["outlets", "stats"],
+    queryFn: fetchOutletStats,
   })
 
   // --- Delete Mutation ---
@@ -164,7 +218,6 @@ export default function Page() {
           const distributor = row.original.distributor
           return (
             <div className="flex flex-col">
-              {/* Display distributor above outlet name if it exists */}
               {distributor && (
                 <span className="mb-0.5 text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
                   {distributor.outlet_name}
@@ -210,73 +263,109 @@ export default function Page() {
   )
 
   return (
-    <div className="flex flex-col space-y-4">
-      {/* Custom Filters Layout */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
-        {/* Distributor Filter Dropdown */}
-        <div>
-          <p className="mb-2 text-xs font-semibold">Filter by Outlets</p>
-          <Select
-            value={distributorFilter}
-            onValueChange={setDistributorFilter}
-          >
-            <SelectTrigger className="w-full sm:w-[240px]">
-              <SelectValue placeholder="Filter by type" />
-            </SelectTrigger>
-            <SelectContent position="popper" side="bottom">
-              <SelectItem value="all">All Outlets</SelectItem>
-              <SelectItem value="distributors">Distributors</SelectItem>
-              <SelectItem value="no_distributor">
-                Outlets with no Distributor
-              </SelectItem>
-              <SelectItem value="has_distributor">
-                Outlets with Distributor
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+    <div className="flex flex-col space-y-6">
+      {/* Stats Section */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card className="bg-primary">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Outlets</CardTitle>
+            <Store className="h-4 w-4" />
+          </CardHeader>
+          <CardContent>
+            {isLoadingStats ? (
+              <Skeleton className="h-8 w-[60px]" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold">
+                  {statsData?.outlets ?? 0}
+                </div>
+                <p className="mt-1 flex items-center text-xs">
+                  Total mapped locations
+                </p>
+              </>
+            )}
+          </CardContent>
+        </Card>
 
-        {/* Date Filters */}
-        <div className="flex items-center gap-2">
-          <div className="flex flex-col">
-            <p className="mb-2 text-xs font-semibold">Date From</p>
-            <Input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              className="w-full sm:w-[150px]"
-            />
-          </div>
-          <div className="flex flex-col">
-            <p className="mb-2 text-xs font-semibold">Date To</p>
-            <Input
-              type="date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              className="w-full sm:w-[150px]"
-            />
-          </div>
-        </div>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Distributors</CardTitle>
+            <Truck className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {isLoadingStats ? (
+              <Skeleton className="h-8 w-[60px]" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold">
+                  {statsData?.distributors ?? 0}
+                </div>
+                <p className="mt-1 flex items-center text-xs text-muted-foreground">
+                  Active delivery hubs
+                </p>
+              </>
+            )}
+          </CardContent>
+        </Card>
 
-        {/* Optional Clear Filters Button */}
-        {(dateFrom || dateTo || distributorFilter !== "all") && (
-          <Button
-            className="underline"
-            variant="ghost"
-            onClick={() => {
-              setDateFrom("")
-              setDateTo("")
-              setDistributorFilter("all")
-            }}
-          >
-            Clear Filters
-          </Button>
-        )}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active</CardTitle>
+            <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {isLoadingStats ? (
+              <Skeleton className="h-8 w-[60px]" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold">
+                  {statsData?.active ?? 0}
+                </div>
+                <p className="mt-1 flex items-center text-xs font-medium text-emerald-500">
+                  <TrendingUp className="mr-1 h-3 w-3" />
+                  Currently operational
+                </p>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Inactive</CardTitle>
+            <XCircle className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {isLoadingStats ? (
+              <Skeleton className="h-8 w-[60px]" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold">
+                  {statsData?.inactive ?? 0}
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Disabled locations
+                </p>
+              </>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
+      {/* Dynamic Filters Toolbar Container */}
+      <DynamicFilter
+        title="Filter Outlets"
+        description="Narrow down the outlets and distributors by type or creation date."
+        fields={filterFields}
+        values={filterValues}
+        onApply={handleApplyFilters}
+        onClear={handleClearFilters}
+      />
+
+      {/* Data Table */}
       <DataTable
         title="Outlets"
-        description="Manage sales outlets, distributors, and location mapping"
+        description="Manage your outlets here"
         entityName="Outlet"
         columns={columns}
         data={data?.data ?? []}

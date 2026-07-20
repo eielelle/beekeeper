@@ -1,4 +1,4 @@
-import { createServerClient, createBrowserClient } from "@supabase/ssr"
+import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 
 export async function createClient() {
@@ -13,9 +13,15 @@ export async function createClient() {
           return cookieStore.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options)
-          )
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            )
+          } catch {
+            // The `catch` is required!
+            // It silently ignores the error if Supabase tries to update a cookie
+            // from inside a Server Component (where cookies are read-only).
+          }
         },
       },
     }
