@@ -3,7 +3,7 @@
 import * as React from "react"
 import { useForm } from "@tanstack/react-form"
 import * as z from "zod"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Loader2 } from "lucide-react"
 
@@ -32,6 +32,7 @@ export function EmployeeForm({
 }) {
   const queryClient = useQueryClient()
   const params = useParams()
+  const router = useRouter()
 
   let id = params?.id as string | undefined
   if (editId) {
@@ -53,7 +54,7 @@ export function EmployeeForm({
         gender?: string
         employment_start?: string
         birthdate?: string
-        is_superuser?: boolean // <-- Added
+        is_superuser?: boolean
       }
     ) => {
       if (isEditMode) {
@@ -63,10 +64,7 @@ export function EmployeeForm({
           id,
         })
       } else {
-        // Create Mode: Hit your API route to create Auth User + Profile
-
-        // Auto-generate password: lowercase last_name + birthdate (YYYYMMDD)
-        // e.g., "cruz" + "1990-05-15" -> "cruz19900515"
+        // Create Mode: Hit your API route
         const formattedDate = values.birthdate
           ? values.birthdate.replace(/-/g, "")
           : ""
@@ -90,17 +88,26 @@ export function EmployeeForm({
           throw new Error(errData.error || "Failed to create user account.")
         }
 
+        // Return the API response so onSuccess can read the new employee ID
         return await res.json()
       }
     },
-    onSuccess: () => {
+    // The `data` parameter receives whatever was returned from mutationFn
+    onSuccess: (data) => {
       toast.success(
         isEditMode ? "Employee updated." : "User account created successfully."
       )
       queryClient.invalidateQueries({ queryKey: ["employees"] })
-      form.reset()
-      if (onClose) {
-        onClose()
+
+      if (!isEditMode && data?.employee?.id) {
+        // If we just created an employee, extract their ID and redirect to the work info tab
+        router.push(`/d/employees/edit/${data.employee.id}/work-information`)
+      } else {
+        // If we just updated an existing employee, stay on the page and optionally close modal
+        form.reset()
+        if (onClose) {
+          onClose()
+        }
       }
     },
     onError: (error: any) => {
