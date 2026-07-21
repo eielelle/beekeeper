@@ -1,5 +1,6 @@
 import { ReactNode } from "react"
 import { redirect } from "next/navigation"
+import { bee } from "@lucide/lab"
 
 import { AppSidebar } from "@/components/custom/sidebar/app-sidebar"
 import { AppBreadcrumb } from "@/components/custom/breadcrumbs/app-breadcrumb"
@@ -18,8 +19,9 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar"
 
-import { Bell } from "lucide-react"
+import { Bell, Icon } from "lucide-react"
 import { createClient } from "@/lib/supabase-server"
+import Logo from "@/components/custom/assets/logo"
 
 export default async function DashboardLayout({
   children,
@@ -43,7 +45,9 @@ export default async function DashboardLayout({
         <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
           <SidebarTrigger className="-ml-1" />
 
-          <span className="text-xs">beekeeper</span>
+          <span className="text-xs">
+            <Logo />
+          </span>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild className="ml-auto">

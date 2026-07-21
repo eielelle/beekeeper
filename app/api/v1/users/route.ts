@@ -56,6 +56,7 @@ export async function POST(req: Request) {
       birthdate,
       employment_start,
       is_superuser,
+      avatar_url,
     } = body
 
     if (!employee_no || !first_name || !last_name || !email || !password) {
@@ -95,6 +96,7 @@ export async function POST(req: Request) {
         birthdate,
         employment_start,
         is_superuser: is_superuser || false,
+        avatar_url,
         org_id: creatorEmployee.org_id,
       })
       .select()
@@ -117,6 +119,73 @@ export async function POST(req: Request) {
     console.error(error)
     return NextResponse.json(
       { error: "Internal server error" },
+      { status: 500 }
+    )
+  }
+}
+
+export async function DELETE(req: Request) {
+  try {
+    // Extract the ID from the URL (e.g., /api/v1/users?id=123)
+    const { searchParams } = new URL(req.url)
+    const employeeId = searchParams.get("id")
+
+    if (!employeeId) {
+      return NextResponse.json(
+        { error: "Employee ID is required." },
+        { status: 400 }
+      )
+    }
+
+    // 1. Find the employee to get their Auth user_id
+    const { data: employee, error: fetchError } = await supabaseAdmin
+      .from("employees")
+      .select("user_id")
+      .eq("id", employeeId)
+      .single()
+
+    if (fetchError || !employee) {
+      return NextResponse.json(
+        { error: "Employee not found." },
+        { status: 404 }
+      )
+    }
+
+    const authUserId = employee.user_id
+
+    // 2. If they have an associated Auth account, delete it using the Admin API
+    if (authUserId) {
+      const { error: authError } =
+        await supabaseAdmin.auth.admin.deleteUser(authUserId)
+
+      if (authError) {
+        return NextResponse.json(
+          { error: `Auth Error: ${authError.message}` },
+          { status: 500 }
+        )
+      }
+    }
+
+    // 3. Delete the employee record from the public.employees table
+    const { error: dbError } = await supabaseAdmin
+      .from("employees")
+      .delete()
+      .eq("id", employeeId)
+
+    if (dbError) {
+      return NextResponse.json(
+        { error: `Database Error: ${dbError.message}` },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json(
+      { success: true, message: "Employee and Auth account deleted." },
+      { status: 200 }
+    )
+  } catch (error: any) {
+    return NextResponse.json(
+      { error: error.message || "Internal Server Error" },
       { status: 500 }
     )
   }

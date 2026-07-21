@@ -12,7 +12,8 @@ export type EmployeeStoreType = {
   gender?: string
   employment_start?: string
   birthdate?: string
-  is_superuser?: boolean // <-- Added
+  is_superuser?: boolean
+  avatar_url?: string
   created_at?: string
 }
 
@@ -143,20 +144,20 @@ export async function updateEmployee(value: EmployeeStoreType) {
   return data
 }
 
-export async function deleteEmployee(id: string) {
-  const t = toast.loading("Deleting Employee. Please wait.")
+export async function deleteEmployee(id: string | number) {
+  // Hit your existing route and pass the ID as a search parameter
+  const res = await fetch(`/api/v1/users?id=${id}`, {
+    method: "DELETE",
+  })
 
-  const { data, error } = await supabase.from("employees").delete().eq("id", id)
-
-  toast.dismiss(t)
-
-  if (error) {
-    toast.error(`ERR: ${error.message}`)
-    throw error
+  if (!res.ok) {
+    const errData = await res.json()
+    throw new Error(
+      errData.error || "Failed to delete employee and auth account."
+    )
   }
 
-  toast.success("Employee successfully deleted.")
-  return data
+  return await res.json()
 }
 
 export async function searchEmployeeOptions(searchTerm: string) {

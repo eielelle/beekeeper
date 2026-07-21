@@ -52,13 +52,11 @@ import { NavSales } from "./nav.sales"
 import { NavInternal } from "./nav-internal"
 import { Badge } from "@/components/ui/badge"
 
+// Import your custom hook here
+import { useCurrentEmployee } from "@/hooks/use-current-employee"
+
 // This is sample data.
 const data = {
-  user: {
-    name: "shadcn",
-    email: "m@example.com",
-    avatar: "/avatars/shadcn.jpg",
-  },
   teams: [
     {
       name: "Acme Inc",
@@ -102,10 +100,6 @@ const data = {
         {
           title: "Attendance Logs",
           url: "#",
-        },
-        {
-          title: "Attendance Adjustments",
-          url: "/d/production/new",
         },
       ],
     },
@@ -255,7 +249,6 @@ const data = {
           title: "Overview",
           url: "#",
         },
-
         {
           title: "Reports",
           url: "#",
@@ -310,6 +303,55 @@ const data = {
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  // Use your custom hook!
+  const { user, employee, isLoading } = useCurrentEmployee()
+
+  // Compute the user details for the UI using the hook's data
+  const sidebarUser = React.useMemo(() => {
+    if (isLoading) {
+      return { name: "Loading...", email: "", avatar: "" }
+    }
+
+    if (!user) {
+      return { name: "Guest", email: "", avatar: "" }
+    }
+
+    // If they have an employee record, format their name and dicebear avatar
+    if (employee) {
+      const fullName =
+        `${employee.first_name || ""} ${employee.last_name || ""}`.trim()
+      let avatarUrl = employee.avatar_url
+
+      if (!avatarUrl) {
+        const seedName = encodeURIComponent(
+          `${fullName} ${employee.gender || ""}`
+        )
+        let bgColors = "backgroundColor=b6e3f4,c0aede,d1d4f9"
+
+        if (employee.gender === "Female") {
+          bgColors = "backgroundColor=ffdfbf,ffd5dc,f4dce8"
+        } else if (employee.gender === "Male") {
+          bgColors = "backgroundColor=b6e3f4,c0aede,d1d4f9"
+        }
+
+        avatarUrl = `https://api.dicebear.com/9.x/lorelei/svg?seed=${seedName}&${bgColors}`
+      }
+
+      return {
+        name: fullName || "Employee",
+        email: user.email || "",
+        avatar: avatarUrl,
+      }
+    }
+
+    // Fallback if auth user exists but has no linked employee profile yet
+    return {
+      name: user.email?.split("@")[0] || "User",
+      email: user.email || "",
+      avatar: `https://api.dicebear.com/9.x/lorelei/svg?seed=${user.email}&backgroundColor=b6e3f4,c0aede,d1d4f9`,
+    }
+  }, [user, employee, isLoading])
+
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
@@ -322,7 +364,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavInternal items={data.navInternal} />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser user={sidebarUser} />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
