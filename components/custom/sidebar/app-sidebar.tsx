@@ -209,7 +209,7 @@ const data = {
       items: [
         {
           title: "My Outlets",
-          url: "#",
+          url: "/d/outlets/my-outlets",
         },
         {
           title: "Outlets",
@@ -217,7 +217,7 @@ const data = {
         },
         {
           title: "Outlet Assignment",
-          url: "#",
+          url: "/d/outlets/assignments",
         },
       ],
     },
