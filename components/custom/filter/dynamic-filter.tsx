@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Filter, X } from "lucide-react"
+import { Filter, X, Check, ChevronsUpDown, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -21,15 +21,31 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command"
 
-export type FilterType = "text" | "select" | "date"
+export type FilterType = "text" | "select" | "date" | "combobox"
 
 export interface FilterField {
   id: string
   label: string
   type: FilterType
-  options?: { label: string; value: string }[] // Required if type === "select"
+  options?: { label: string; value: string; description?: string }[] // Required for select/combobox
   placeholder?: string
+  // Combobox specific props
+  onSearchChange?: (val: string) => void // Allows parent to fetch options dynamically
+  isLoading?: boolean // Shows a spinner while searching
 }
 
 interface DynamicFilterProps {
@@ -39,6 +55,103 @@ interface DynamicFilterProps {
   values: Record<string, string>
   onApply: (values: Record<string, string>) => void
   onClear: () => void
+}
+
+// Internal component to manage individual combobox popover state cleanly
+function FilterCombobox({
+  field,
+  value,
+  onChange,
+}: {
+  field: FilterField
+  value: string
+  onChange: (val: string, label?: string) => void
+}) {
+  const [open, setOpen] = React.useState(false)
+
+  // Find the selected option to display its label
+  const selectedOption = field.options?.find((o) => o.value === value)
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between font-normal"
+        >
+          <span className="truncate">
+            {value && value !== " "
+              ? selectedOption?.label || value
+              : field.placeholder || `Select ${field.label}`}
+          </span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent
+        className="w-[--radix-popover-trigger-width] p-0"
+        align="start"
+      >
+        <Command shouldFilter={!field.onSearchChange}>
+          <CommandInput
+            placeholder={`Search ${field.label.toLowerCase()}...`}
+            onValueChange={field.onSearchChange}
+          />
+          <CommandList>
+            {field.isLoading ? (
+              <div className="flex h-16 items-center justify-center">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : !field.options || field.options.length === 0 ? (
+              <CommandEmpty>No results found.</CommandEmpty>
+            ) : (
+              <CommandGroup>
+                <CommandItem
+                  value=" "
+                  onSelect={() => {
+                    onChange(" ", "All")
+                    setOpen(false)
+                  }}
+                >
+                  <Check
+                    className={`mr-2 h-4 w-4 ${
+                      value === " " || !value ? "opacity-100" : "opacity-0"
+                    }`}
+                  />
+                  All
+                </CommandItem>
+                {field.options.map((opt) => (
+                  <CommandItem
+                    key={opt.value}
+                    value={opt.value}
+                    onSelect={() => {
+                      onChange(opt.value, opt.label)
+                      setOpen(false)
+                    }}
+                  >
+                    <Check
+                      className={`mr-2 h-4 w-4 ${
+                        value === opt.value ? "opacity-100" : "opacity-0"
+                      }`}
+                    />
+                    <div className="flex flex-col">
+                      <span className="font-medium">{opt.label}</span>
+                      {opt.description && (
+                        <span className="text-xs text-muted-foreground">
+                          {opt.description}
+                        </span>
+                      )}
+                    </div>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  )
 }
 
 export function DynamicFilter({
@@ -52,6 +165,9 @@ export function DynamicFilter({
   const [isOpen, setIsOpen] = React.useState(false)
   const [draftValues, setDraftValues] =
     React.useState<Record<string, string>>(values)
+
+  // Cache labels for async comboboxes so badges don't revert to raw IDs when search results change
+  const [labelCache, setLabelCache] = React.useState<Record<string, string>>({})
 
   // Sync draft values when sheet opens
   React.useEffect(() => {
@@ -77,18 +193,26 @@ export function DynamicFilter({
     onApply(newValues)
   }
 
+  const updateDraftValue = (key: string, val: string, label?: string) => {
+    setDraftValues((prev) => ({ ...prev, [key]: val }))
+    if (label && val !== " ") {
+      setLabelCache((prev) => ({ ...prev, [val]: label }))
+    }
+  }
+
   // Count active filters (ignoring empty strings or undefined)
   const activeKeys = Object.keys(values).filter((key) => Boolean(values[key]))
-  const activeCount = activeKeys.length
+  const activeCount = activeKeys.filter((k) => values[k] !== " ").length
 
   // Helper to get human-readable labels for badges
   const getBadgeDisplay = (key: string, val: string) => {
     const field = fields.find((f) => f.id === key)
     if (!field) return val
 
-    if (field.type === "select" && field.options) {
-      const option = field.options.find((o) => o.value === val)
-      return `${field.label}: ${option ? option.label : val}`
+    if (field.type === "select" || field.type === "combobox") {
+      const option = field.options?.find((o) => o.value === val)
+      const label = option ? option.label : labelCache[val] || val
+      return `${field.label}: ${label}`
     }
     return `${field.label}: ${val}`
   }
@@ -124,9 +248,7 @@ export function DynamicFilter({
                 {field.type === "select" && field.options && (
                   <Select
                     value={draftValues[field.id] || ""}
-                    onValueChange={(val) =>
-                      setDraftValues({ ...draftValues, [field.id]: val })
-                    }
+                    onValueChange={(val) => updateDraftValue(field.id, val)}
                   >
                     <SelectTrigger>
                       <SelectValue
@@ -136,7 +258,6 @@ export function DynamicFilter({
                       />
                     </SelectTrigger>
                     <SelectContent position="popper" side="bottom">
-                      {/* Empty string acts as the "All" or "Reset" choice for a select */}
                       <SelectItem value=" ">All</SelectItem>
                       {field.options.map((opt) => (
                         <SelectItem key={opt.value} value={opt.value}>
@@ -147,17 +268,22 @@ export function DynamicFilter({
                   </Select>
                 )}
 
+                {field.type === "combobox" && (
+                  <FilterCombobox
+                    field={field}
+                    value={draftValues[field.id] || ""}
+                    onChange={(val, label) =>
+                      updateDraftValue(field.id, val, label)
+                    }
+                  />
+                )}
+
                 {(field.type === "text" || field.type === "date") && (
                   <Input
                     type={field.type}
                     placeholder={field.placeholder}
                     value={draftValues[field.id] || ""}
-                    onChange={(e) =>
-                      setDraftValues({
-                        ...draftValues,
-                        [field.id]: e.target.value,
-                      })
-                    }
+                    onChange={(e) => updateDraftValue(field.id, e.target.value)}
                   />
                 )}
               </div>
@@ -186,7 +312,7 @@ export function DynamicFilter({
               <Badge
                 key={key}
                 variant="secondary"
-                className="flex items-center gap-1 pr-1"
+                className="flex items-center gap-1 pr-1 font-normal"
               >
                 {getBadgeDisplay(key, values[key])}
                 <button

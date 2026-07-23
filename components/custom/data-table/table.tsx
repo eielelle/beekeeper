@@ -55,6 +55,11 @@ interface DataTableProps<TData extends { id?: string | number }> {
   description?: string
   entityName?: string // e.g., "SKU Category" (used in Dialog headings and labels)
 
+  // Permissions / Action Toggles
+  canCreate?: boolean
+  canUpdate?: boolean
+  canDelete?: boolean
+
   // Data & Pagination
   columns: ColumnDef<TData, unknown>[]
   data: TData[]
@@ -89,6 +94,9 @@ export function DataTable<TData extends { id?: string | number }>({
   title,
   description,
   entityName = "Item",
+  canCreate = true,
+  canUpdate = true,
+  canDelete = true,
   columns,
   data,
   rowCount,
@@ -138,8 +146,15 @@ export function DataTable<TData extends { id?: string | number }>({
     }
   }
 
-  // Inject Actions Column (Edit/Delete) automatically if onDelete or renderForm are passed
+  // Inject Actions Column (Edit/Delete) based on permissions and provided handlers
   const tableColumns = React.useMemo(() => {
+    const showActions = canUpdate || (canDelete && !!onDelete)
+
+    // If neither edit nor delete are allowed, return columns as-is
+    if (!showActions) {
+      return columns
+    }
+
     const actionsColumn: ColumnDef<TData, unknown> = {
       id: "actions",
       header: () => <div className="text-right">Actions</div>,
@@ -155,11 +170,13 @@ export function DataTable<TData extends { id?: string | number }>({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => handleOpenEdit(item.id!)}>
-                  <Pencil className="mr-2 h-4 w-4" />
-                  Edit
-                </DropdownMenuItem>
-                {onDelete && (
+                {canUpdate && (
+                  <DropdownMenuItem onClick={() => handleOpenEdit(item.id!)}>
+                    <Pencil className="mr-2 h-4 w-4" />
+                    Edit
+                  </DropdownMenuItem>
+                )}
+                {canDelete && onDelete && (
                   <DropdownMenuItem
                     className="text-red-600 focus:text-red-600"
                     onClick={() => handleOpenDelete(item)}
@@ -176,7 +193,7 @@ export function DataTable<TData extends { id?: string | number }>({
     }
 
     return [...columns, actionsColumn]
-  }, [columns, onDelete])
+  }, [columns, onDelete, canUpdate, canDelete])
 
   const table = useReactTable({
     data,
@@ -202,10 +219,12 @@ export function DataTable<TData extends { id?: string | number }>({
               <p className="text-xs text-muted-foreground">{description}</p>
             )}
           </div>
-          <Button size="sm" onClick={handleOpenAdd}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add {entityName}
-          </Button>
+          {canCreate && (
+            <Button size="sm" onClick={handleOpenAdd}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add {entityName}
+            </Button>
+          )}
         </header>
 
         {/* Search + Filters */}
