@@ -66,19 +66,22 @@ export function ExpenseReportForm({
   })
 
   // 2. Mutations
-  const mutation = useMutation({
-    mutationFn: (values: z.infer<typeof expenseReportSchema>) => {
-      if (isEditMode) {
-        return updateExpenseReport(id!, values)
-      }
-      return createExpenseReport(values)
-    },
-    onSuccess: () => {
-      form.reset()
-      if (onClose) onClose()
-    },
-  })
-  // 1. Define your typed default values object using Zod's input type inference
+  const mutation = useMutation<any, Error, z.infer<typeof expenseReportSchema>>(
+    {
+      mutationFn: async (values) => {
+        if (isEditMode) {
+          return await updateExpenseReport(id!, values)
+        }
+        return await createExpenseReport(values)
+      },
+      onSuccess: () => {
+        form.reset()
+        if (onClose) onClose()
+      },
+    }
+  )
+
+  // 3. Define typed default values object using Zod's input type inference
   const dv: z.input<typeof expenseReportSchema> = {
     report_title: reportData?.report_title ?? "",
     report_description: reportData?.report_description ?? "",
@@ -99,7 +102,7 @@ export function ExpenseReportForm({
         })) ?? [],
     })) ?? [
       {
-        expense_type_id: "",
+        expense_type_id: 0,
         date_from: "",
         date_to: "",
         amount: 0,
@@ -109,7 +112,7 @@ export function ExpenseReportForm({
     ],
   }
 
-  // 2. Pass `dv` into TanStack `useForm`
+  // 4. Pass `dv` into TanStack `useForm`
   const form = useForm({
     defaultValues: dv,
     validators: {
@@ -143,9 +146,9 @@ export function ExpenseReportForm({
         form.handleSubmit()
       }}
     >
-      <pre className="text-xs">
-        {JSON.stringify(form.state.errorMap, null, 2)}
-      </pre>
+      {/* Remove in production - helpful for debugging Zod validation */}
+      {/* <pre className="text-xs">{JSON.stringify(form.state.errorMap, null, 2)}</pre> */}
+
       {/* --- REPORT HEADER DETAILS --- */}
       <div className="space-y-4 rounded-lg border bg-muted/20 p-4">
         <h3 className="text-sm font-semibold">Report Information</h3>
@@ -174,33 +177,49 @@ export function ExpenseReportForm({
 
         <div className="grid grid-cols-2 gap-4">
           <form.Field name="date_from">
-            {(field) => (
-              <Field>
-                <FieldLabel htmlFor={field.name}>Date From *</FieldLabel>
-                <Input
-                  id={field.name}
-                  type="date"
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  disabled={mutation.isPending}
-                />
-              </Field>
-            )}
+            {(field) => {
+              const isInvalid =
+                field.state.meta.isTouched && !field.state.meta.isValid
+              return (
+                <Field data-invalid={isInvalid}>
+                  <FieldLabel htmlFor={field.name}>
+                    Date From <span className="text-red-500">*</span>
+                  </FieldLabel>
+                  <Input
+                    id={field.name}
+                    type="date"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    disabled={mutation.isPending}
+                  />
+                  {isInvalid && <FieldError errors={field.state.meta.errors} />}
+                </Field>
+              )
+            }}
           </form.Field>
 
           <form.Field name="date_to">
-            {(field) => (
-              <Field>
-                <FieldLabel htmlFor={field.name}>Date To *</FieldLabel>
-                <Input
-                  id={field.name}
-                  type="date"
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  disabled={mutation.isPending}
-                />
-              </Field>
-            )}
+            {(field) => {
+              const isInvalid =
+                field.state.meta.isTouched && !field.state.meta.isValid
+              return (
+                <Field data-invalid={isInvalid}>
+                  <FieldLabel htmlFor={field.name}>
+                    Date To <span className="text-red-500">*</span>
+                  </FieldLabel>
+                  <Input
+                    id={field.name}
+                    type="date"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    disabled={mutation.isPending}
+                  />
+                  {isInvalid && <FieldError errors={field.state.meta.errors} />}
+                </Field>
+              )
+            }}
           </form.Field>
         </div>
 
@@ -232,7 +251,7 @@ export function ExpenseReportForm({
                 size="sm"
                 onClick={() =>
                   field.pushValue({
-                    expense_type_id: "",
+                    expense_type_id: 0,
                     date_from: "",
                     date_to: "",
                     amount: 0,
@@ -272,116 +291,153 @@ export function ExpenseReportForm({
                   <form.Field
                     name={`entries[${index}].expense_type_id` as const}
                   >
-                    {(subField) => (
-                      <Field>
-                        <FieldLabel>Expense Type *</FieldLabel>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant="outline"
-                              role="combobox"
-                              className="w-full justify-between"
-                            >
-                              {subField.state.value
-                                ? expenseTypes.find(
-                                    (t) => t.id === subField.state.value
-                                  )?.type_name
-                                : "Select Type..."}
-                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-[250px] p-0">
-                            <Command>
-                              <CommandInput placeholder="Search type..." />
-                              <CommandList>
-                                <CommandEmpty>
-                                  No expense type found.
-                                </CommandEmpty>
-                                <CommandGroup>
-                                  {expenseTypes.map((type) => (
-                                    <CommandItem
-                                      key={type.id}
-                                      value={type.type_name}
-                                      onSelect={() => {
-                                        subField.handleChange(type.id)
-                                      }}
-                                    >
-                                      <Check
-                                        className={cn(
-                                          "mr-2 h-4 w-4",
-                                          subField.state.value === type.id
-                                            ? "opacity-100"
-                                            : "opacity-0"
-                                        )}
-                                      />
-                                      {type.type_name}
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
-                              </CommandList>
-                            </Command>
-                          </PopoverContent>
-                        </Popover>
-                      </Field>
-                    )}
+                    {(subField) => {
+                      const isInvalid =
+                        subField.state.meta.isTouched &&
+                        !subField.state.meta.isValid
+                      return (
+                        <Field data-invalid={isInvalid}>
+                          <FieldLabel>
+                            Expense Type <span className="text-red-500">*</span>
+                          </FieldLabel>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                role="combobox"
+                                className="w-full justify-between"
+                              >
+                                {subField.state.value
+                                  ? expenseTypes.find(
+                                      (t) => t.id === subField.state.value
+                                    )?.type_name
+                                  : "Select Type..."}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[250px] p-0">
+                              <Command>
+                                <CommandInput placeholder="Search type..." />
+                                <CommandList>
+                                  <CommandEmpty>
+                                    No expense type found.
+                                  </CommandEmpty>
+                                  <CommandGroup>
+                                    {expenseTypes.map((type) => (
+                                      <CommandItem
+                                        key={type.id}
+                                        value={type.type_name}
+                                        onSelect={() => {
+                                          subField.handleChange(type.id)
+                                        }}
+                                      >
+                                        <Check
+                                          className={cn(
+                                            "mr-2 h-4 w-4",
+                                            subField.state.value === type.id
+                                              ? "opacity-100"
+                                              : "opacity-0"
+                                          )}
+                                        />
+                                        {type.type_name}
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+                          {isInvalid && (
+                            <FieldError errors={subField.state.meta.errors} />
+                          )}
+                        </Field>
+                      )
+                    }}
                   </form.Field>
 
                   <form.Field name={`entries[${index}].amount` as const}>
-                    {(subField) => (
-                      <Field>
-                        <FieldLabel htmlFor={subField.name}>
-                          Amount *
-                        </FieldLabel>
-                        <Input
-                          id={subField.name}
-                          type="number"
-                          step="0.01"
-                          value={subField.state.value}
-                          onChange={(e) =>
-                            subField.handleChange(e.target.valueAsNumber || 0)
-                          }
-                          disabled={mutation.isPending}
-                        />
-                      </Field>
-                    )}
+                    {(subField) => {
+                      const isInvalid =
+                        subField.state.meta.isTouched &&
+                        !subField.state.meta.isValid
+                      return (
+                        <Field data-invalid={isInvalid}>
+                          <FieldLabel htmlFor={subField.name}>
+                            Amount <span className="text-red-500">*</span>
+                          </FieldLabel>
+                          <Input
+                            id={subField.name}
+                            type="number"
+                            step="0.01"
+                            value={subField.state.value}
+                            onBlur={subField.handleBlur}
+                            onChange={(e) =>
+                              subField.handleChange(e.target.valueAsNumber || 0)
+                            }
+                            disabled={mutation.isPending}
+                          />
+                          {isInvalid && (
+                            <FieldError errors={subField.state.meta.errors} />
+                          )}
+                        </Field>
+                      )
+                    }}
                   </form.Field>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <form.Field name={`entries[${index}].date_from` as const}>
-                    {(subField) => (
-                      <Field>
-                        <FieldLabel htmlFor={subField.name}>
-                          Date From *
-                        </FieldLabel>
-                        <Input
-                          id={subField.name}
-                          type="date"
-                          value={subField.state.value}
-                          onChange={(e) =>
-                            subField.handleChange(e.target.value)
-                          }
-                        />
-                      </Field>
-                    )}
+                    {(subField) => {
+                      const isInvalid =
+                        subField.state.meta.isTouched &&
+                        !subField.state.meta.isValid
+                      return (
+                        <Field data-invalid={isInvalid}>
+                          <FieldLabel htmlFor={subField.name}>
+                            Date From <span className="text-red-500">*</span>
+                          </FieldLabel>
+                          <Input
+                            id={subField.name}
+                            type="date"
+                            value={subField.state.value}
+                            onBlur={subField.handleBlur}
+                            onChange={(e) =>
+                              subField.handleChange(e.target.value)
+                            }
+                          />
+                          {isInvalid && (
+                            <FieldError errors={subField.state.meta.errors} />
+                          )}
+                        </Field>
+                      )
+                    }}
                   </form.Field>
 
                   <form.Field name={`entries[${index}].date_to` as const}>
-                    {(subField) => (
-                      <Field>
-                        <FieldLabel htmlFor={subField.name}>
-                          Date To *
-                        </FieldLabel>
-                        <Input
-                          id={subField.name}
-                          type="date"
-                          value={subField.state.value}
-                          onChange={(e) =>
-                            subField.handleChange(e.target.value)
-                          }
-                        />
-                      </Field>
-                    )}
+                    {(subField) => {
+                      const isInvalid =
+                        subField.state.meta.isTouched &&
+                        !subField.state.meta.isValid
+                      return (
+                        <Field data-invalid={isInvalid}>
+                          <FieldLabel htmlFor={subField.name}>
+                            Date To <span className="text-red-500">*</span>
+                          </FieldLabel>
+                          <Input
+                            id={subField.name}
+                            type="date"
+                            value={subField.state.value}
+                            onBlur={subField.handleBlur}
+                            onChange={(e) =>
+                              subField.handleChange(e.target.value)
+                            }
+                          />
+                          {isInvalid && (
+                            <FieldError errors={subField.state.meta.errors} />
+                          )}
+                        </Field>
+                      )
+                    }}
                   </form.Field>
                 </div>
 
@@ -418,14 +474,12 @@ export function ExpenseReportForm({
                           multiple
                           onChange={(e) => {
                             const files = Array.from(e.target.files ?? [])
-
                             const fileObjs: ExpenseAttachmentValues[] =
                               files.map((file) => ({
                                 id: undefined,
                                 url_link: undefined,
                                 file,
                               }))
-
                             subField.handleChange([...attachments, ...fileObjs])
                           }}
                         />
@@ -441,6 +495,15 @@ export function ExpenseReportForm({
                 </form.Field>
               </div>
             ))}
+            {field.state.meta.errors && field.state.meta.errors.length > 0 && (
+              <p className="text-sm font-medium text-destructive">
+                {field.state.meta.errors
+                  .map((err: any) =>
+                    typeof err === "string" ? err : err.message
+                  )
+                  .join(", ")}
+              </p>
+            )}
           </div>
         )}
       </form.Field>
