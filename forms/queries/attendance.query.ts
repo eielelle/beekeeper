@@ -1,7 +1,12 @@
 import {
   fetchAttendanceLogsAction,
+  fetchMyAttendanceLogsAction,
   fetchAttendanceStatsAction,
-} from "@/actions/attendance.action"
+  fetchMyAttendanceStatsAction,
+  createAttendanceAction,
+  updateAttendanceAction,
+  deleteAttendanceAction,
+} from "@/actions/attendance.action" // Adjust path if needed
 import { toast } from "sonner"
 
 // --- TYPES ---
@@ -34,7 +39,9 @@ export type FetchAttendanceLogsParams = {
   dateRange?: { from?: string; to?: string }
 }
 
-// --- FETCH LOGS (CUSTOM TABLE) ---
+// ==========================================
+// ADMIN FETCH WRAPPERS
+// ==========================================
 export async function fetchAttendanceLogs(params: FetchAttendanceLogsParams) {
   try {
     const response = await fetchAttendanceLogsAction(params)
@@ -48,16 +55,90 @@ export async function fetchAttendanceLogs(params: FetchAttendanceLogsParams) {
   }
 }
 
-// --- FETCH STATS ---
 export async function fetchAttendanceStats({
   dateRange,
 }: {
   dateRange?: { from?: string; to?: string }
 }) {
   try {
-    const stats = await fetchAttendanceStatsAction(dateRange)
-    return stats
+    return await fetchAttendanceStatsAction(dateRange)
   } catch (error: any) {
+    toast.error(`ERR: ${error.message}`)
+    throw error
+  }
+}
+
+// ==========================================
+// PERSONAL (EMPLOYEE) FETCH WRAPPERS
+// ==========================================
+export async function fetchMyAttendanceLogs(
+  params: Omit<FetchAttendanceLogsParams, "employeeId">
+) {
+  try {
+    const response = await fetchMyAttendanceLogsAction(params)
+    return {
+      data: response.data as unknown as AttendanceLogType[],
+      rowCount: response.rowCount,
+    }
+  } catch (error: any) {
+    toast.error(`ERR: ${error.message}`)
+    throw error
+  }
+}
+
+export async function fetchMyAttendanceStats({
+  dateRange,
+}: {
+  dateRange?: { from?: string; to?: string }
+}) {
+  try {
+    return await fetchMyAttendanceStatsAction(dateRange)
+  } catch (error: any) {
+    toast.error(`ERR: ${error.message}`)
+    throw error
+  }
+}
+
+// ==========================================
+// STANDARD CRUD WRAPPERS
+// ==========================================
+export async function createAttendance(value: any) {
+  const t = toast.loading("Creating attendance log...")
+  try {
+    const data = await createAttendanceAction(value)
+    toast.dismiss(t)
+    toast.success("Attendance successfully created.")
+    return data
+  } catch (error: any) {
+    toast.dismiss(t)
+    toast.error(`ERR: ${error.message}`)
+    throw error
+  }
+}
+
+export async function updateAttendance(id: string | number, value: any) {
+  const t = toast.loading("Updating attendance log...")
+  try {
+    const data = await updateAttendanceAction(id, value)
+    toast.dismiss(t)
+    toast.success("Attendance successfully updated.")
+    return data
+  } catch (error: any) {
+    toast.dismiss(t)
+    toast.error(`ERR: ${error.message}`)
+    throw error
+  }
+}
+
+export async function deleteAttendance(id: string | number) {
+  const t = toast.loading("Deleting attendance log...")
+  try {
+    const data = await deleteAttendanceAction(id)
+    toast.dismiss(t)
+    toast.success("Attendance successfully deleted.")
+    return data
+  } catch (error: any) {
+    toast.dismiss(t)
     toast.error(`ERR: ${error.message}`)
     throw error
   }

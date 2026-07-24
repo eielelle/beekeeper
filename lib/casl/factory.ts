@@ -9,7 +9,7 @@ export type AppSubject =
   | "skus"
   | "bad_orders"
   | "productions"
-  | "attendance"
+  | "attendances"
   | "expenses"
   | "organization"
   | "stt"
