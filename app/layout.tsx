@@ -15,6 +15,10 @@ import { Toaster } from "sonner"
 import { QueryProvider } from "@/components/custom/providers/query"
 import { ColorProvider } from "@/components/custom/custom-themes/color-provider"
 
+// 1. CASL Imports
+import { fetchUserPermissions } from "@/lib/casl/server"
+import { CaslProvider } from "@/lib/providers/casl-provider"
+
 // 1. Default Mono
 const fontMono = Geist_Mono({
   subsets: ["latin"],
@@ -53,11 +57,14 @@ const vt323 = VT323({
   variable: "--font-vt323",
 })
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  // Fetch user permissions on the server before rendering the page
+  const { permissions, isSuperuser } = await fetchUserPermissions()
+
   return (
     <html
       lang="en"
@@ -91,7 +98,10 @@ export default function RootLayout({
           <Toaster />
           <QueryProvider>
             <ThemeProvider>
-              <ColorProvider>{children}</ColorProvider>
+              {/* Wrap the app in the CASL Provider */}
+              <CaslProvider permissions={permissions} isSuperuser={isSuperuser}>
+                <ColorProvider>{children}</ColorProvider>
+              </CaslProvider>
             </ThemeProvider>
           </QueryProvider>
         </TooltipProvider>
