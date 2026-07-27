@@ -1,5 +1,11 @@
-import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
+import {
+  fetchSkuCategoriesAction,
+  getSkuCategoryAction,
+  createSkuCategoryAction,
+  updateSkuCategoryAction,
+  deleteSkuCategoryAction,
+} from "@/actions/sku_category.action"
 
 export type SkuCategoryStoreType = {
   id?: string
@@ -16,121 +22,80 @@ export type FetchSkuCategoriesParams = {
   sorting?: { id: string; desc: boolean }[]
 }
 
-export async function fetchSkuCategories({
-  pageIndex,
-  pageSize,
-  globalFilter,
-  sorting,
-}: FetchSkuCategoriesParams) {
+export async function fetchSkuCategories(params: FetchSkuCategoriesParams) {
   const t = toast.loading("Fetching SKU Categories. Please wait.")
-
-  let query = supabase.from("sku_categories").select("*", { count: "exact" })
-
-  if (globalFilter) {
-    query = query.ilike("category_name", `%${globalFilter}%`)
-  }
-
-  if (sorting && sorting.length > 0) {
-    const sort = sorting[0]
-    query = query.order(sort.id, { ascending: !sort.desc })
-  } else {
-    query = query.order("created_at", { ascending: false })
-  }
-
-  const from = pageIndex * pageSize
-  const to = from + pageSize - 1
-  query = query.range(from, to)
-
-  const { data, error, count } = await query
-
-  toast.dismiss(t)
-
-  if (error) {
-    toast.error(`ERR: ${error.message}`)
+  try {
+    const response = await fetchSkuCategoriesAction(params)
+    toast.dismiss(t)
+    return response
+  } catch (error: unknown) {
+    toast.dismiss(t)
+    const message =
+      error instanceof Error ? error.message : "An unknown error occurred"
+    toast.error(`ERR: ${message}`)
     throw error
-  }
-
-  return {
-    data: data || [],
-    rowCount: count || 0,
   }
 }
 
 export async function getSkuCategory(id: string) {
   const t = toast.loading("Fetching SKU Category. Please wait.")
-
-  const { data, error } = await supabase
-    .from("sku_categories")
-    .select("*")
-    .eq("id", id)
-    .single()
-
-  toast.dismiss(t)
-
-  if (error) {
-    toast.error(`ERR: ${error.message}`)
+  try {
+    const data = await getSkuCategoryAction(id)
+    toast.dismiss(t)
+    return data
+  } catch (error: unknown) {
+    toast.dismiss(t)
+    const message =
+      error instanceof Error ? error.message : "An unknown error occurred"
+    toast.error(`ERR: ${message}`)
     throw error
   }
-
-  return data
 }
 
 export async function createSkuCategory(value: SkuCategoryStoreType) {
   const t = toast.loading("Creating SKU Category. Please wait.")
-
-  const { data, error } = await supabase.from("sku_categories").insert([value])
-
-  toast.dismiss(t)
-
-  if (error) {
-    toast.error(`ERR: ${error.message}`)
+  try {
+    const data = await createSkuCategoryAction(value)
+    toast.dismiss(t)
+    toast.success("SKU Category successfully created.")
+    return data
+  } catch (error: unknown) {
+    toast.dismiss(t)
+    const message =
+      error instanceof Error ? error.message : "An unknown error occurred"
+    toast.error(`ERR: ${message}`)
     throw error
   }
-
-  toast.success("SKU Category successfully created.")
-
-  return data
 }
 
 export async function updateSkuCategory(value: SkuCategoryStoreType) {
   const t = toast.loading("Updating SKU Category. Please wait.")
-
-  // Strip read-only or system keys from the payload
-  const { id, created_at, org_id, ...updates } = value
-
-  const { data, error } = await supabase
-    .from("sku_categories")
-    .update(updates)
-    .eq("id", id)
-    .select()
-
-  toast.dismiss(t)
-
-  if (error) {
-    toast.error(`ERR: ${error.message}`)
+  try {
+    const data = await updateSkuCategoryAction(value)
+    toast.dismiss(t)
+    toast.success("SKU Category successfully updated.")
+    return data
+  } catch (error: unknown) {
+    toast.dismiss(t)
+    const message =
+      error instanceof Error ? error.message : "An unknown error occurred"
+    toast.error(`ERR: ${message}`)
     throw error
   }
-
-  toast.success("SKU Category successfully updated.")
-
-  return data
 }
 
 export async function deleteSkuCategory(id: string) {
   const t = toast.loading("Deleting SKU Category. Please wait.")
-
-  const { data, error } = await supabase
-    .from("sku_categories")
-    .delete()
-    .eq("id", id)
-
-  toast.dismiss(t)
-
-  if (error) {
-    toast.error(`ERR: ${error.message}`)
+  try {
+    const data = await deleteSkuCategoryAction(id)
+    toast.dismiss(t)
+    toast.success("SKU Category successfully deleted.")
+    return data
+  } catch (error: unknown) {
+    toast.dismiss(t)
+    const message =
+      error instanceof Error ? error.message : "An unknown error occurred"
+    toast.error(`ERR: ${message}`)
     throw error
   }
-
-  toast.success("SKU Category successfully deleted.")
-  return data
 }

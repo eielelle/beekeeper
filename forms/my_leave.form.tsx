@@ -16,7 +16,7 @@ import {
   createMyLeave,
   getMyLeave,
   updateMyLeave,
-} from "./queries/my-leave.query"
+} from "./queries/my_leave.query"
 import { myLeaveSchema } from "@/forms/schemas/my_leave.schema"
 
 export function MyLeaveForm({

@@ -38,6 +38,16 @@ export type AppSubject =
   | "outlets"
   | "sales_bookings"
   | "approval_requests"
+  | "employee_work_info"
+  | "work_types"
+  | "visit_types"
+  | "visit_plans"
+  | "sku_uoms"
+  | "sku_categories"
+  | "sku_brands"
+  | "skus"
+  | "shift_types"
+  | "sales_groups"
   | EmployeeSubject
   | LeaveSubject
   | InventorySubject

@@ -89,6 +89,147 @@ export async function getServerAbility(): Promise<AppAbility> {
         can("delete", "employees")
         break
 
+      // EMPLOYEE WORK INFO (Strict HR Permissions)
+      case "read_employee_work_info":
+        can("read", "employee_work_info")
+        break
+      case "manage_employee_work_info":
+        can("create", "employee_work_info")
+        can("update", "employee_work_info")
+        can("delete", "employee_work_info")
+        break
+      // (Optional) Let employees see their own govt numbers
+      case "read_my_work_info":
+        if (employeeId)
+          can("read", "employee_work_info", { employee_id: employeeId })
+        break
+
+      // WORK TYPES
+      case "read_work_types":
+        can("read", "work_types")
+        break
+      case "create_work_type":
+        can("create", "work_types")
+        break
+      case "update_work_type":
+        can("update", "work_types")
+        break
+      case "delete_work_type":
+        can("delete", "work_types")
+        break
+
+      // VISIT TYPES
+      case "read_visit_types":
+        can("read", "visit_types")
+        break
+      case "create_visit_type":
+        can("create", "visit_types")
+        break
+      case "update_visit_type":
+        can("update", "visit_types")
+        break
+      case "delete_visit_type":
+        can("delete", "visit_types")
+        break
+
+      // VISIT PLANS
+      case "read_visit_plans":
+        can("read", "visit_plans")
+        break
+      case "create_visit_plan":
+        can("create", "visit_plans")
+        break
+      case "update_visit_plan":
+        can("update", "visit_plans")
+        break
+      case "delete_visit_plan":
+        can("delete", "visit_plans")
+        break
+
+      // SKU UOMs
+      case "read_sku_uoms":
+        can("read", "sku_uoms")
+        break
+      case "create_sku_uom":
+        can("create", "sku_uoms")
+        break
+      case "update_sku_uom":
+        can("update", "sku_uoms")
+        break
+      case "delete_sku_uom":
+        can("delete", "sku_uoms")
+        break
+
+      // SKU CATEGORIES
+      case "read_sku_categories":
+        can("read", "sku_categories")
+        break
+      case "create_sku_category":
+        can("create", "sku_categories")
+        break
+      case "update_sku_category":
+        can("update", "sku_categories")
+        break
+      case "delete_sku_category":
+        can("delete", "sku_categories")
+        break
+
+      // SKU BRANDS
+      case "read_sku_brands":
+        can("read", "sku_brands")
+        break
+      case "create_sku_brand":
+        can("create", "sku_brands")
+        break
+      case "update_sku_brand":
+        can("update", "sku_brands")
+        break
+      case "delete_sku_brand":
+        can("delete", "sku_brands")
+        break
+
+      // SKUS
+      case "read_skus":
+        can("read", "skus")
+        break
+      case "create_sku":
+        can("create", "skus")
+        break
+      case "update_sku":
+        can("update", "skus")
+        break
+      case "delete_sku":
+        can("delete", "skus")
+        break
+
+      // SHIFT TYPES
+      case "read_shift_types":
+        can("read", "shift_types")
+        break
+      case "create_shift_type":
+        can("create", "shift_types")
+        break
+      case "update_shift_type":
+        can("update", "shift_types")
+        break
+      case "delete_shift_type":
+        can("delete", "shift_types")
+        break
+
+      // SALES GROUPS
+      case "read_sales_groups":
+        can("read", "sales_groups")
+        break
+      case "create_sales_group":
+        can("create", "sales_groups")
+        break
+      case "update_sales_group":
+        can("update", "sales_groups")
+        break
+      case "delete_sales_group":
+        can("delete", "sales_groups")
+        break
+
       // ATTENDANCES
       case "read_my_attendances":
         if (employeeId) can("read", "attendances", { employee_id: employeeId })

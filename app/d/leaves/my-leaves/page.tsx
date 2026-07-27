@@ -25,7 +25,7 @@ import {
   fetchMyLeaves,
   fetchMyLeaveStats,
   MyLeaveStoreType,
-} from "@/forms/queries/my-leave.query"
+} from "@/forms/queries/my_leave.query"
 import { MyLeaveForm } from "@/forms/my_leave.form"
 
 const filterFields: FilterField[] = [
