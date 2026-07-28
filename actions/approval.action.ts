@@ -5,7 +5,6 @@ import { createClient } from "@/lib/supabase/server"
 import { supabaseAdmin } from "@/lib/supabase/admin"
 import { getServerAbility } from "@/lib/casl/server"
 
-// With this:
 async function getCurrentEmployee(supabase: SupabaseClient, userId: string) {
   const { data, error } = await supabase
     .from("employees")
@@ -20,8 +19,6 @@ async function getCurrentEmployee(supabase: SupabaseClient, userId: string) {
 // ==========================================
 // 1. TRIGGER WORKFLOW (Internal System Action)
 // ==========================================
-// Other server actions (like createExpenseAction) will call this.
-// We do NOT check CASL here because the parent action already checked it.
 export async function triggerApprovalWorkflow(
   moduleName: string,
   recordId: string,
@@ -30,7 +27,6 @@ export async function triggerApprovalWorkflow(
 ) {
   const supabase = await createClient()
 
-  // 1. Check if the organization has approval rules for this specific module
   let query = supabase
     .from("approval_rules")
     .select("id")
@@ -39,10 +35,9 @@ export async function triggerApprovalWorkflow(
 
   const { data: rules } = await query.order("step_level", { ascending: true })
 
-  // If no rules exist, the workflow isn't required (auto-approved or manual)
+  // If no rules exist, the workflow isn't required
   if (!rules || rules.length === 0) return null
 
-  // 2. Initialize the request at Step 1 using Admin (bypassing RLS)
   const { data: request, error } = await supabaseAdmin
     .from("approval_requests")
     .insert([
@@ -62,9 +57,15 @@ export async function triggerApprovalWorkflow(
   return request
 }
 
-// Inside app/actions/approval.action.ts
-
+// ==========================================
+// 2. FETCH PENDING APPROVALS
+// ==========================================
 export async function fetchMyPendingApprovalsAction() {
+  const ability = await getServerAbility()
+  if (ability.cannot("read", "approval_requests")) {
+    throw new Error("Forbidden: You do not have permission to view approvals.")
+  }
+
   const supabase = await createClient()
   const {
     data: { user },
@@ -74,13 +75,9 @@ export async function fetchMyPendingApprovalsAction() {
   const employee = await getCurrentEmployee(supabase, user.id)
   if (!employee) return []
 
-  // 1. Build the dynamic condition to check for Role OR Specific Employee
   let ruleConditions = `employee_id.eq.${employee.id}`
-  if (employee.role_id) {
-    ruleConditions += `,role_id.eq.${employee.role_id}`
-  }
+  if (employee.role_id) ruleConditions += `,role_id.eq.${employee.role_id}`
 
-  // 2. Find all rules assigned to this user's role OR their direct ID
   const { data: myRules } = await supabase
     .from("approval_rules")
     .select("module, step_level")
@@ -88,8 +85,6 @@ export async function fetchMyPendingApprovalsAction() {
 
   if (!myRules || myRules.length === 0) return []
 
-  // 3. Build the OR query to find the actual requests waiting at those specific steps
-  // e.g., and(module.eq.expenses,current_step.eq.1),and(module.eq.leaves,current_step.eq.2)
   const requestConditions = myRules
     .map((r) => `and(module.eq.${r.module},current_step.eq.${r.step_level})`)
     .join(",")
@@ -116,7 +111,7 @@ export async function fetchMyPendingApprovalsAction() {
 }
 
 // ==========================================
-// 3. PROCESS APPROVAL/REJECTION (Actioned by Managers)
+// 3. PROCESS APPROVAL/REJECTION
 // ==========================================
 export async function processApprovalAction(
   requestId: string,
@@ -131,7 +126,7 @@ export async function processApprovalAction(
 
   const employee = await getCurrentEmployee(supabase, user.id)
 
-  // 1. CASL Security Check (Ensure they have general approval rights)
+  // 1. CASL Security Check (System-level access)
   const ability = await getServerAbility()
   if (ability.cannot("update", "approval_requests")) {
     throw new Error(
@@ -152,7 +147,30 @@ export async function processApprovalAction(
     )
   }
 
-  // 3. Log the manager's action securely
+  // 3. ✨ CRITICAL FIX: Verify THIS employee is authorized for THIS specific step
+  let authQuery = supabaseAdmin
+    .from("approval_rules")
+    .select("id")
+    .eq("module", request.module)
+    .eq("step_level", request.current_step)
+
+  if (employee.role_id) {
+    authQuery = authQuery.or(
+      `employee_id.eq.${employee.id},role_id.eq.${employee.role_id}`
+    )
+  } else {
+    authQuery = authQuery.eq("employee_id", employee.id)
+  }
+
+  const { data: isAuthorized } = await authQuery.single()
+
+  if (!isAuthorized) {
+    throw new Error(
+      "Forbidden: You are not the designated approver for this workflow step."
+    )
+  }
+
+  // 4. Log the manager's action securely
   await supabaseAdmin.from("approval_logs").insert([
     {
       request_id: requestId,
@@ -164,7 +182,7 @@ export async function processApprovalAction(
     },
   ])
 
-  // 4. Handle Rejection (Fails immediately)
+  // 5. Handle Rejection (Fails immediately)
   if (action === "rejected") {
     await supabaseAdmin
       .from("approval_requests")
@@ -179,7 +197,7 @@ export async function processApprovalAction(
     return { success: true, status: "rejected" }
   }
 
-  // 5. Handle Approval (Check if there is a Next Step)
+  // 6. Handle Approval (Check if there is a Next Step)
   const { data: nextStep } = await supabaseAdmin
     .from("approval_rules")
     .select("id")

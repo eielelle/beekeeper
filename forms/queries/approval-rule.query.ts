@@ -1,5 +1,11 @@
-import { supabase } from "@/lib/supabase"
+import { toast } from "sonner"
 import { ApprovalRuleFormValues } from "../schemas/approval-rule.schema"
+import {
+  fetchRolesForRulesAction,
+  fetchApprovalRulesAction,
+  createApprovalRuleAction,
+  deleteApprovalRuleAction,
+} from "@/actions/approval-rule.action"
 
 export type Role = {
   id: number
@@ -16,31 +22,27 @@ export type ApprovalRule = {
 }
 
 export async function fetchRoles() {
-  const { data, error } = await supabase
-    .from("roles")
-    .select("id, role_name")
-    .order("role_name")
-
-  if (error) throw new Error(error.message)
-  return data as Role[]
+  try {
+    const data = await fetchRolesForRulesAction()
+    return data as Role[]
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Failed to fetch roles"
+    toast.error(`ERR: ${message}`)
+    return []
+  }
 }
 
 export async function fetchApprovalRules() {
-  const { data, error } = await supabase
-    .from("approval_rules")
-    .select(
-      `
-      id,
-      module,
-      step_level,
-      role:roles(role_name)
-    `
-    )
-    .order("module", { ascending: true })
-    .order("step_level", { ascending: true })
-
-  if (error) throw new Error(error.message)
-  return data as unknown as ApprovalRule[]
+  try {
+    const data = await fetchApprovalRulesAction()
+    return data as unknown as ApprovalRule[]
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Failed to fetch rules"
+    toast.error(`ERR: ${message}`)
+    return []
+  }
 }
 
 export async function createApprovalRule({
@@ -50,24 +52,33 @@ export async function createApprovalRule({
   values: ApprovalRuleFormValues
   orgId: number
 }) {
-  const { data, error } = await supabase
-    .from("approval_rules")
-    .insert({
-      org_id: orgId,
-      module: values.module,
-      step_level: values.step_level,
-      role_id: parseInt(values.role_id),
-    })
-    .select()
-    .single()
-
-  if (error) {
-    // Handle unique constraint violations if you added one for (module, step_level)
-    if (error.code === "23505") {
-      throw new Error("This step level already exists for this module.")
-    }
-    throw new Error(error.message)
+  const t = toast.loading("Saving workflow rule...")
+  try {
+    const data = await createApprovalRuleAction(values, orgId)
+    toast.dismiss(t)
+    toast.success("Approval rule successfully added.")
+    return data
+  } catch (error: unknown) {
+    toast.dismiss(t)
+    const message =
+      error instanceof Error ? error.message : "An unknown error occurred"
+    toast.error(`ERR: ${message}`)
+    throw error
   }
+}
 
-  return data
+export async function deleteApprovalRule(id: number) {
+  const t = toast.loading("Deleting workflow rule...")
+  try {
+    const data = await deleteApprovalRuleAction(id)
+    toast.dismiss(t)
+    toast.success("Approval rule deleted.")
+    return data
+  } catch (error: unknown) {
+    toast.dismiss(t)
+    const message =
+      error instanceof Error ? error.message : "An unknown error occurred"
+    toast.error(`ERR: ${message}`)
+    throw error
+  }
 }

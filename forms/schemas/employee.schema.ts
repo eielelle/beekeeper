@@ -13,4 +13,7 @@ export const employeeSchema = z.object({
   employment_start: z.string().optional(),
   birthdate: z.string().optional(),
   is_superuser: z.boolean().catch(false), // Catches undefined and defaults to false
+
+  // NEW: Allow the form to process the Role selection
+  role_id: z.string().optional(),
 })

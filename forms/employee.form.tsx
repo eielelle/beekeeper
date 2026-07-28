@@ -20,10 +20,11 @@ import {
 import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "sonner"
 
-// Make sure this path matches where your supabase browser client is located
 import { supabase } from "@/lib/supabase"
 import { getEmployee, updateEmployee } from "./queries/employee.query"
 import { employeeSchema } from "./schemas/employee.schema"
+// 1. Import your secure fetchRoles wrapper
+import { fetchRoles } from "./queries/role.query"
 
 export function EmployeeForm({
   editId,
@@ -49,12 +50,17 @@ export function EmployeeForm({
     enabled: isEditMode,
   })
 
+  // 2. Fetch Available Roles for the Dropdown
+  const { data: roles = [], isLoading: isLoadingRoles } = useQuery({
+    queryKey: ["roles"],
+    queryFn: () => fetchRoles(),
+  })
+
   // --- PROFILE PICTURE STATE ---
   const fileInputRef = React.useRef<HTMLInputElement>(null)
   const [avatarFile, setAvatarFile] = React.useState<File | null>(null)
   const [avatarPreview, setAvatarPreview] = React.useState<string | null>(null)
 
-  // Set initial preview if editing and they already have a picture
   React.useEffect(() => {
     if (employeeData?.avatar_url) {
       setAvatarPreview(employeeData.avatar_url)
@@ -65,7 +71,7 @@ export function EmployeeForm({
     const file = e.target.files?.[0]
     if (file) {
       setAvatarFile(file)
-      setAvatarPreview(URL.createObjectURL(file)) // Live preview before upload
+      setAvatarPreview(URL.createObjectURL(file))
     }
   }
 
@@ -78,40 +84,36 @@ export function EmployeeForm({
         birthdate?: string
         is_superuser?: boolean
         avatar_url?: string
+        role_id?: string // Added role_id to payload type
       }
     ) => {
       let finalAvatarUrl = employeeData?.avatar_url || null
 
-      // 1. UPLOAD IMAGE TO SUPABASE STORAGE (If a new file was selected)
       if (avatarFile) {
         const fileExt = avatarFile.name.split(".").pop()
         const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExt}`
         const filePath = `avatars/${fileName}`
 
-        // Upload to the "images" bucket
         const { error: uploadError } = await supabase.storage
           .from("images")
           .upload(filePath, avatarFile)
 
-        if (uploadError) {
+        if (uploadError)
           throw new Error(`Image upload failed: ${uploadError.message}`)
-        }
 
-        // Get the public URL for the newly uploaded image
         const { data: urlData } = supabase.storage
           .from("images")
           .getPublicUrl(filePath)
-
         finalAvatarUrl = urlData.publicUrl
       }
 
-      // Prepare the payload with the new avatar_url included
+      // Convert role_id string back to number for the database if provided
       const payload = {
         ...values,
         avatar_url: finalAvatarUrl,
+        role_id: values.role_id ? Number(values.role_id) : null,
       }
 
-      // 2. SAVE TO DATABASE OR API
       if (isEditMode) {
         return updateEmployee({
           ...payload,
@@ -130,9 +132,7 @@ export function EmployeeForm({
 
         const res = await fetch("/api/v1/users", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(apiPayload),
         })
 
@@ -155,9 +155,7 @@ export function EmployeeForm({
       } else {
         form.reset()
         setAvatarFile(null)
-        if (onClose) {
-          onClose()
-        }
+        if (onClose) onClose()
       }
     },
     onError: (error: any) => {
@@ -177,6 +175,8 @@ export function EmployeeForm({
     employment_start: employeeData?.employment_start ?? "",
     birthdate: employeeData?.birthdate ?? "",
     is_superuser: employeeData?.is_superuser ?? false,
+    // Add role_id to default values (convert to string for the Select component)
+    role_id: employeeData?.role_id ? String(employeeData.role_id) : "",
   }
 
   const form = useForm({
@@ -262,7 +262,6 @@ export function EmployeeForm({
           ) : (
             <User className="h-10 w-10 text-muted-foreground" />
           )}
-          {/* Hover Overlay */}
           <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
             <Camera className="h-6 w-6 text-white" />
           </div>
@@ -518,11 +517,47 @@ export function EmployeeForm({
             }}
           </form.Field>
         )}
+      </div>
+
+      {/* 3. NEW ROLE & SUPERUSER ROW */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <form.Field name="role_id">
+          {(field) => {
+            const isInvalid =
+              field.state.meta.isTouched && !field.state.meta.isValid
+            return (
+              <Field data-invalid={isInvalid}>
+                <FieldLabel>System Role</FieldLabel>
+                <Select
+                  value={field.state.value}
+                  onValueChange={(val) => field.handleChange(val)}
+                  disabled={mutation.isPending || isLoadingRoles}
+                >
+                  <SelectTrigger>
+                    <SelectValue
+                      placeholder={
+                        isLoadingRoles ? "Loading roles..." : "Select a role"
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {roles.map((role) => (
+                      <SelectItem key={role.id} value={String(role.id)}>
+                        {role.role_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {isInvalid && <FieldError errors={field.state.meta.errors} />}
+              </Field>
+            )
+          }}
+        </form.Field>
 
         {/* SUPERUSER CHECKBOX */}
         <form.Field name="is_superuser">
           {(field) => (
-            <Field className="flex flex-col gap-2 pt-2">
+            <Field className="flex flex-col gap-2 sm:pt-8">
               <div className="flex items-start gap-3">
                 <Checkbox
                   id={field.name}
@@ -538,7 +573,7 @@ export function EmployeeForm({
                     Superuser Access
                   </FieldLabel>
                   <p className="text-xs text-muted-foreground">
-                    Grants full administrative privileges to this employee.
+                    Grants full administrative privileges (bypasses Role rules).
                   </p>
                 </div>
               </div>

@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState, useMemo } from "react"
-import { supabase } from "@/lib/supabase"
 import { useCurrentEmployee } from "@/hooks/use-current-employee"
 import { Button } from "@/components/ui/button"
 import {
@@ -32,14 +31,25 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Loader2 } from "lucide-react"
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
+import { Plus, Loader2, Pencil, Trash2 } from "lucide-react"
 
-// Types based on your database schema
-type Permission = { id: number; name: string; description: string | null }
-type Role = { id: number; role_name: string; permissions: string[] }
+import {
+  fetchPermissions,
+  fetchRoles,
+  createRole,
+  updateRole,
+  deleteRole,
+  Permission,
+  Role,
+} from "@/forms/queries/role.query"
 
 export default function RolesAndPermissionsPage() {
-  // 1. Call the custom hook to get the employee's orgId
   const { orgId, isLoading: isAuthLoading } = useCurrentEmployee()
 
   const [permissions, setPermissions] = useState<Permission[]>([])
@@ -47,69 +57,48 @@ export default function RolesAndPermissionsPage() {
   const [isDataLoading, setIsDataLoading] = useState(true)
 
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [editingRoleId, setEditingRoleId] = useState<number | null>(null)
+
   const [newRoleName, setNewRoleName] = useState("")
   const [selectedPermissionIds, setSelectedPermissionIds] = useState<number[]>(
     []
   )
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // 2. Fetch Data on Mount
   useEffect(() => {
-    fetchData()
+    loadData()
   }, [])
 
-  const fetchData = async () => {
+  const loadData = async () => {
     setIsDataLoading(true)
-
-    // Fetch all master permissions
-    const { data: permsData, error: permsError } = await supabase
-      .from("permissions")
-      .select("*")
-      .order("name")
-
-    if (permsError) console.error("Error fetching permissions:", permsError)
-    else setPermissions(permsData || [])
-
-    // Fetch roles and their nested permissions
-    const { data: rolesData, error: rolesError } = await supabase
-      .from("roles")
-      .select(
-        `
-        id,
-        role_name,
-        role_permissions (
-          permissions ( name )
-        )
-      `
-      )
-      .order("created_at", { ascending: false })
-
-    if (rolesError) {
-      console.error("Error fetching roles:", rolesError)
-    } else if (rolesData) {
-      // Flatten the Supabase nested response into a clean array of strings for the UI
-      const formattedRoles = rolesData.map((role: any) => ({
-        id: role.id,
-        role_name: role.role_name,
-        permissions: role.role_permissions
-          .map((rp: any) => rp.permissions?.name)
-          .filter(Boolean), // Remove nulls if any
-      }))
-      setRoles(formattedRoles)
-    }
-
+    const [permsData, rolesData] = await Promise.all([
+      fetchPermissions(),
+      fetchRoles(),
+    ])
+    setPermissions(permsData)
+    setRoles(rolesData)
     setIsDataLoading(false)
   }
 
-  // Group permissions by module (e.g., { employees: [{ id: 1, action: 'create' }] })
   const groupedPermissions = useMemo(() => {
     return permissions.reduce(
       (acc, permission) => {
-        const [module, action] = permission.name.split(".")
-        if (!acc[module]) acc[module] = []
-        acc[module].push({
+        const firstUnderscoreIdx = permission.name.indexOf("_")
+
+        let moduleName = "general"
+        let actionName = permission.name
+
+        if (firstUnderscoreIdx !== -1) {
+          actionName = permission.name.slice(0, firstUnderscoreIdx)
+          moduleName = permission.name
+            .slice(firstUnderscoreIdx + 1)
+            .replace(/_/g, " ")
+        }
+
+        if (!acc[moduleName]) acc[moduleName] = []
+        acc[moduleName].push({
           id: permission.id,
-          action,
+          action: actionName,
           fullString: permission.name,
         })
         return acc
@@ -142,54 +131,66 @@ export default function RolesAndPermissionsPage() {
     }
   }
 
-  // 3. Submit New Role to Supabase
-  const handleCreateRole = async () => {
-    if (!newRoleName.trim() || selectedPermissionIds.length === 0 || !orgId) {
-      alert("Missing role name, permissions, or organization context.")
-      return
-    }
+  // --- Reset Form State ---
+  const resetForm = () => {
+    setEditingRoleId(null)
+    setNewRoleName("")
+    setSelectedPermissionIds([])
+  }
 
-    setIsSubmitting(true)
+  // --- Handlers for Edit and Delete ---
+  const handleEditClick = (role: Role) => {
+    setEditingRoleId(role.id)
+    setNewRoleName(role.role_name)
+
+    // Map the string permissions back to their exact IDs
+    const permIds = permissions
+      .filter((p) => role.permissions.includes(p.name))
+      .map((p) => p.id)
+
+    setSelectedPermissionIds(permIds)
+    setIsDialogOpen(true)
+  }
+
+  const handleDeleteClick = async (roleId: number) => {
+    if (!window.confirm("Are you sure you want to delete this role?")) return
 
     try {
-      // Step A: Insert the Role using orgId from our hook
-      const { data: newRole, error: roleError } = await supabase
-        .from("roles")
-        .insert({
-          role_name: newRoleName,
-          org_id: orgId,
-        })
-        .select()
-        .single()
+      await deleteRole(roleId)
+      await loadData()
+    } catch (error) {
+      console.error(error)
+    }
+  }
 
-      if (roleError) throw roleError
+  const handleSaveRole = async () => {
+    if (!newRoleName.trim() || selectedPermissionIds.length === 0 || !orgId)
+      return
 
-      // Step B: Prepare and Insert the Many-to-Many Mappings
-      const rolePermissionsToInsert = selectedPermissionIds.map((permId) => ({
-        role_id: newRole.id,
-        permission_id: permId,
-      }))
+    setIsSubmitting(true)
+    try {
+      const payload = {
+        role_name: newRoleName,
+        org_id: orgId,
+        permission_ids: selectedPermissionIds,
+      }
 
-      const { error: mappingError } = await supabase
-        .from("role_permissions")
-        .insert(rolePermissionsToInsert)
+      if (editingRoleId) {
+        await updateRole(editingRoleId, payload)
+      } else {
+        await createRole(payload)
+      }
 
-      if (mappingError) throw mappingError
-
-      // Step C: Refresh UI State
-      await fetchData() // Refetch to get updated list
-      setNewRoleName("")
-      setSelectedPermissionIds([])
+      await loadData() // Refresh list
+      resetForm()
       setIsDialogOpen(false)
     } catch (error) {
-      console.error("Failed to create role:", error)
-      alert("Failed to save role. Check console for details.")
+      console.error(error)
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  // Show a single loader while either auth or data is fetching
   if (isAuthLoading || isDataLoading) {
     return (
       <div className="flex justify-center py-20">
@@ -210,17 +211,25 @@ export default function RolesAndPermissionsPage() {
           </p>
         </div>
 
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog
+          open={isDialogOpen}
+          onOpenChange={(open) => {
+            if (!open) resetForm()
+            setIsDialogOpen(open)
+          }}
+        >
           <DialogTrigger asChild>
             <Button disabled={!orgId}>
               <Plus className="mr-2 h-4 w-4" /> Add Role
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-h-[85vh] max-w-4xl overflow-y-auto">
+          <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Create New Role</DialogTitle>
+              <DialogTitle>
+                {editingRoleId ? "Edit Role" : "Create New Role"}
+              </DialogTitle>
               <DialogDescription>
-                Define a new role and assign its specific permissions.
+                Define the role and assign its specific permissions.
               </DialogDescription>
             </DialogHeader>
 
@@ -236,8 +245,9 @@ export default function RolesAndPermissionsPage() {
               </div>
 
               <div className="space-y-4">
-                <Label>Permissions</Label>
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <Label>Permissions Configurator</Label>
+
+                <Accordion type="multiple" className="w-full rounded-md border">
                   {Object.entries(groupedPermissions).map(([module, perms]) => {
                     const allSelected = perms.every((p) =>
                       selectedPermissionIds.includes(p.id)
@@ -247,9 +257,13 @@ export default function RolesAndPermissionsPage() {
                     )
 
                     return (
-                      <Card key={module} className="shadow-sm">
-                        <CardHeader className="border-b pb-3">
-                          <div className="flex items-center space-x-2">
+                      <AccordionItem
+                        key={module}
+                        value={module}
+                        className="px-4"
+                      >
+                        <div className="flex w-full items-center justify-between">
+                          <div className="z-10 flex flex-shrink-0 items-center space-x-3 py-4">
                             <Checkbox
                               id={`module-${module}`}
                               checked={
@@ -263,42 +277,54 @@ export default function RolesAndPermissionsPage() {
                                 handleToggleModule(perms, checked === true)
                               }
                             />
-                            <Label
-                              htmlFor={`module-${module}`}
-                              className="cursor-pointer text-base font-semibold capitalize"
-                            >
-                              {module}
-                            </Label>
                           </div>
-                        </CardHeader>
-                        <CardContent className="space-y-3 pt-4">
-                          {perms.map((perm) => (
-                            <div
-                              key={perm.id}
-                              className="flex items-center space-x-2 pl-6"
+
+                          <AccordionTrigger className="ml-2 font-semibold capitalize hover:no-underline">
+                            {module}
+                            <Badge
+                              variant={someSelected ? "default" : "secondary"}
+                              className="ml-3 text-xs opacity-80"
                             >
-                              <Checkbox
-                                id={`perm-${perm.id}`}
-                                checked={selectedPermissionIds.includes(
-                                  perm.id
-                                )}
-                                onCheckedChange={() =>
-                                  handleTogglePermission(perm.id)
-                                }
-                              />
-                              <Label
-                                htmlFor={`perm-${perm.id}`}
-                                className="cursor-pointer text-sm leading-none font-normal peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                              {
+                                perms.filter((p) =>
+                                  selectedPermissionIds.includes(p.id)
+                                ).length
+                              }{" "}
+                              / {perms.length}
+                            </Badge>
+                          </AccordionTrigger>
+                        </div>
+
+                        <AccordionContent className="pb-4 pl-9">
+                          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                            {perms.map((perm) => (
+                              <div
+                                key={perm.id}
+                                className="flex items-center space-x-2 rounded border p-2 shadow-sm transition-colors hover:bg-muted/50"
                               >
-                                {perm.action}
-                              </Label>
-                            </div>
-                          ))}
-                        </CardContent>
-                      </Card>
+                                <Checkbox
+                                  id={`perm-${perm.id}`}
+                                  checked={selectedPermissionIds.includes(
+                                    perm.id
+                                  )}
+                                  onCheckedChange={() =>
+                                    handleTogglePermission(perm.id)
+                                  }
+                                />
+                                <Label
+                                  htmlFor={`perm-${perm.id}`}
+                                  className="flex-grow cursor-pointer text-sm font-medium capitalize"
+                                >
+                                  {perm.action}
+                                </Label>
+                              </div>
+                            ))}
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
                     )
                   })}
-                </div>
+                </Accordion>
               </div>
             </div>
 
@@ -307,7 +333,7 @@ export default function RolesAndPermissionsPage() {
                 Cancel
               </Button>
               <Button
-                onClick={handleCreateRole}
+                onClick={handleSaveRole}
                 disabled={
                   isSubmitting ||
                   !newRoleName.trim() ||
@@ -315,7 +341,11 @@ export default function RolesAndPermissionsPage() {
                   !orgId
                 }
               >
-                {isSubmitting ? "Saving..." : "Save Role"}
+                {isSubmitting
+                  ? "Saving..."
+                  : editingRoleId
+                    ? "Save Changes"
+                    : "Save Role"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -336,6 +366,7 @@ export default function RolesAndPermissionsPage() {
                 <TableHead className="w-[200px]">Role Name</TableHead>
                 <TableHead>Permissions Count</TableHead>
                 <TableHead>Quick View</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -357,12 +388,31 @@ export default function RolesAndPermissionsPage() {
                       </Badge>
                     )}
                   </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleEditClick(role)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        onClick={() => handleDeleteClick(role.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
                 </TableRow>
               ))}
               {roles.length === 0 && (
                 <TableRow>
                   <TableCell
-                    colSpan={3}
+                    colSpan={4}
                     className="py-6 text-center text-muted-foreground"
                   >
                     No roles found. Create one to get started.

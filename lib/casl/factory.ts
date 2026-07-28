@@ -48,6 +48,16 @@ export type AppSubject =
   | "skus"
   | "shift_types"
   | "sales_groups"
+  | "production_areas"
+  | "production_lines"
+  | "productions"
+  | "employment_statuses"
+  | "employment_types"
+  | "organizations"
+  | "roles"
+  | "announcements"
+  | "approval_rules"
+  | "positions"
   | EmployeeSubject
   | LeaveSubject
   | InventorySubject

@@ -1,7 +1,12 @@
-import { supabase } from "@/lib/supabase"
 import * as z from "zod"
+import { toast } from "sonner"
+import {
+  fetchAnnouncementsAction,
+  createAnnouncementAction,
+  deleteAnnouncementAction,
+} from "@/actions/announcement.action"
 
-// 1. Updated Zod Schema
+// 1. Zod Schema
 export const announcementSchema = z.object({
   title: z.string().min(1, "Title is required"),
   content: z.string().min(8, "Content cannot be empty"),
@@ -11,49 +16,48 @@ export const announcementSchema = z.object({
 
 export type AnnouncementFormValues = z.infer<typeof announcementSchema>
 
-// 2. Updated Create Function
-export async function createAnnouncement(values: AnnouncementFormValues) {
-  const { data: authData } = await supabase.auth.getUser()
-
-  const { data, error } = await supabase
-    .from("announcements")
-    .insert({
-      title: values.title,
-      content: values.content,
-      is_superuser_only: values.is_superuser_only,
-      send_notification: values.send_notification,
-      author_id: authData.user?.id,
-    })
-    .select()
-    .single()
-
-  if (error) throw new Error(error.message)
-  return data
+// 2. Fetch Query
+export async function fetchAnnouncements() {
+  try {
+    return await fetchAnnouncementsAction()
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "An unknown error occurred"
+    toast.error(`ERR: ${message}`)
+    throw error
+  }
 }
 
-// Add this to forms/queries/announcement.query.ts
+// 3. Create Mutation
+export async function createAnnouncement(values: AnnouncementFormValues) {
+  const t = toast.loading("Publishing announcement...")
+  try {
+    const data = await createAnnouncementAction(values)
+    toast.dismiss(t)
+    toast.success("Announcement successfully published.")
+    return data
+  } catch (error: unknown) {
+    toast.dismiss(t)
+    const message =
+      error instanceof Error ? error.message : "An unknown error occurred"
+    toast.error(`ERR: ${message}`)
+    throw error
+  }
+}
 
-export async function fetchAnnouncements() {
-  const { data, error } = await supabase
-    .from("announcements")
-    .select(
-      `
-      id,
-      title,
-      content,
-      is_superuser_only,
-      send_notification,
-      created_at,
-      author_id,
-      author:employees!user_id (
-        first_name,
-        last_name,
-        avatar_url
-      )
-    `
-    )
-    .order("created_at", { ascending: false })
-
-  if (error) throw new Error(error.message)
-  return data
+// 4. Delete Mutation (Bonus)
+export async function deleteAnnouncement(id: string) {
+  const t = toast.loading("Deleting announcement...")
+  try {
+    const data = await deleteAnnouncementAction(id)
+    toast.dismiss(t)
+    toast.success("Announcement successfully deleted.")
+    return data
+  } catch (error: unknown) {
+    toast.dismiss(t)
+    const message =
+      error instanceof Error ? error.message : "An unknown error occurred"
+    toast.error(`ERR: ${message}`)
+    throw error
+  }
 }

@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { AbilityBuilder, createMongoAbility } from "@casl/ability"
-import { AppAbility } from "./factory"
+import { AppAbility, AppAction, AppSubject } from "./factory" // Ensure this matches your file name
 
 type PermissionRecord = { name: string }
 type RolePermissionRecord = { permissions: PermissionRecord | null }
@@ -24,27 +24,18 @@ export async function fetchUserPermissions() {
   const { data: employee, error } = await supabase
     .from("employees")
     .select(
-      `
-      id,
-      is_superuser,
-      roles (
-        role_permissions (
-          permissions ( name )
-        )
-      )
-    `
+      `id, is_superuser, roles ( role_permissions ( permissions ( name ) ) )`
     )
     .eq("user_id", user.id)
     .single()
 
-  if (error || !employee) {
+  if (error || !employee)
     return {
       permissions: [],
       isSuperuser: false,
       employeeId: null,
       userId: user.id,
     }
-  }
 
   const rawRoles = employee.roles as unknown as RoleRecord | RoleRecord[] | null
   const roleData = Array.isArray(rawRoles) ? rawRoles[0] : rawRoles
@@ -62,283 +53,176 @@ export async function fetchUserPermissions() {
   }
 }
 
-// 2. Server Ability builder used by Server Actions
+// ------------------------------------------------------------------
+// COMPACT PERMISSION MAP: Standard 1:1 "String to Action/Subject" mappings
+// ------------------------------------------------------------------
+const standardRules: Record<string, [AppAction, Extract<AppSubject, string>]> =
+  {
+    // Configs & Masters
+    read_employee: ["read", "employees"],
+    create_employee: ["create", "employees"],
+    update_employee: ["update", "employees"],
+    delete_employee: ["delete", "employees"],
+    read_work_types: ["read", "work_types"],
+    create_work_type: ["create", "work_types"],
+    update_work_type: ["update", "work_types"],
+    delete_work_type: ["delete", "work_types"],
+    read_employment_statuses: ["read", "employment_statuses"],
+    create_employment_status: ["create", "employment_statuses"],
+    update_employment_status: ["update", "employment_statuses"],
+    delete_employment_status: ["delete", "employment_statuses"],
+    read_organizations: ["read", "organizations"],
+    create_organization: ["create", "organizations"],
+    update_organization: ["update", "organizations"],
+    delete_organization: ["delete", "organizations"],
+    read_approval_rules: ["read", "approval_rules"],
+    create_approval_rule: ["create", "approval_rules"],
+    update_approval_rule: ["update", "approval_rules"],
+    delete_approval_rule: ["delete", "approval_rules"],
+    read_positions: ["read", "positions"],
+    create_position: ["create", "positions"],
+    update_position: ["update", "positions"],
+    delete_position: ["delete", "positions"],
+    read_roles: ["read", "roles"],
+    create_role: ["create", "roles"],
+    update_role: ["update", "roles"],
+    delete_role: ["delete", "roles"],
+    read_announcements: ["read", "announcements"],
+    create_announcement: ["create", "announcements"],
+    update_announcement: ["update", "announcements"],
+    delete_announcement: ["delete", "announcements"],
+    read_employment_types: ["read", "employment_types"],
+    create_employment_type: ["create", "employment_types"],
+    update_employment_type: ["update", "employment_types"],
+    delete_employment_type: ["delete", "employment_types"],
+    read_visit_types: ["read", "visit_types"],
+    create_visit_type: ["create", "visit_types"],
+    update_visit_type: ["update", "visit_types"],
+    delete_visit_type: ["delete", "visit_types"],
+    read_visit_plans: ["read", "visit_plans"],
+    create_visit_plan: ["create", "visit_plans"],
+    update_visit_plan: ["update", "visit_plans"],
+    delete_visit_plan: ["delete", "visit_plans"],
+    read_sku_uoms: ["read", "sku_uoms"],
+    create_sku_uom: ["create", "sku_uoms"],
+    update_sku_uom: ["update", "sku_uoms"],
+    delete_sku_uom: ["delete", "sku_uoms"],
+    read_sku_categories: ["read", "sku_categories"],
+    create_sku_category: ["create", "sku_categories"],
+    update_sku_category: ["update", "sku_categories"],
+    delete_sku_category: ["delete", "sku_categories"],
+    read_sku_brands: ["read", "sku_brands"],
+    create_sku_brand: ["create", "sku_brands"],
+    update_sku_brand: ["update", "sku_brands"],
+    delete_sku_brand: ["delete", "sku_brands"],
+    read_skus: ["read", "skus"],
+    create_sku: ["create", "skus"],
+    update_sku: ["update", "skus"],
+    delete_sku: ["delete", "skus"],
+    read_shift_types: ["read", "shift_types"],
+    create_shift_type: ["create", "shift_types"],
+    update_shift_type: ["update", "shift_types"],
+    delete_shift_type: ["delete", "shift_types"],
+    read_sales_groups: ["read", "sales_groups"],
+    create_sales_group: ["create", "sales_groups"],
+    update_sales_group: ["update", "sales_groups"],
+    delete_sales_group: ["delete", "sales_groups"],
+    read_production_areas: ["read", "production_areas"],
+    create_production_area: ["create", "production_areas"],
+    update_production_area: ["update", "production_areas"],
+    delete_production_area: ["delete", "production_areas"],
+    read_production_lines: ["read", "production_lines"],
+    create_production_line: ["create", "production_lines"],
+    update_production_line: ["update", "production_lines"],
+    delete_production_line: ["delete", "production_lines"],
+    read_productions: ["read", "productions"],
+    create_production: ["create", "productions"],
+    update_production: ["update", "productions"],
+    delete_production: ["delete", "productions"],
+
+    // Transactions ("read_all" variations & mutators)
+    read_employee_work_info: ["read", "employee_work_info"],
+    read_all_attendances: ["read", "attendances"],
+    create_attendance: ["create", "attendances"],
+    update_attendance: ["update", "attendances"],
+    delete_attendance: ["delete", "attendances"],
+    read_all_leaves: ["read", "leaves"],
+    create_leave: ["create", "leaves"],
+    update_leave: ["update", "leaves"],
+    delete_leave: ["delete", "leaves"],
+    read_all_inventory: ["read", "inventories"],
+    create_inventory: ["create", "inventories"],
+    update_inventory: ["update", "inventories"],
+    delete_inventory: ["delete", "inventories"],
+    read_all_visits: ["read", "visits"],
+    create_visit: ["create", "visits"],
+    update_visit: ["update", "visits"],
+    delete_visit: ["delete", "visits"],
+    read_all_outlets: ["read", "outlets"],
+    create_outlet: ["create", "outlets"],
+    update_outlet: ["update", "outlets"],
+    delete_outlet: ["delete", "outlets"],
+    assign_outlets: ["assign", "outlets"],
+    read_all_bookings: ["read", "sales_bookings"],
+    create_booking: ["create", "sales_bookings"],
+    update_booking: ["update", "sales_bookings"],
+    delete_booking: ["delete", "sales_bookings"],
+  }
+
+// 2. Server Ability builder
 export async function getServerAbility(): Promise<AppAbility> {
   const { can, build } = new AbilityBuilder<AppAbility>(createMongoAbility)
   const { permissions, isSuperuser, employeeId, userId } =
     await fetchUserPermissions()
 
+  // Superusers bypass all rules
   if (isSuperuser) {
     can("manage", "all")
     return build()
   }
 
   permissions.forEach((perm: string) => {
-    switch (perm) {
-      // EMPLOYEES
-      case "read_employee":
-        can("read", "employees")
-        break
-      case "create_employee":
-        can("create", "employees")
-        break
-      case "update_employee":
-        can("update", "employees")
-        break
-      case "delete_employee":
-        can("delete", "employees")
-        break
+    // A. Apply standard unconditional mappings automatically from the dictionary
+    if (standardRules[perm]) {
+      can(standardRules[perm][0], standardRules[perm][1])
+      return
+    }
 
-      // EMPLOYEE WORK INFO (Strict HR Permissions)
-      case "read_employee_work_info":
-        can("read", "employee_work_info")
-        break
+    // B. Handle complex & scoped rules manually
+    switch (perm) {
       case "manage_employee_work_info":
         can("create", "employee_work_info")
         can("update", "employee_work_info")
         can("delete", "employee_work_info")
         break
-      // (Optional) Let employees see their own govt numbers
       case "read_my_work_info":
         if (employeeId)
           can("read", "employee_work_info", { employee_id: employeeId })
         break
-
-      // WORK TYPES
-      case "read_work_types":
-        can("read", "work_types")
-        break
-      case "create_work_type":
-        can("create", "work_types")
-        break
-      case "update_work_type":
-        can("update", "work_types")
-        break
-      case "delete_work_type":
-        can("delete", "work_types")
-        break
-
-      // VISIT TYPES
-      case "read_visit_types":
-        can("read", "visit_types")
-        break
-      case "create_visit_type":
-        can("create", "visit_types")
-        break
-      case "update_visit_type":
-        can("update", "visit_types")
-        break
-      case "delete_visit_type":
-        can("delete", "visit_types")
-        break
-
-      // VISIT PLANS
-      case "read_visit_plans":
-        can("read", "visit_plans")
-        break
-      case "create_visit_plan":
-        can("create", "visit_plans")
-        break
-      case "update_visit_plan":
-        can("update", "visit_plans")
-        break
-      case "delete_visit_plan":
-        can("delete", "visit_plans")
-        break
-
-      // SKU UOMs
-      case "read_sku_uoms":
-        can("read", "sku_uoms")
-        break
-      case "create_sku_uom":
-        can("create", "sku_uoms")
-        break
-      case "update_sku_uom":
-        can("update", "sku_uoms")
-        break
-      case "delete_sku_uom":
-        can("delete", "sku_uoms")
-        break
-
-      // SKU CATEGORIES
-      case "read_sku_categories":
-        can("read", "sku_categories")
-        break
-      case "create_sku_category":
-        can("create", "sku_categories")
-        break
-      case "update_sku_category":
-        can("update", "sku_categories")
-        break
-      case "delete_sku_category":
-        can("delete", "sku_categories")
-        break
-
-      // SKU BRANDS
-      case "read_sku_brands":
-        can("read", "sku_brands")
-        break
-      case "create_sku_brand":
-        can("create", "sku_brands")
-        break
-      case "update_sku_brand":
-        can("update", "sku_brands")
-        break
-      case "delete_sku_brand":
-        can("delete", "sku_brands")
-        break
-
-      // SKUS
-      case "read_skus":
-        can("read", "skus")
-        break
-      case "create_sku":
-        can("create", "skus")
-        break
-      case "update_sku":
-        can("update", "skus")
-        break
-      case "delete_sku":
-        can("delete", "skus")
-        break
-
-      // SHIFT TYPES
-      case "read_shift_types":
-        can("read", "shift_types")
-        break
-      case "create_shift_type":
-        can("create", "shift_types")
-        break
-      case "update_shift_type":
-        can("update", "shift_types")
-        break
-      case "delete_shift_type":
-        can("delete", "shift_types")
-        break
-
-      // SALES GROUPS
-      case "read_sales_groups":
-        can("read", "sales_groups")
-        break
-      case "create_sales_group":
-        can("create", "sales_groups")
-        break
-      case "update_sales_group":
-        can("update", "sales_groups")
-        break
-      case "delete_sales_group":
-        can("delete", "sales_groups")
-        break
-
-      // ATTENDANCES
       case "read_my_attendances":
         if (employeeId) can("read", "attendances", { employee_id: employeeId })
         break
-      case "read_all_attendances":
-        can("read", "attendances")
-        break
-      case "create_attendance":
-        can("create", "attendances")
-        break
-      case "update_attendance":
-        can("update", "attendances")
-        break
-      case "delete_attendance":
-        can("delete", "attendances")
-        break
-
-      // LEAVES
       case "read_my_leaves":
         if (employeeId) can("read", "leaves", { employee_id: employeeId })
         break
-      case "read_all_leaves":
-        can("read", "leaves")
-        break
-      case "create_leave":
-        can("create", "leaves")
-        break
-      case "update_leave":
-        can("update", "leaves")
-        break
-      case "delete_leave":
-        can("delete", "leaves")
-        break
-
-      // INVENTORY
       case "read_my_inventory":
         if (userId) can("read", "inventories", { created_by: userId })
         break
-      case "read_all_inventory":
-        can("read", "inventories")
-        break
-      case "create_inventory":
-        can("create", "inventories")
-        break
-      case "update_inventory":
-        can("update", "inventories")
-        break
-      case "delete_inventory":
-        can("delete", "inventories")
-        break
-
-      // VISITS
       case "read_my_visits":
         can("read", "visits", { is_assigned: true })
         break
-      case "read_all_visits":
-        can("read", "visits")
-        break
-      case "create_visit":
-        can("create", "visits")
-        break
-      case "update_visit":
-        can("update", "visits")
-        break
-      case "delete_visit":
-        can("delete", "visits")
-        break
-
-      // OUTLETS
       case "read_assigned_outlets":
         can("read", "outlets", { is_assigned: true })
         break
-      case "read_all_outlets":
-        can("read", "outlets")
-        break
-      case "create_outlet":
-        can("create", "outlets")
-        break
-      case "update_outlet":
-        can("update", "outlets")
-        break
-      case "delete_outlet":
-        can("delete", "outlets")
-        break
-      case "assign_outlets":
-        can("assign", "outlets")
-        break
-
-      // SALES BOOKINGS
       case "read_my_bookings":
         if (employeeId)
           can("read", "sales_bookings", { employee_id: employeeId })
         break
-      case "read_all_bookings":
-        can("read", "sales_bookings")
-        break
-      case "create_booking":
-        can("create", "sales_bookings")
-        break
-      case "update_booking":
-        can("update", "sales_bookings")
-        break
-      case "delete_booking":
-        can("delete", "sales_bookings")
-        break
     }
   })
 
-  can("update", "approval_requests")
+  // Global defaults that all users have access to (Workflow driven)
+  can("read", "approval_requests")
 
   return build()
 }
