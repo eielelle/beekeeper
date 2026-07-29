@@ -5,6 +5,7 @@ import {
   fetchApprovalRulesAction,
   createApprovalRuleAction,
   deleteApprovalRuleAction,
+  fetchDepartmentsForRulesAction,
 } from "@/actions/approval-rule.action"
 
 export type Role = {
@@ -16,9 +17,11 @@ export type ApprovalRule = {
   id: number
   module: string
   step_level: number
+  is_department_head: boolean
   role: {
     role_name: string
   } | null
+  department: { name: string; code: string } | null
 }
 
 export async function fetchRoles() {
@@ -80,5 +83,13 @@ export async function deleteApprovalRule(id: number) {
       error instanceof Error ? error.message : "An unknown error occurred"
     toast.error(`ERR: ${message}`)
     throw error
+  }
+}
+
+export async function fetchDepartmentsForRule() {
+  try {
+    return await fetchDepartmentsForRulesAction()
+  } catch (error: any) {
+    return []
   }
 }

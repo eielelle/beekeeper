@@ -95,11 +95,11 @@ const data = {
       items: [
         {
           title: "My Attendance",
-          url: "#",
+          url: "/d/attendances/my-attendances",
         },
         {
           title: "Attendance Logs",
-          url: "#",
+          url: "/d/attendances/attendance-logs",
         },
       ],
     },

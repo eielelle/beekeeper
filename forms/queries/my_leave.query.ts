@@ -9,6 +9,16 @@ import {
 } from "@/actions/leave.action"
 import { LeaveStoreType } from "./leave.query"
 
+export type ApprovalLogType = {
+  step_level: number
+  status: string
+  created_at: string
+  approver:
+    | { first_name: string; last_name: string }
+    | { first_name: string; last_name: string }[]
+    | null
+}
+
 export type MyLeaveStoreType = {
   id?: string | number
   employee_id?: number
@@ -16,6 +26,8 @@ export type MyLeaveStoreType = {
   reason: string
   created_at?: string
   status?: "pending" | "approved" | "rejected"
+  current_step?: number | null // <-- Added for Approval Workflow tracking
+  approval_logs?: ApprovalLogType[] // <-- Added for the multi-step timeline
 }
 
 export type FetchMyLeavesParams = {
@@ -51,7 +63,7 @@ export async function getMyLeave(id: string) {
 }
 
 export async function createMyLeave(
-  value: Omit<MyLeaveStoreType, "employee_id">
+  value: Omit<MyLeaveStoreType, "employee_id" | "approval_logs">
 ) {
   const t = toast.loading("Recording Leave. Please wait.")
   try {

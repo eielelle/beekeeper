@@ -16,8 +16,10 @@ export type LeaveStoreType = {
   reason: string
   created_at?: string
   status?: "pending" | "approved" | "rejected"
+  current_step?: number | null // <-- Added for Approval Workflow tracking
   // Joined relation for the UI
   employee?: { first_name: string; last_name: string } | null
+  approved_by?: string | null
 }
 
 export type FetchLeavesParams = {

@@ -33,7 +33,8 @@ export async function fetchAnnouncementsAction() {
       author:employees!user_id (
         first_name,
         last_name,
-        avatar_url
+        avatar_url,
+        gender
       )
     `
     )

@@ -8,13 +8,7 @@ import {
   PaginationState,
   Updater,
 } from "@tanstack/react-table"
-import {
-  Calendar,
-  CheckSquare,
-  ArrowUpDown,
-  CheckCircle2,
-  XCircle,
-} from "lucide-react"
+import { Calendar, Users, ArrowUpDown } from "lucide-react"
 import { useRouter, usePathname, useSearchParams } from "next/navigation"
 
 import { Button } from "@/components/ui/button"
@@ -27,13 +21,12 @@ import {
   FilterField,
 } from "@/components/custom/filter/dynamic-filter"
 import {
-  deleteMyLeave,
-  fetchMyLeaves,
-  fetchMyLeaveStats,
-  MyLeaveStoreType,
-} from "@/forms/queries/my_leave.query"
-import { MyLeaveForm } from "@/forms/my_leave.form"
-import { Badge } from "@/components/ui/badge"
+  deleteLeave,
+  fetchLeaves,
+  fetchLeaveStats,
+  LeaveStoreType,
+} from "@/forms/queries/leave.query"
+import { LeaveForm } from "@/forms/leave.form"
 
 const filterFields: FilterField[] = [
   {
@@ -48,7 +41,7 @@ const filterFields: FilterField[] = [
   },
 ]
 
-export default function MyLeavesPage() {
+export default function LeavesPage() {
   const queryClient = useQueryClient()
   const router = useRouter()
   const pathname = usePathname()
@@ -95,7 +88,7 @@ export default function MyLeavesPage() {
 
   const { data, isLoading } = useQuery({
     queryKey: [
-      "my-leaves",
+      "leaves",
       pagination.pageIndex,
       pagination.pageSize,
       globalFilter,
@@ -104,7 +97,7 @@ export default function MyLeavesPage() {
       dateTo,
     ],
     queryFn: () =>
-      fetchMyLeaves({
+      fetchLeaves({
         pageIndex: pagination.pageIndex,
         pageSize: pagination.pageSize,
         globalFilter,
@@ -115,19 +108,31 @@ export default function MyLeavesPage() {
   })
 
   const { data: statsData, isLoading: isLoadingStats } = useQuery({
-    queryKey: ["my-leaves", "stats"],
-    queryFn: fetchMyLeaveStats,
+    queryKey: ["leaves", "stats"],
+    queryFn: fetchLeaveStats,
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string | number) => deleteMyLeave(id.toString()),
+    mutationFn: (id: string | number) => deleteLeave(id.toString()),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["my-leaves"] })
+      queryClient.invalidateQueries({ queryKey: ["leaves"] })
     },
   })
 
-  const columns = React.useMemo<ColumnDef<MyLeaveStoreType>[]>(
+  const columns = React.useMemo<ColumnDef<LeaveStoreType>[]>(
     () => [
+      {
+        accessorKey: "employee",
+        header: "Employee",
+        cell: ({ row }) => {
+          const emp = row.original.employee
+          return emp ? (
+            <span className="font-medium">{`${emp.first_name} ${emp.last_name}`}</span>
+          ) : (
+            "—"
+          )
+        },
+      },
       {
         accessorKey: "leave_date",
         header: ({ column }) => (
@@ -151,13 +156,7 @@ export default function MyLeavesPage() {
         ),
         cell: ({ row }) => {
           const raw = row.getValue("leave_date") as string
-          return raw ? (
-            <span className="font-semibold">
-              {new Date(raw).toLocaleDateString()}
-            </span>
-          ) : (
-            "—"
-          )
+          return raw ? new Date(raw).toLocaleDateString() : "—"
         },
       },
       {
@@ -165,7 +164,7 @@ export default function MyLeavesPage() {
         header: "Reason",
         cell: ({ row }) => (
           <span
-            className="block max-w-[350px] truncate text-muted-foreground"
+            className="block max-w-[300px] truncate"
             title={row.getValue("reason")}
           >
             {row.getValue("reason")}
@@ -180,78 +179,6 @@ export default function MyLeavesPage() {
           return raw ? new Date(raw).toLocaleDateString() : "—"
         },
       },
-      // --- UPDATED APPROVAL CHAIN COLUMN ---
-      {
-        accessorKey: "status",
-        header: "Approval Chain",
-        cell: ({ row }) => {
-          const status = (row.getValue("status") as string) || "pending"
-          const currentStep = row.original.current_step
-          const logs = row.original.approval_logs || []
-
-          // 1. Render Main Status Badge
-          let mainBadge
-          if (status === "approved") {
-            mainBadge = (
-              <Badge
-                variant="secondary"
-                className="bg-green-100 text-green-800 capitalize hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400"
-              >
-                Approved
-              </Badge>
-            )
-          } else if (status === "rejected") {
-            mainBadge = (
-              <Badge variant="destructive" className="capitalize">
-                Rejected
-              </Badge>
-            )
-          } else {
-            mainBadge = (
-              <Badge
-                variant="outline"
-                className="border-amber-500/30 bg-amber-50 text-amber-600 capitalize dark:bg-amber-950/30 dark:text-amber-400"
-              >
-                Pending {currentStep ? `(Step ${currentStep})` : ""}
-              </Badge>
-            )
-          }
-
-          return (
-            <div className="flex flex-col items-start gap-2">
-              {mainBadge}
-
-              {/* 2. Render Log History Timeline */}
-              {logs.length > 0 && (
-                <div className="mt-1 flex min-w-[140px] flex-col gap-1 rounded-md border bg-muted/30 p-1.5 text-[11px] text-muted-foreground">
-                  {logs.map((log: any, idx: number) => {
-                    const emp = Array.isArray(log.approver)
-                      ? log.approver[0]
-                      : log.approver
-                    const name = emp
-                      ? `${emp.first_name} ${emp.last_name}`
-                      : "Unknown"
-
-                    return (
-                      <div key={idx} className="flex items-center gap-1.5">
-                        {log.status === "approved" ? (
-                          <CheckCircle2 className="h-3 w-3 text-green-500" />
-                        ) : (
-                          <XCircle className="h-3 w-3 text-red-500" />
-                        )}
-                        <span>
-                          Step {log.step_level}:{" "}
-                          <span className="font-medium">{name}</span>
-                        </span>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-          )
-        },
-      },
     ],
     [sorting]
   )
@@ -263,9 +190,9 @@ export default function MyLeavesPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              My Total Leaves
+              Total Leaves Filed
             </CardTitle>
-            <CheckSquare className="h-4 w-4 text-muted-foreground" />
+            <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             {isLoadingStats ? (
@@ -279,7 +206,7 @@ export default function MyLeavesPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              My Upcoming Leaves
+              Upcoming Leaves
             </CardTitle>
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -297,7 +224,7 @@ export default function MyLeavesPage() {
 
       <DynamicFilter
         title="Filter Leaves"
-        description="Filter your past and upcoming leave requests by date."
+        description="Filter leave records by the actual date of leave."
         fields={filterFields}
         values={filterValues}
         onApply={handleApplyFilters}
@@ -305,8 +232,8 @@ export default function MyLeavesPage() {
       />
 
       <DataTable
-        title="My Leaves"
-        description="File and manage your leave requests."
+        title="Leave Records"
+        description="Manage employee leave requests"
         entityName="Leave"
         columns={columns}
         data={data?.data ?? []}
@@ -321,7 +248,7 @@ export default function MyLeavesPage() {
         onSortingChange={setSorting}
         renderForm={({ id, onClose }) => (
           <div className="max-h-[80vh] overflow-y-auto pr-1">
-            <MyLeaveForm editId={id?.toString()} onClose={onClose} />
+            <LeaveForm editId={id?.toString()} onClose={onClose} />
           </div>
         )}
         onDelete={async (id) => {
@@ -329,7 +256,7 @@ export default function MyLeavesPage() {
         }}
         isDeleting={deleteMutation.isPending}
         getItemDisplayName={(item) =>
-          `leave scheduled for ${new Date(item.leave_date).toLocaleDateString()}`
+          `leave on ${new Date(item.leave_date).toLocaleDateString()} for ${item.employee?.first_name || "Employee"}`
         }
       />
     </div>

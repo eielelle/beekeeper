@@ -52,7 +52,51 @@ export async function fetchLeavesAction(params: FetchLeavesParams) {
   const { data, error, count } = await query
   if (error) throw new Error(error.message)
 
-  return { data, rowCount: count || 0 }
+  if (!data || data.length === 0) {
+    return { data: [], rowCount: count || 0 }
+  }
+
+  // --- APPROVAL WORKFLOW STITCHING ---
+  const leaveIds = data.map((leave) => String(leave.id))
+
+  const { data: approvals } = await supabase
+    .from("approval_requests")
+    .select(
+      `
+      record_id,
+      current_step,
+      status,
+      approval_logs (
+        step_level,
+        status,
+        created_at,
+        approver:employees (
+          first_name,
+          last_name
+        )
+      )
+    `
+    )
+    .eq("module", "leaves")
+    .in("record_id", leaveIds)
+
+  const enrichedLeaves = data.map((leave) => {
+    const request = approvals?.find((a) => a.record_id === String(leave.id))
+
+    // Sort logs sequentially by step_level
+    const sortedLogs = request?.approval_logs
+      ? [...request.approval_logs].sort((a, b) => a.step_level - b.step_level)
+      : []
+
+    return {
+      ...leave,
+      current_step:
+        request && request.status === "pending" ? request.current_step : null,
+      approval_logs: sortedLogs, // Return the full timeline array
+    }
+  })
+
+  return { data: enrichedLeaves, rowCount: count || 0 }
 }
 
 // ==========================================
@@ -154,8 +198,6 @@ export async function updateLeaveAction(value: LeaveStoreType) {
     throw new Error("Forbidden: You cannot update this leave request.")
   }
 
-  // SECURITY FIX: Extract `employee_id` so it is completely stripped from the `updates` object.
-  // This guarantees a user cannot re-assign their leave request to another employee.
   const { id, employee, created_at, employee_id, status, ...updates } = value
 
   const { data, error } = await supabase
@@ -208,7 +250,6 @@ export async function deleteLeaveAction(id: string) {
 export async function fetchLeaveStatsAction() {
   const ability = await getServerAbility()
 
-  // ADD THIS CHECK: Block completely if they have zero read permissions
   if (ability.cannot("read", "leaves")) {
     throw new Error(
       "Forbidden: You do not have permission to view leave stats."
@@ -227,7 +268,6 @@ export async function fetchLeaveStatsAction() {
     .select("*", { count: "exact", head: true })
     .gte("leave_date", today)
 
-  // Scope stats to the user if they don't have global read access
   const canReadAll = ability.can("read", subject("leaves", { employee_id: -1 }))
   if (!canReadAll && employeeId) {
     queryTotal = queryTotal.eq("employee_id", employeeId)
@@ -248,7 +288,6 @@ export async function fetchLeaveStatsAction() {
 export async function searchEmployeeOptionsAction(searchTerm: string) {
   const ability = await getServerAbility()
 
-  // CASL check: Ensure they have rights to view the employee directory
   if (ability.cannot("read", "employees")) {
     throw new Error("Forbidden: You do not have permission to view employees.")
   }
@@ -281,7 +320,6 @@ export async function fetchMyLeavesAction(params: FetchLeavesParams) {
 
   if (!employeeId) throw new Error("Employee profile not found.")
 
-  // Verify they have baseline permission to read their own leaves
   if (ability.cannot("read", subject("leaves", { employee_id: employeeId }))) {
     throw new Error(
       "Forbidden: You do not have permission to view your leaves."
@@ -292,7 +330,7 @@ export async function fetchMyLeavesAction(params: FetchLeavesParams) {
   let query = supabase
     .from("leaves")
     .select("*", { count: "exact" })
-    .eq("employee_id", employeeId) // Strictly locked to current user
+    .eq("employee_id", employeeId)
 
   if (params.globalFilter)
     query = query.ilike("reason", `%${params.globalFilter}%`)
@@ -314,7 +352,51 @@ export async function fetchMyLeavesAction(params: FetchLeavesParams) {
   const { data, error, count } = await query
   if (error) throw new Error(error.message)
 
-  return { data, rowCount: count || 0 }
+  if (!data || data.length === 0) {
+    return { data: [], rowCount: count || 0 }
+  }
+
+  // --- APPROVAL WORKFLOW STITCHING ---
+  const leaveIds = data.map((leave) => String(leave.id))
+
+  const { data: approvals } = await supabase
+    .from("approval_requests")
+    .select(
+      `
+      record_id,
+      current_step,
+      status,
+      approval_logs (
+        step_level,
+        status,
+        created_at,
+        approver:employees (
+          first_name,
+          last_name
+        )
+      )
+    `
+    )
+    .eq("module", "leaves")
+    .in("record_id", leaveIds)
+
+  const enrichedLeaves = data.map((leave) => {
+    const request = approvals?.find((a) => a.record_id === String(leave.id))
+
+    // Sort logs sequentially by step_level
+    const sortedLogs = request?.approval_logs
+      ? [...request.approval_logs].sort((a, b) => a.step_level - b.step_level)
+      : []
+
+    return {
+      ...leave,
+      current_step:
+        request && request.status === "pending" ? request.current_step : null,
+      approval_logs: sortedLogs, // Return the full timeline array
+    }
+  })
+
+  return { data: enrichedLeaves, rowCount: count || 0 }
 }
 
 // ==========================================

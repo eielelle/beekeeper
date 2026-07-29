@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
+import { EmployeeAvatar } from "@/components/custom/avatars/default-avatar"
 
 export default function AnnouncementsPage() {
   // Fetch Announcements
@@ -69,23 +70,11 @@ export default function AnnouncementsPage() {
               ? `${author.first_name} ${author.last_name}`
               : "System Announcement"
 
-            const initials = author
-              ? `${author.first_name?.charAt(0)}${author.last_name?.charAt(0)}`
-              : "SA"
-
             return (
               <Card key={post.id} className="shadow-sm">
                 {/* Post Header: Avatar, Name, Date */}
                 <CardHeader className="flex flex-row items-start gap-4 pb-3">
-                  <Avatar className="h-10 w-10 border">
-                    <AvatarImage
-                      src={author?.avatar_url}
-                      className="object-cover"
-                    />
-                    <AvatarFallback className="bg-muted text-xs font-medium">
-                      {initials || <User className="h-4 w-4" />}
-                    </AvatarFallback>
-                  </Avatar>
+                  <EmployeeAvatar employee={author} />
                   <div className="flex flex-col">
                     <span className="text-sm font-semibold">{authorName}</span>
                     <span className="text-xs text-muted-foreground">

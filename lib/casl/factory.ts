@@ -58,6 +58,7 @@ export type AppSubject =
   | "announcements"
   | "approval_rules"
   | "positions"
+  | "departments"
   | EmployeeSubject
   | LeaveSubject
   | InventorySubject

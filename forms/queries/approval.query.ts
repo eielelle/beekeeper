@@ -8,13 +8,14 @@ import { toast } from "sonner"
 // TYPES
 // ==========================================
 
-export type ApprovalRequestType = {
+export type PendingApproval = {
   id: string
   module: string
   record_id: string
   status: "pending" | "approved" | "rejected"
   current_step: number
   created_at: string
+  requester_id: number
   requester: {
     id: number
     first_name: string | null
@@ -27,13 +28,18 @@ export type ApprovalRequestType = {
 // FETCH WRAPPERS
 // ==========================================
 
-export async function fetchMyPendingApprovals(): Promise<
-  ApprovalRequestType[]
-> {
+export async function fetchMyPendingApprovals(): Promise<PendingApproval[]> {
   try {
     const data = await fetchMyPendingApprovalsAction()
-    // Cast the returned data to our frontend type
-    return data as unknown as ApprovalRequestType[]
+
+    // Safely normalize the requester object at runtime
+    // (Supabase sometimes wraps relational joins in arrays)
+    return data.map((item: any) => ({
+      ...item,
+      requester: Array.isArray(item.requester)
+        ? item.requester[0]
+        : item.requester,
+    })) as PendingApproval[]
   } catch (error: unknown) {
     const message =
       error instanceof Error ? error.message : "An unknown error occurred"
@@ -46,11 +52,16 @@ export async function fetchMyPendingApprovals(): Promise<
 // MUTATION WRAPPERS
 // ==========================================
 
-export async function processApproval(
-  requestId: string,
-  action: "approved" | "rejected",
+// Wrapped parameters in a single object to support React Query's mutate()
+export async function processApproval({
+  requestId,
+  action,
+  remarks,
+}: {
+  requestId: string
+  action: "approved" | "rejected"
   remarks?: string
-) {
+}) {
   const t = toast.loading(`Processing ${action}...`)
   try {
     const result = await processApprovalAction(requestId, action, remarks)

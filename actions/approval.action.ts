@@ -17,7 +17,7 @@ async function getCurrentEmployee(supabase: SupabaseClient, userId: string) {
 }
 
 // ==========================================
-// 1. TRIGGER WORKFLOW (Internal System Action)
+// 1. TRIGGER WORKFLOW
 // ==========================================
 export async function triggerApprovalWorkflow(
   moduleName: string,
@@ -35,7 +35,6 @@ export async function triggerApprovalWorkflow(
 
   const { data: rules } = await query.order("step_level", { ascending: true })
 
-  // If no rules exist, the workflow isn't required
   if (!rules || rules.length === 0) return null
 
   const { data: request, error } = await supabaseAdmin
@@ -75,21 +74,7 @@ export async function fetchMyPendingApprovalsAction() {
   const employee = await getCurrentEmployee(supabase, user.id)
   if (!employee) return []
 
-  let ruleConditions = `employee_id.eq.${employee.id}`
-  if (employee.role_id) ruleConditions += `,role_id.eq.${employee.role_id}`
-
-  const { data: myRules } = await supabase
-    .from("approval_rules")
-    .select("module, step_level")
-    .or(ruleConditions)
-
-  if (!myRules || myRules.length === 0) return []
-
-  const requestConditions = myRules
-    .map((r) => `and(module.eq.${r.module},current_step.eq.${r.step_level})`)
-    .join(",")
-
-  const { data: pendingRequests, error } = await supabase
+  const { data: allPending } = await supabaseAdmin
     .from("approval_requests")
     .select(
       `
@@ -99,15 +84,71 @@ export async function fetchMyPendingApprovalsAction() {
       status,
       current_step,
       created_at,
+      requester_id,
       requester:employees!requester_id(id, first_name, last_name, avatar_url)
     `
     )
     .eq("status", "pending")
-    .or(requestConditions)
     .order("created_at", { ascending: false })
 
-  if (error) throw new Error(error.message)
-  return pendingRequests
+  if (!allPending || allPending.length === 0) return []
+
+  const { data: allRules } = await supabaseAdmin
+    .from("approval_rules")
+    .select("*")
+
+  const { data: myDepartments } = await supabaseAdmin
+    .from("departments")
+    .select("id")
+    .eq("department_head_id", employee.id)
+
+  let myEmployeeIds: number[] = []
+
+  if (myDepartments && myDepartments.length > 0) {
+    const deptIds = myDepartments.map((d) => Number(d.id))
+    const { data: deptEmployees } = await supabaseAdmin
+      .from("employee_work_information")
+      .select("employee_id")
+      .in("department_id", deptIds)
+
+    myEmployeeIds = deptEmployees?.map((e) => Number(e.employee_id)) || []
+  }
+
+  const myApprovals = allPending.filter((request) => {
+    // Check ALL matching rules to prevent short-circuiting on duplicate/test rules
+    const matchingRules =
+      allRules?.filter(
+        (r) =>
+          r.module === request.module &&
+          Number(r.step_level) === Number(request.current_step)
+      ) || []
+
+    let isMatch = false
+
+    for (const rule of matchingRules) {
+      if (rule.is_department_head === true) {
+        if (myEmployeeIds.includes(Number(request.requester_id))) isMatch = true
+      }
+      if (rule.department_id) {
+        if (
+          myDepartments?.some(
+            (d) => Number(d.id) === Number(rule.department_id)
+          )
+        )
+          isMatch = true
+      }
+      if (rule.role_id && employee.role_id) {
+        if (Number(rule.role_id) === Number(employee.role_id)) isMatch = true
+      }
+      if (rule.employee_id) {
+        if (Number(rule.employee_id) === Number(employee.id)) isMatch = true
+      }
+    }
+
+    return isMatch
+  })
+
+  return myApprovals
 }
 
 // ==========================================
@@ -126,15 +167,6 @@ export async function processApprovalAction(
 
   const employee = await getCurrentEmployee(supabase, user.id)
 
-  // 1. CASL Security Check (System-level access)
-  const ability = await getServerAbility()
-  if (ability.cannot("update", "approval_requests")) {
-    throw new Error(
-      "Forbidden: You do not have permission to process approvals."
-    )
-  }
-
-  // 2. Fetch current request state via Admin
   const { data: request } = await supabaseAdmin
     .from("approval_requests")
     .select("*")
@@ -147,22 +179,67 @@ export async function processApprovalAction(
     )
   }
 
-  // 3. ✨ CRITICAL FIX: Verify THIS employee is authorized for THIS specific step
-  let authQuery = supabaseAdmin
+  // 🚀 FIX: Fetch ALL rules for this step instead of .single() to avoid crashes
+  const { data: rules } = await supabaseAdmin
     .from("approval_rules")
-    .select("id")
+    .select("*")
     .eq("module", request.module)
     .eq("step_level", request.current_step)
 
-  if (employee.role_id) {
-    authQuery = authQuery.or(
-      `employee_id.eq.${employee.id},role_id.eq.${employee.role_id}`
-    )
-  } else {
-    authQuery = authQuery.eq("employee_id", employee.id)
-  }
+  if (!rules || rules.length === 0)
+    throw new Error("No rule configured for this step.")
 
-  const { data: isAuthorized } = await authQuery.single()
+  let isAuthorized = false
+
+  for (const rule of rules) {
+    if (rule.is_department_head === true) {
+      const { data: requesterInfo } = await supabaseAdmin
+        .from("employee_work_information")
+        .select("department_id")
+        .eq("employee_id", request.requester_id)
+        .single()
+
+      if (requesterInfo?.department_id) {
+        const { data: dept } = await supabaseAdmin
+          .from("departments")
+          .select("department_head_id")
+          .eq("id", requesterInfo.department_id)
+          .single()
+
+        if (Number(dept?.department_head_id) === Number(employee.id)) {
+          isAuthorized = true
+          break // Authorized, stop checking
+        }
+      }
+    }
+
+    if (rule.department_id) {
+      const { data: dept } = await supabaseAdmin
+        .from("departments")
+        .select("department_head_id")
+        .eq("id", rule.department_id)
+        .single()
+
+      if (Number(dept?.department_head_id) === Number(employee.id)) {
+        isAuthorized = true
+        break
+      }
+    }
+
+    if (rule.role_id && employee.role_id) {
+      if (Number(rule.role_id) === Number(employee.role_id)) {
+        isAuthorized = true
+        break
+      }
+    }
+
+    if (rule.employee_id) {
+      if (Number(rule.employee_id) === Number(employee.id)) {
+        isAuthorized = true
+        break
+      }
+    }
+  }
 
   if (!isAuthorized) {
     throw new Error(
@@ -170,7 +247,7 @@ export async function processApprovalAction(
     )
   }
 
-  // 4. Log the manager's action securely
+  // 5. Log the manager's action securely
   await supabaseAdmin.from("approval_logs").insert([
     {
       request_id: requestId,
@@ -182,14 +259,13 @@ export async function processApprovalAction(
     },
   ])
 
-  // 5. Handle Rejection (Fails immediately)
+  // 6. Handle Rejection (Fails immediately)
   if (action === "rejected") {
     await supabaseAdmin
       .from("approval_requests")
       .update({ status: "rejected", updated_at: new Date().toISOString() })
       .eq("id", requestId)
 
-    // Dynamically update the source table to rejected!
     await supabaseAdmin
       .from(request.module)
       .update({ status: "rejected" })
@@ -197,16 +273,16 @@ export async function processApprovalAction(
     return { success: true, status: "rejected" }
   }
 
-  // 6. Handle Approval (Check if there is a Next Step)
+  // 7. Handle Approval (Check if there is a Next Step)
   const { data: nextStep } = await supabaseAdmin
     .from("approval_rules")
     .select("id")
     .eq("module", request.module)
     .eq("step_level", request.current_step + 1)
-    .single()
+    .limit(1)
+    .maybeSingle() // Use maybeSingle in case there are no more steps
 
   if (nextStep) {
-    // Escalate to the next manager in the chain
     await supabaseAdmin
       .from("approval_requests")
       .update({
@@ -227,7 +303,6 @@ export async function processApprovalAction(
       .update({ status: "approved", updated_at: new Date().toISOString() })
       .eq("id", requestId)
 
-    // Dynamically update the source table to fully approved!
     await supabaseAdmin
       .from(request.module)
       .update({ status: "approved" })

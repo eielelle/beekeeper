@@ -3,7 +3,7 @@
 import * as React from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { ColumnDef, SortingState, PaginationState } from "@tanstack/react-table"
-import { ArrowUpDown } from "lucide-react"
+import { ArrowUpDown, User } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { DataTable } from "@/components/custom/data-table/table"
@@ -104,6 +104,24 @@ export default function DepartmentsPage() {
         cell: ({ row }) => (
           <span className="font-medium">{row.getValue("name")}</span>
         ),
+      },
+      // --- NEW DEPARTMENT HEAD COLUMN ---
+      {
+        id: "manager",
+        header: "Department Head",
+        cell: ({ row }) => {
+          const manager = row.original.manager
+          return manager ? (
+            <div className="flex items-center gap-2">
+              <User className="h-4 w-4 text-muted-foreground" />
+              <span className="font-medium">
+                {manager.first_name} {manager.last_name}
+              </span>
+            </div>
+          ) : (
+            <span className="text-muted-foreground italic">—</span>
+          )
+        },
       },
       {
         accessorKey: "created_at",

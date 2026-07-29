@@ -21,7 +21,11 @@ import {
   approvalRuleSchema,
   type ApprovalRuleFormValues,
 } from "./schemas/approval-rule.schema"
-import { fetchRoles, createApprovalRule } from "./queries/approval-rule.query"
+import {
+  fetchRoles,
+  fetchDepartmentsForRule,
+  createApprovalRule,
+} from "./queries/approval-rule.query"
 import { useCurrentEmployee } from "@/hooks/use-current-employee"
 
 const MODULES = [
@@ -40,38 +44,34 @@ export function ApprovalRuleForm({ onSuccess }: { onSuccess: () => void }) {
     queryFn: fetchRoles,
   })
 
+  const { data: departments = [], isLoading: isLoadingDepts } = useQuery({
+    queryKey: ["departments-for-rules"],
+    queryFn: fetchDepartmentsForRule,
+  })
+
   const mutation = useMutation({
     mutationFn: (values: ApprovalRuleFormValues) =>
-      createApprovalRule({
-        values,
-        orgId: employee!.org_id,
-      }),
+      createApprovalRule({ values, orgId: employee!.org_id }),
     onSuccess: () => {
       toast.success("Approval rule created successfully!")
       queryClient.invalidateQueries({ queryKey: ["approval_rules"] })
       form.reset()
       onSuccess()
     },
-    onError: (error: Error) => {
-      toast.error(error.message)
-    },
+    onError: (error: Error) => toast.error(error.message),
   })
 
-  // ✅ Correct
   const form = useForm({
     defaultValues: {
       module: "",
       step_level: 1,
+      routing_mode: "role",
       role_id: "",
-    } as ApprovalRuleFormValues, // Casting here is enough for TS to infer everything!
-    validators: {
-      onSubmit: approvalRuleSchema,
-    },
+      department_id: "",
+    } as ApprovalRuleFormValues,
+    validators: { onSubmit: approvalRuleSchema },
     onSubmit: async ({ value }) => {
-      if (!employee?.org_id) {
-        toast.error("Organization context missing.")
-        return
-      }
+      if (!employee?.org_id) return toast.error("Organization context missing.")
       mutation.mutate(value)
     },
   })
@@ -85,6 +85,7 @@ export function ApprovalRuleForm({ onSuccess }: { onSuccess: () => void }) {
         form.handleSubmit()
       }}
     >
+      {/* Target Module */}
       <form.Field name="module">
         {(field) => {
           const isInvalid =
@@ -100,7 +101,7 @@ export function ApprovalRuleForm({ onSuccess }: { onSuccess: () => void }) {
                 disabled={mutation.isPending}
               >
                 <SelectTrigger aria-invalid={isInvalid}>
-                  <SelectValue placeholder="Select which module this rule applies to" />
+                  <SelectValue placeholder="Select module" />
                 </SelectTrigger>
                 <SelectContent>
                   {MODULES.map((m) => (
@@ -116,6 +117,7 @@ export function ApprovalRuleForm({ onSuccess }: { onSuccess: () => void }) {
         }}
       </form.Field>
 
+      {/* Step Level */}
       <form.Field name="step_level">
         {(field) => {
           const isInvalid =
@@ -133,8 +135,7 @@ export function ApprovalRuleForm({ onSuccess }: { onSuccess: () => void }) {
                 disabled={mutation.isPending}
               />
               <p className="mt-1.5 text-xs text-muted-foreground">
-                Level 1 is the first approver. Level 2 happens after Level 1
-                approves, etc.
+                Level 1 is the first approver.
               </p>
               {isInvalid && <FieldError errors={field.state.meta.errors} />}
             </Field>
@@ -142,29 +143,40 @@ export function ApprovalRuleForm({ onSuccess }: { onSuccess: () => void }) {
         }}
       </form.Field>
 
-      <form.Field name="role_id">
+      {/* Routing Mode */}
+      <form.Field name="routing_mode">
         {(field) => {
           const isInvalid =
             field.state.meta.isTouched && !field.state.meta.isValid
           return (
             <Field data-invalid={isInvalid}>
               <FieldLabel>
-                Approver Role <span className="text-destructive">*</span>
+                Routing Mode <span className="text-destructive">*</span>
               </FieldLabel>
               <Select
                 value={field.state.value}
-                onValueChange={field.handleChange}
-                disabled={isLoadingRoles || mutation.isPending}
+                onValueChange={(val) => {
+                  field.handleChange(
+                    val as "role" | "requester_dept" | "specific_dept"
+                  )
+                  form.setFieldValue("role_id", "")
+                  form.setFieldValue("department_id", "")
+                }}
+                disabled={mutation.isPending}
               >
                 <SelectTrigger aria-invalid={isInvalid}>
-                  <SelectValue placeholder="Select required role" />
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {roles.map((r) => (
-                    <SelectItem key={r.id} value={r.id.toString()}>
-                      {r.role_name}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="role">
+                    Fixed Role (e.g., General Manager)
+                  </SelectItem>
+                  <SelectItem value="requester_dept">
+                    Dynamic: Requester's Dept. Head
+                  </SelectItem>
+                  <SelectItem value="specific_dept">
+                    Specific Department's Head
+                  </SelectItem>
                 </SelectContent>
               </Select>
               {isInvalid && <FieldError errors={field.state.meta.errors} />}
@@ -172,6 +184,91 @@ export function ApprovalRuleForm({ onSuccess }: { onSuccess: () => void }) {
           )
         }}
       </form.Field>
+
+      {/* Conditional Rendering: Role OR Department Dropdowns */}
+      <form.Subscribe selector={(state) => state.values.routing_mode}>
+        {(routingMode) => (
+          <>
+            {routingMode === "role" && (
+              <form.Field name="role_id">
+                {(field) => {
+                  const isInvalid =
+                    field.state.meta.isTouched && !field.state.meta.isValid
+                  return (
+                    <Field
+                      data-invalid={isInvalid}
+                      className="animate-in fade-in slide-in-from-top-2"
+                    >
+                      <FieldLabel>
+                        Approver Role{" "}
+                        <span className="text-destructive">*</span>
+                      </FieldLabel>
+                      <Select
+                        value={field.state.value}
+                        onValueChange={field.handleChange}
+                        disabled={isLoadingRoles || mutation.isPending}
+                      >
+                        <SelectTrigger aria-invalid={isInvalid}>
+                          <SelectValue placeholder="Select required role" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {roles.map((r: any) => (
+                            <SelectItem key={r.id} value={r.id.toString()}>
+                              {r.role_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {isInvalid && (
+                        <FieldError errors={field.state.meta.errors} />
+                      )}
+                    </Field>
+                  )
+                }}
+              </form.Field>
+            )}
+
+            {routingMode === "specific_dept" && (
+              <form.Field name="department_id">
+                {(field) => {
+                  const isInvalid =
+                    field.state.meta.isTouched && !field.state.meta.isValid
+                  return (
+                    <Field
+                      data-invalid={isInvalid}
+                      className="animate-in fade-in slide-in-from-top-2"
+                    >
+                      <FieldLabel>
+                        Target Department{" "}
+                        <span className="text-destructive">*</span>
+                      </FieldLabel>
+                      <Select
+                        value={field.state.value}
+                        onValueChange={field.handleChange}
+                        disabled={isLoadingDepts || mutation.isPending}
+                      >
+                        <SelectTrigger aria-invalid={isInvalid}>
+                          <SelectValue placeholder="Select required department" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {departments.map((d: any) => (
+                            <SelectItem key={d.id} value={d.id.toString()}>
+                              {d.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {isInvalid && (
+                        <FieldError errors={field.state.meta.errors} />
+                      )}
+                    </Field>
+                  )
+                }}
+              </form.Field>
+            )}
+          </>
+        )}
+      </form.Subscribe>
 
       <div className="flex justify-end border-t pt-4">
         <Button type="submit" disabled={mutation.isPending}>
