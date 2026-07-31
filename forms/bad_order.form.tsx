@@ -4,7 +4,7 @@ import * as React from "react"
 import { useForm } from "@tanstack/react-form"
 import * as z from "zod"
 import { useParams } from "next/navigation"
-import { useMutation, useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useState, useEffect } from "react"
 import { Check, ChevronsUpDown, Loader2, Plus, Trash2 } from "lucide-react"
 import { toast } from "sonner"
@@ -43,6 +43,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 
+import { supabase } from "@/lib/supabase"
 import {
   createBadOrder,
   getBadOrder,
@@ -51,6 +52,9 @@ import {
   searchSkus,
 } from "./queries/bad_order.query"
 import { badOrderSchema } from "./schemas/bad_order.schema"
+
+// 🚀 Import your approval engine action here (adjust the path to match your project)
+import { triggerApprovalWorkflow } from "@/actions/approval.action"
 
 const getFirstItem = (data: any) => (Array.isArray(data) ? data[0] : data)
 
@@ -163,6 +167,7 @@ export function BadOrderForm({
   editId?: string
   onClose?: () => void
 }) {
+  const queryClient = useQueryClient()
   const params = useParams()
   let id = params?.id as string | undefined
   if (editId) id = editId
@@ -211,15 +216,47 @@ export function BadOrderForm({
   }, [isEditMode, badOrderData])
 
   const mutation = useMutation({
-    mutationFn: (values: z.infer<typeof badOrderSchema>) => {
+    mutationFn: async (values: z.infer<typeof badOrderSchema>) => {
+      // 1. Fetch current user and employee profile securely
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) throw new Error("Authentication required")
+
+      const { data: employee } = await supabase
+        .from("employees")
+        .select("id")
+        .eq("user_id", user.id)
+        .single()
+
+      if (!employee?.id) throw new Error("Employee profile not found")
+
+      // 2. Attach employee_id to the payload
+      const payload = { ...values, employee_id: employee.id } as any
+
       if (isEditMode) {
-        return updateBadOrder(id!, values)
+        return await updateBadOrder(id!, payload)
+      } else {
+        const newOrder = await createBadOrder(payload)
+
+        // 3. 🚀 TRIGGER THE ENGINE IMMEDIATELY AFTER CREATION
+        // This drops the request into the first department's approvals inbox!
+        await triggerApprovalWorkflow("bad_orders", newOrder.id, employee.id)
+
+        return newOrder
       }
-      return createBadOrder(values)
     },
     onSuccess: () => {
+      // Invalidate queries so lists update instantly
+      queryClient.invalidateQueries({ queryKey: ["bad_orders"] })
+      queryClient.invalidateQueries({ queryKey: ["my-bad-orders"] })
+      queryClient.invalidateQueries({ queryKey: ["all-bad-orders"] })
+
       form.reset()
       if (onClose) onClose()
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Failed to submit form.")
     },
   })
 

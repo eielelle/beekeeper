@@ -13,6 +13,19 @@ export const badOrderSchema = z.object({
     required_error: "Type is required",
   }),
   notes: z.string().or(z.literal("")).nullable(),
+
+  // Optional fields for Approvers (Added for future Department integrations)
+  return_count: z.coerce
+    .number()
+    .min(0, "Count cannot be negative")
+    .nullable()
+    .optional(),
+  total_price: z.coerce
+    .number()
+    .min(0, "Price cannot be negative")
+    .nullable()
+    .optional(),
+
   items: z
     .array(badOrderItemSchema)
     .min(1, "At least one item is required in the bad order"),

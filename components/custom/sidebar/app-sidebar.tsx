@@ -222,6 +222,22 @@ const data = {
       ],
     },
     {
+      title: "Bookings",
+      url: "#",
+      icon: Files,
+      isActive: false,
+      items: [
+        {
+          title: "Overview",
+          url: "#",
+        },
+        {
+          title: "My Bookings",
+          url: "#",
+        },
+      ],
+    },
+    {
       title: "Reports",
       url: "#",
       icon: Files,
