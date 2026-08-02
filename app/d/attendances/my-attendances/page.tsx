@@ -143,11 +143,14 @@ export default function MyAttendancePage() {
     enabled: !!employeeId,
   })
 
+  // FIXED: Extract the raw data into a local variable first to satisfy the React Compiler
+  const logs = attendanceData?.data
+
   // 3. Map the raw logs into FullCalendar Event objects
   const calendarEvents = React.useMemo(() => {
-    if (!attendanceData?.data) return []
+    if (!logs) return []
 
-    return attendanceData.data.map((log) => {
+    return logs.map((log) => {
       const isCompleted = !!log.time_out
       return {
         id: log.id.toString(),
@@ -165,7 +168,7 @@ export default function MyAttendancePage() {
         extendedProps: { log },
       }
     })
-  }, [attendanceData?.data])
+  }, [logs]) // <-- Pass the clean local variable without optional chaining
 
   // Helper to format date strings cleanly
   const formatDateTime = (isoString: string | null) => {
@@ -184,15 +187,15 @@ export default function MyAttendancePage() {
   if (isLoadingId) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <Skeleton className="mx-auto h-full w-full max-w-7xl" />
+        <Skeleton className="h-full w-full" />
       </div>
     )
   }
 
   return (
-    <div className="mx-auto flex max-w-7xl flex-col space-y-6 px-4 py-8">
+    <div className="flex flex-col space-y-6 px-4 py-8">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">My Attendance</h1>
+        <h1 className="text-md font-bold tracking-tight">My Attendance</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           View your shift history, GPS logs, and attached photos.
         </p>
@@ -208,15 +211,13 @@ export default function MyAttendancePage() {
         onClear={handleClearFilters}
       />
 
-      <Tabs defaultValue="calendar" className="w-full">
+      <Tabs defaultValue="list" className="w-full">
         <TabsList className="mb-4">
           <TabsTrigger value="calendar" className="gap-2">
             <CalendarIcon className="h-4 w-4" />
-            Calendar View
           </TabsTrigger>
           <TabsTrigger value="list" className="gap-2">
             <ListIcon className="h-4 w-4" />
-            List View
           </TabsTrigger>
         </TabsList>
 
@@ -282,7 +283,7 @@ export default function MyAttendancePage() {
                         </TableCell>
                       </TableRow>
                     ))
-                  ) : attendanceData?.data.length === 0 ? (
+                  ) : logs?.length === 0 ? (
                     <TableRow>
                       <TableCell
                         colSpan={3}
@@ -292,7 +293,7 @@ export default function MyAttendancePage() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    attendanceData?.data.map((log) => {
+                    logs?.map((log) => {
                       const isCompleted = !!log.time_out
                       return (
                         <TableRow

@@ -169,12 +169,8 @@ export function DynamicFilter({
   // Cache labels for async comboboxes so badges don't revert to raw IDs when search results change
   const [labelCache, setLabelCache] = React.useState<Record<string, string>>({})
 
-  // Sync draft values when sheet opens
-  React.useEffect(() => {
-    if (isOpen) {
-      setDraftValues(values)
-    }
-  }, [isOpen, values])
+  // --- FIXED: Removed the useEffect that caused the cascading render warning ---
+  // Instead, we handle the state sync inside the `onOpenChange` of the Sheet below.
 
   const handleApply = () => {
     onApply(draftValues)
@@ -219,7 +215,19 @@ export function DynamicFilter({
 
   return (
     <div className="flex flex-wrap items-center gap-4">
-      <Sheet open={isOpen} onOpenChange={setIsOpen}>
+      {/* 
+        FIXED: We sync the draft values directly in the onOpenChange event handler. 
+        This is the recommended React pattern (Event Handlers instead of Effects).
+      */}
+      <Sheet
+        open={isOpen}
+        onOpenChange={(open) => {
+          setIsOpen(open)
+          if (open) {
+            setDraftValues(values)
+          }
+        }}
+      >
         <SheetTrigger asChild>
           <Button variant="outline" className="flex items-center gap-2">
             <Filter className="h-4 w-4" />

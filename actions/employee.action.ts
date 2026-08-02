@@ -22,12 +22,28 @@ export async function fetchEmployeesAction(params: FetchEmployeesParams) {
   const supabase = await createClient()
   let query = supabase.from("employees").select("*", { count: "exact" })
 
+  // --- 1. Global Search ---
   if (params.globalFilter) {
     query = query.or(
       `employee_no.ilike.%${params.globalFilter}%,first_name.ilike.%${params.globalFilter}%,last_name.ilike.%${params.globalFilter}%,email.ilike.%${params.globalFilter}%`
     )
   }
 
+  // --- 2. Dynamic Filters ---
+  if (params.gender && params.gender !== "all") {
+    query = query.eq("gender", params.gender)
+  }
+
+  if (params.role && params.role !== "all") {
+    if (params.role === "superuser") {
+      query = query.eq("is_superuser", true)
+    } else if (params.role === "employee") {
+      // Handles both explicit 'false' or empty 'null' values in the DB safely
+      query = query.or("is_superuser.eq.false,is_superuser.is.null")
+    }
+  }
+
+  // --- 3. Sorting ---
   if (params.sorting && params.sorting.length > 0) {
     const sort = params.sorting[0]
     query = query.order(sort.id, { ascending: !sort.desc })
@@ -35,6 +51,7 @@ export async function fetchEmployeesAction(params: FetchEmployeesParams) {
     query = query.order("created_at", { ascending: false })
   }
 
+  // --- 4. Pagination ---
   const from = params.pageIndex * params.pageSize
   const to = from + params.pageSize - 1
   query = query.range(from, to)

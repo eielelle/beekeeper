@@ -29,13 +29,20 @@ export type FetchEmployeesParams = {
   pageSize: number
   globalFilter?: string
   sorting?: { id: string; desc: boolean }[]
+  role?: string
+  gender?: string
+}
+
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) return error.message
+  return String(error)
 }
 
 export async function fetchEmployees(params: FetchEmployeesParams) {
   try {
     return await fetchEmployeesAction(params)
-  } catch (error: any) {
-    toast.error(`ERR: ${error.message}`)
+  } catch (error) {
+    toast.error(`ERR: ${getErrorMessage(error)}`)
     throw error
   }
 }
@@ -43,17 +50,16 @@ export async function fetchEmployees(params: FetchEmployeesParams) {
 export async function getEmployee(id: string) {
   try {
     return await getEmployeeAction(id)
-  } catch (error: any) {
-    toast.error(`ERR: ${error.message}`)
+  } catch (error) {
+    toast.error(`ERR: ${getErrorMessage(error)}`)
     throw error
   }
 }
 
-// Used securely by the My Outlets page & others
 export async function getCurrentEmployeeId() {
   try {
     return await getCurrentEmployeeIdAction()
-  } catch (error: any) {
+  } catch (error) {
     console.error(error)
     throw error
   }
@@ -68,9 +74,9 @@ export async function createEmployee(value: EmployeeStoreType) {
     toast.dismiss(t)
     toast.success("Employee successfully created.")
     return data
-  } catch (error: any) {
+  } catch (error) {
     toast.dismiss(t)
-    toast.error(`ERR: ${error.message}`)
+    toast.error(`ERR: ${getErrorMessage(error)}`)
     throw error
   }
 }
@@ -82,9 +88,9 @@ export async function updateEmployee(value: EmployeeStoreType) {
     toast.dismiss(t)
     toast.success("Employee successfully updated.")
     return data
-  } catch (error: any) {
+  } catch (error) {
     toast.dismiss(t)
-    toast.error(`ERR: ${error.message}`)
+    toast.error(`ERR: ${getErrorMessage(error)}`)
     throw error
   }
 }
@@ -92,7 +98,6 @@ export async function updateEmployee(value: EmployeeStoreType) {
 export async function deleteEmployee(id: string | number) {
   const t = toast.loading("Deleting Employee. Please wait.")
   try {
-    // We hit your existing route since it securely handles both DB and Auth deletion via Supabase Admin
     const res = await fetch(`/api/v1/users?id=${id}`, {
       method: "DELETE",
     })
@@ -107,9 +112,9 @@ export async function deleteEmployee(id: string | number) {
     toast.dismiss(t)
     toast.success("Employee successfully deleted.")
     return await res.json()
-  } catch (error: any) {
+  } catch (error) {
     toast.dismiss(t)
-    toast.error(`ERR: ${error.message}`)
+    toast.error(`ERR: ${getErrorMessage(error)}`)
     throw error
   }
 }
@@ -117,9 +122,9 @@ export async function deleteEmployee(id: string | number) {
 export async function searchEmployeeOptions(searchTerm: string) {
   try {
     return await searchEmployeeOptionsAction(searchTerm)
-  } catch (error: any) {
+  } catch (error) {
     console.error(error)
-    toast.error(`ERR: ${error.message}`)
+    toast.error(`ERR: ${getErrorMessage(error)}`)
     return []
   }
 }
