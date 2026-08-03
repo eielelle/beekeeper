@@ -8,24 +8,18 @@ import {
   PaginationState,
   Updater,
 } from "@tanstack/react-table"
-import {
-  Calendar,
-  CheckSquare,
-  ArrowUpDown,
-  CheckCircle2,
-  XCircle,
-} from "lucide-react"
+import { Calendar, CheckSquare, ArrowUpDown } from "lucide-react"
 import { useRouter, usePathname, useSearchParams } from "next/navigation"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Badge } from "@/components/ui/badge"
 
 import { DataTable } from "@/components/custom/data-table/table"
-import {
-  DynamicFilter,
-  FilterField,
-} from "@/components/custom/filter/dynamic-filter"
+import { FilterField } from "@/components/custom/filter/dynamic-filter"
+import { SortOption } from "@/components/custom/sort/dynamic-sorter"
+
 import {
   deleteMyLeave,
   fetchMyLeaves,
@@ -33,7 +27,6 @@ import {
   MyLeaveStoreType,
 } from "@/forms/queries/my_leave.query"
 import { MyLeaveForm } from "@/forms/my_leave.form"
-import { Badge } from "@/components/ui/badge"
 
 const filterFields: FilterField[] = [
   {
@@ -48,14 +41,22 @@ const filterFields: FilterField[] = [
   },
 ]
 
+const sortOptions: SortOption[] = [
+  { label: "Leave Date (Newest)", value: "leave_date-true" },
+  { label: "Leave Date (Oldest)", value: "leave_date-false" },
+  { label: "Filed On (Newest)", value: "created_at-true" },
+  { label: "Filed On (Oldest)", value: "created_at-false" },
+]
+
 export default function MyLeavesPage() {
   const queryClient = useQueryClient()
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
 
+  // --- URL-based Pagination State ---
   const pageIndex = Number(searchParams.get("page") ?? "0")
-  const pageSize = Number(searchParams.get("size") ?? "10")
+  const pageSize = Number(searchParams.get("size") ?? "15")
 
   const pagination = React.useMemo<PaginationState>(
     () => ({ pageIndex, pageSize }),
@@ -74,8 +75,11 @@ export default function MyLeavesPage() {
     [pagination, searchParams, pathname, router]
   )
 
+  // --- Search, Filter & Sort State ---
   const [globalFilter, setGlobalFilter] = React.useState("")
-  const [sorting, setSorting] = React.useState<SortingState>([])
+  const [sorting, setSorting] = React.useState<SortingState>([
+    { id: "leave_date", desc: true },
+  ])
   const [filterValues, setFilterValues] = React.useState<
     Record<string, string>
   >({})
@@ -90,9 +94,15 @@ export default function MyLeavesPage() {
     setPagination((prev) => ({ ...prev, pageIndex: 0 }))
   }
 
+  const handleSortingChange = (updater: Updater<SortingState>) => {
+    setSorting(updater)
+    setPagination((prev) => ({ ...prev, pageIndex: 0 }))
+  }
+
   const dateFrom = filterValues.dateFrom || ""
   const dateTo = filterValues.dateTo || ""
 
+  // --- Data Fetching ---
   const { data, isLoading } = useQuery({
     queryKey: [
       "my-leaves",
@@ -126,16 +136,17 @@ export default function MyLeavesPage() {
     },
   })
 
+  // --- Columns Definition ---
   const columns = React.useMemo<ColumnDef<MyLeaveStoreType>[]>(
     () => [
       {
         accessorKey: "leave_date",
-        header: ({ column }) => (
+        header: () => (
           <Button
             variant="ghost"
             size="sm"
-            className="-ml-3 h-8"
-            onClick={() =>
+            className="-ml-3 h-8 text-xs font-semibold text-gray-700 dark:text-gray-300"
+            onClick={() => {
               setSorting([
                 {
                   id: "leave_date",
@@ -143,7 +154,8 @@ export default function MyLeavesPage() {
                     sorting[0]?.id === "leave_date" ? !sorting[0].desc : true,
                 },
               ])
-            }
+              setPagination((prev) => ({ ...prev, pageIndex: 0 }))
+            }}
           >
             Date
             <ArrowUpDown className="ml-2 h-3.5 w-3.5" />
@@ -152,7 +164,7 @@ export default function MyLeavesPage() {
         cell: ({ row }) => {
           const raw = row.getValue("leave_date") as string
           return raw ? (
-            <span className="font-semibold">
+            <span className="text-xs text-muted-foreground">
               {new Date(raw).toLocaleDateString()}
             </span>
           ) : (
@@ -162,10 +174,14 @@ export default function MyLeavesPage() {
       },
       {
         accessorKey: "reason",
-        header: "Reason",
+        header: () => (
+          <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+            Reason
+          </span>
+        ),
         cell: ({ row }) => (
           <span
-            className="block max-w-[350px] truncate text-muted-foreground"
+            className="block max-w-[200px] truncate text-xs text-muted-foreground sm:max-w-[300px]"
             title={row.getValue("reason")}
           >
             {row.getValue("reason")}
@@ -174,93 +190,95 @@ export default function MyLeavesPage() {
       },
       {
         accessorKey: "created_at",
-        header: "Filed On",
+        header: () => (
+          <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+            Filed On
+          </span>
+        ),
         cell: ({ row }) => {
           const raw = row.getValue("created_at") as string
-          return raw ? new Date(raw).toLocaleDateString() : "—"
+          return raw ? (
+            <span className="text-xs text-muted-foreground">
+              {new Date(raw).toLocaleDateString()}
+            </span>
+          ) : (
+            "—"
+          )
         },
       },
-      // --- UPDATED APPROVAL CHAIN COLUMN ---
       {
         accessorKey: "status",
-        header: "Approval Chain",
+        header: () => (
+          <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+            Approvals
+          </span>
+        ),
         cell: ({ row }) => {
-          const status = (row.getValue("status") as string) || "pending"
-          const currentStep = row.original.current_step
-          const logs = row.original.approval_logs || []
-
-          // 1. Render Main Status Badge
-          let mainBadge
-          if (status === "approved") {
-            mainBadge = (
-              <Badge
-                variant="secondary"
-                className="bg-green-100 text-green-800 capitalize hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400"
-              >
-                Approved
-              </Badge>
-            )
-          } else if (status === "rejected") {
-            mainBadge = (
-              <Badge variant="destructive" className="capitalize">
-                Rejected
-              </Badge>
-            )
-          } else {
-            mainBadge = (
-              <Badge
-                variant="outline"
-                className="border-amber-500/30 bg-amber-50 text-amber-600 capitalize dark:bg-amber-950/30 dark:text-amber-400"
-              >
-                Pending {currentStep ? `(Step ${currentStep})` : ""}
-              </Badge>
-            )
-          }
+          const approvalLogs = row.original.approval_logs || []
 
           return (
-            <div className="flex flex-col items-start gap-2">
-              {mainBadge}
+            <div className="flex flex-col gap-2 py-1">
+              {approvalLogs.length > 0 ? (
+                approvalLogs.map((alog: any, idx: number) => {
+                  const emp = Array.isArray(alog.approver)
+                    ? alog.approver[0]
+                    : alog.approver
+                  const name = emp
+                    ? `${emp.first_name} ${emp.last_name}`
+                    : "Unknown"
 
-              {/* 2. Render Log History Timeline */}
-              {logs.length > 0 && (
-                <div className="mt-1 flex min-w-[140px] flex-col gap-1 rounded-md border bg-muted/30 p-1.5 text-[11px] text-muted-foreground">
-                  {logs.map((log: any, idx: number) => {
-                    const emp = Array.isArray(log.approver)
-                      ? log.approver[0]
-                      : log.approver
-                    const name = emp
-                      ? `${emp.first_name} ${emp.last_name}`
-                      : "Unknown"
-
-                    return (
-                      <div key={idx} className="flex items-center gap-1.5">
-                        {log.status === "approved" ? (
-                          <CheckCircle2 className="h-3 w-3 text-green-500" />
+                  return (
+                    <div key={idx} className="flex flex-col gap-0.5">
+                      <span className="text-[9px] font-bold tracking-wider text-muted-foreground uppercase">
+                        Step {alog.step_level}: {name}
+                      </span>
+                      <div>
+                        {alog.status === "approved" ? (
+                          <Badge
+                            variant="secondary"
+                            className="h-4 bg-green-100 px-1.5 py-0 text-[10px] text-green-800 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400"
+                          >
+                            Approved
+                          </Badge>
+                        ) : alog.status === "rejected" ? (
+                          <Badge
+                            variant="destructive"
+                            className="h-4 px-1.5 py-0 text-[10px]"
+                          >
+                            Rejected
+                          </Badge>
                         ) : (
-                          <XCircle className="h-3 w-3 text-red-500" />
+                          <Badge
+                            variant="outline"
+                            className="h-4 border-amber-500/30 bg-amber-50 px-1.5 py-0 text-[10px] text-amber-600 dark:bg-amber-950/30 dark:text-amber-400"
+                          >
+                            Pending
+                          </Badge>
                         )}
-                        <span>
-                          Step {log.step_level}:{" "}
-                          <span className="font-medium">{name}</span>
-                        </span>
                       </div>
-                    )
-                  })}
-                </div>
+                    </div>
+                  )
+                })
+              ) : (
+                <span className="text-xs text-muted-foreground italic">
+                  No approvers found
+                </span>
               )}
             </div>
           )
         },
       },
+      // Note: No need to define an "Actions" column here. The new <DataTable> component
+      // automatically injects the Edit/Delete column when renderForm and onDelete are provided!
     ],
-    [sorting]
+    [sorting, setPagination]
   )
 
   return (
-    <div className="flex flex-col space-y-6">
+    <div className="flex h-full min-h-[calc(100vh-6rem)] flex-col space-y-6">
       {/* Stats Section */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
+        <Card className="bg-primary">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
               My Total Leaves
@@ -287,7 +305,7 @@ export default function MyLeavesPage() {
             {isLoadingStats ? (
               <Skeleton className="h-8 w-[60px]" />
             ) : (
-              <div className="text-2xl font-bold text-blue-600">
+              <div className="text-2xl font-bold">
                 {statsData?.upcoming ?? 0}
               </div>
             )}
@@ -295,43 +313,45 @@ export default function MyLeavesPage() {
         </Card>
       </div>
 
-      <DynamicFilter
-        title="Filter Leaves"
-        description="Filter your past and upcoming leave requests by date."
-        fields={filterFields}
-        values={filterValues}
-        onApply={handleApplyFilters}
-        onClear={handleClearFilters}
-      />
+      {/* Main Data Table */}
+      <div className="flex-1 pb-6">
+        <DataTable
+          title="My Leaves"
+          entityName="Leave Request"
+          columns={columns}
+          data={data?.data ?? []}
+          rowCount={data?.rowCount ?? 0}
+          isLoading={isLoading}
+          searchPlaceholder="Search by reason..."
 
-      <DataTable
-        title="My Leaves"
-        description="File and manage your leave requests."
-        entityName="Leave"
-        columns={columns}
-        data={data?.data ?? []}
-        rowCount={data?.rowCount ?? 0}
-        isLoading={isLoading}
-        searchPlaceholder="Search by reason..."
-        globalFilter={globalFilter}
-        onSearchChange={setGlobalFilter}
-        pagination={pagination}
-        onPaginationChange={setPagination}
-        sorting={sorting}
-        onSortingChange={setSorting}
-        renderForm={({ id, onClose }) => (
-          <div className="max-h-[80vh] overflow-y-auto pr-1">
+          // Data Table Props
+          globalFilter={globalFilter}
+          onSearchChange={setGlobalFilter}
+          pagination={pagination}
+          onPaginationChange={setPagination}
+          sorting={sorting}
+          onSortingChange={handleSortingChange}
+
+          // Dynamic Toolbars
+          sortOptions={sortOptions}
+          filterFields={filterFields}
+          filterValues={filterValues}
+          onFilterChange={handleApplyFilters}
+          onFilterClear={handleClearFilters}
+
+          // Form & Actions
+          renderForm={({ id, onClose }) => (
             <MyLeaveForm editId={id?.toString()} onClose={onClose} />
-          </div>
-        )}
-        onDelete={async (id) => {
-          await deleteMutation.mutateAsync(id)
-        }}
-        isDeleting={deleteMutation.isPending}
-        getItemDisplayName={(item) =>
-          `leave scheduled for ${new Date(item.leave_date).toLocaleDateString()}`
-        }
-      />
+          )}
+          onDelete={async (id) => {
+            await deleteMutation.mutateAsync(id)
+          }}
+          isDeleting={deleteMutation.isPending}
+          getItemDisplayName={(item) =>
+            `leave scheduled for ${new Date(item.leave_date).toLocaleDateString()}`
+          }
+        />
+      </div>
     </div>
   )
 }

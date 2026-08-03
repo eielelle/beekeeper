@@ -14,12 +14,12 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Badge } from "@/components/ui/badge"
 
 import { DataTable } from "@/components/custom/data-table/table"
-import {
-  DynamicFilter,
-  FilterField,
-} from "@/components/custom/filter/dynamic-filter"
+import { FilterField } from "@/components/custom/filter/dynamic-filter"
+import { SortOption } from "@/components/custom/sort/dynamic-sorter"
+
 import {
   deleteLeave,
   fetchLeaves,
@@ -41,14 +41,22 @@ const filterFields: FilterField[] = [
   },
 ]
 
+const sortOptions: SortOption[] = [
+  { label: "Leave Date (Newest)", value: "leave_date-true" },
+  { label: "Leave Date (Oldest)", value: "leave_date-false" },
+  { label: "Filed On (Newest)", value: "created_at-true" },
+  { label: "Filed On (Oldest)", value: "created_at-false" },
+]
+
 export default function LeavesPage() {
   const queryClient = useQueryClient()
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
 
+  // --- URL-based Pagination State ---
   const pageIndex = Number(searchParams.get("page") ?? "0")
-  const pageSize = Number(searchParams.get("size") ?? "10")
+  const pageSize = Number(searchParams.get("size") ?? "15")
 
   const pagination = React.useMemo<PaginationState>(
     () => ({ pageIndex, pageSize }),
@@ -67,8 +75,11 @@ export default function LeavesPage() {
     [pagination, searchParams, pathname, router]
   )
 
+  // --- Search, Filter & Sort State ---
   const [globalFilter, setGlobalFilter] = React.useState("")
-  const [sorting, setSorting] = React.useState<SortingState>([])
+  const [sorting, setSorting] = React.useState<SortingState>([
+    { id: "leave_date", desc: true },
+  ])
   const [filterValues, setFilterValues] = React.useState<
     Record<string, string>
   >({})
@@ -83,9 +94,15 @@ export default function LeavesPage() {
     setPagination((prev) => ({ ...prev, pageIndex: 0 }))
   }
 
+  const handleSortingChange = (updater: Updater<SortingState>) => {
+    setSorting(updater)
+    setPagination((prev) => ({ ...prev, pageIndex: 0 }))
+  }
+
   const dateFrom = filterValues.dateFrom || ""
   const dateTo = filterValues.dateTo || ""
 
+  // --- Data Fetching ---
   const { data, isLoading } = useQuery({
     queryKey: [
       "leaves",
@@ -119,28 +136,37 @@ export default function LeavesPage() {
     },
   })
 
+  // --- Columns Definition ---
   const columns = React.useMemo<ColumnDef<LeaveStoreType>[]>(
     () => [
       {
         accessorKey: "employee",
-        header: "Employee",
+        header: () => (
+          <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+            Employee
+          </span>
+        ),
         cell: ({ row }) => {
           const emp = row.original.employee
           return emp ? (
-            <span className="font-medium">{`${emp.first_name} ${emp.last_name}`}</span>
+            <div className="flex flex-col">
+              <span className="text-xs whitespace-nowrap text-muted-foreground">
+                {`${emp.first_name} ${emp.last_name}`}
+              </span>
+            </div>
           ) : (
-            "—"
+            <span className="text-muted-foreground">—</span>
           )
         },
       },
       {
         accessorKey: "leave_date",
-        header: ({ column }) => (
+        header: () => (
           <Button
             variant="ghost"
             size="sm"
-            className="-ml-3 h-8"
-            onClick={() =>
+            className="-ml-3 h-8 text-xs font-semibold text-gray-700 dark:text-gray-300"
+            onClick={() => {
               setSorting([
                 {
                   id: "leave_date",
@@ -148,7 +174,8 @@ export default function LeavesPage() {
                     sorting[0]?.id === "leave_date" ? !sorting[0].desc : true,
                 },
               ])
-            }
+              setPagination((prev) => ({ ...prev, pageIndex: 0 }))
+            }}
           >
             Date
             <ArrowUpDown className="ml-2 h-3.5 w-3.5" />
@@ -156,15 +183,25 @@ export default function LeavesPage() {
         ),
         cell: ({ row }) => {
           const raw = row.getValue("leave_date") as string
-          return raw ? new Date(raw).toLocaleDateString() : "—"
+          return raw ? (
+            <span className="text-xs font-medium whitespace-nowrap text-muted-foreground">
+              {new Date(raw).toLocaleDateString()}
+            </span>
+          ) : (
+            "—"
+          )
         },
       },
       {
         accessorKey: "reason",
-        header: "Reason",
+        header: () => (
+          <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+            Reason
+          </span>
+        ),
         cell: ({ row }) => (
           <span
-            className="block max-w-[300px] truncate"
+            className="block max-w-[200px] truncate text-xs text-muted-foreground sm:max-w-[300px]"
             title={row.getValue("reason")}
           >
             {row.getValue("reason")}
@@ -173,30 +210,102 @@ export default function LeavesPage() {
       },
       {
         accessorKey: "created_at",
-        header: "Filed On",
+        header: () => (
+          <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+            Filed On
+          </span>
+        ),
         cell: ({ row }) => {
           const raw = row.getValue("created_at") as string
-          return raw ? new Date(raw).toLocaleDateString() : "—"
+          return raw ? (
+            <span className="text-xs whitespace-nowrap text-muted-foreground">
+              {new Date(raw).toLocaleDateString()}
+            </span>
+          ) : (
+            "—"
+          )
+        },
+      },
+      {
+        accessorKey: "status",
+        header: () => (
+          <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+            Approvals
+          </span>
+        ),
+        cell: ({ row }) => {
+          const approvalLogs = row.original.approval_logs || []
+
+          return (
+            <div className="flex flex-col gap-2 py-1">
+              {approvalLogs.length > 0 ? (
+                approvalLogs.map((alog: any, idx: number) => {
+                  const emp = Array.isArray(alog.approver)
+                    ? alog.approver[0]
+                    : alog.approver
+                  const name = emp
+                    ? `${emp.first_name} ${emp.last_name}`
+                    : "Unknown"
+
+                  return (
+                    <div key={idx} className="flex flex-col gap-0.5">
+                      <span className="text-[9px] font-bold tracking-wider text-muted-foreground uppercase">
+                        Step {alog.step_level}: {name}
+                      </span>
+                      <div>
+                        {alog.status === "approved" ? (
+                          <Badge
+                            variant="secondary"
+                            className="h-4 bg-green-100 px-1.5 py-0 text-[10px] text-green-800 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400"
+                          >
+                            Approved
+                          </Badge>
+                        ) : alog.status === "rejected" ? (
+                          <Badge
+                            variant="destructive"
+                            className="h-4 px-1.5 py-0 text-[10px]"
+                          >
+                            Rejected
+                          </Badge>
+                        ) : (
+                          <Badge
+                            variant="outline"
+                            className="h-4 border-amber-500/30 bg-amber-50 px-1.5 py-0 text-[10px] text-amber-600 dark:bg-amber-950/30 dark:text-amber-400"
+                          >
+                            Pending
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })
+              ) : (
+                <span className="text-xs text-muted-foreground italic">
+                  No approvers found
+                </span>
+              )}
+            </div>
+          )
         },
       },
     ],
-    [sorting]
+    [sorting, setPagination]
   )
 
   return (
-    <div className="flex flex-col space-y-6">
+    <div className="flex h-full min-h-[calc(100vh-6rem)] flex-col space-y-6">
       {/* Stats Section */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
+        <Card className="bg-primary text-primary-foreground">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
               Total Leaves Filed
             </CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+            <Users className="h-4 w-4 text-primary-foreground/80" />
           </CardHeader>
           <CardContent>
             {isLoadingStats ? (
-              <Skeleton className="h-8 w-[60px]" />
+              <Skeleton className="h-8 w-[60px] bg-primary-foreground/20" />
             ) : (
               <div className="text-2xl font-bold">{statsData?.total ?? 0}</div>
             )}
@@ -214,7 +323,7 @@ export default function LeavesPage() {
             {isLoadingStats ? (
               <Skeleton className="h-8 w-[60px]" />
             ) : (
-              <div className="text-2xl font-bold text-blue-600">
+              <div className="text-2xl font-bold">
                 {statsData?.upcoming ?? 0}
               </div>
             )}
@@ -222,43 +331,48 @@ export default function LeavesPage() {
         </Card>
       </div>
 
-      <DynamicFilter
-        title="Filter Leaves"
-        description="Filter leave records by the actual date of leave."
-        fields={filterFields}
-        values={filterValues}
-        onApply={handleApplyFilters}
-        onClear={handleClearFilters}
-      />
+      {/* Main Data Table */}
+      <div className="flex-1 pb-6">
+        <DataTable
+          title="Leave Records"
+          description="Manage company-wide employee leave requests."
+          entityName="Leave"
+          columns={columns}
+          data={data?.data ?? []}
+          rowCount={data?.rowCount ?? 0}
+          isLoading={isLoading}
+          searchPlaceholder="Search by reason..."
 
-      <DataTable
-        title="Leave Records"
-        description="Manage employee leave requests"
-        entityName="Leave"
-        columns={columns}
-        data={data?.data ?? []}
-        rowCount={data?.rowCount ?? 0}
-        isLoading={isLoading}
-        searchPlaceholder="Search by reason..."
-        globalFilter={globalFilter}
-        onSearchChange={setGlobalFilter}
-        pagination={pagination}
-        onPaginationChange={setPagination}
-        sorting={sorting}
-        onSortingChange={setSorting}
-        renderForm={({ id, onClose }) => (
-          <div className="max-h-[80vh] overflow-y-auto pr-1">
-            <LeaveForm editId={id?.toString()} onClose={onClose} />
-          </div>
-        )}
-        onDelete={async (id) => {
-          await deleteMutation.mutateAsync(id)
-        }}
-        isDeleting={deleteMutation.isPending}
-        getItemDisplayName={(item) =>
-          `leave on ${new Date(item.leave_date).toLocaleDateString()} for ${item.employee?.first_name || "Employee"}`
-        }
-      />
+          // Data Table State Props
+          globalFilter={globalFilter}
+          onSearchChange={setGlobalFilter}
+          pagination={pagination}
+          onPaginationChange={setPagination}
+          sorting={sorting}
+          onSortingChange={handleSortingChange}
+
+          // Dynamic Toolbars
+          sortOptions={sortOptions}
+          filterFields={filterFields}
+          filterValues={filterValues}
+          onFilterChange={handleApplyFilters}
+          onFilterClear={handleClearFilters}
+
+          // Form & Actions
+          renderForm={({ id, onClose }) => (
+            <div className="max-h-[80vh] overflow-y-auto pr-1">
+              <LeaveForm editId={id?.toString()} onClose={onClose} />
+            </div>
+          )}
+          onDelete={async (id) => {
+            await deleteMutation.mutateAsync(id)
+          }}
+          isDeleting={deleteMutation.isPending}
+          getItemDisplayName={(item) =>
+            `leave on ${new Date(item.leave_date).toLocaleDateString()} for ${item.employee?.first_name || "Employee"}`
+          }
+        />
+      </div>
     </div>
   )
 }

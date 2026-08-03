@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { useQuery } from "@tanstack/react-query"
+import { useVirtualizer } from "@tanstack/react-virtual"
 import {
   Calendar as CalendarIcon,
   List as ListIcon,
@@ -34,12 +35,12 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet"
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
 
 // Your custom calendar & dynamic filter components
@@ -54,6 +55,7 @@ import {
   AttendanceLogType,
 } from "@/forms/queries/attendance.query"
 import { getCurrentEmployeeId } from "@/forms/queries/employee.query"
+import { CoordinateHoverMap } from "@/components/custom/maps/coordinates-hover-map"
 
 // Dynamically import MapViewer to prevent SSR issues
 const MapViewer = dynamic(() => import("@/components/custom/maps/map-viewer"), {
@@ -111,18 +113,15 @@ export default function MyAttendancePage() {
 
   // --- Fetch Logic ---
 
-  // 1. Get the securely logged-in Employee ID
   const { data: employeeId, isLoading: isLoadingId } = useQuery({
     queryKey: ["current_employee_id"],
     queryFn: getCurrentEmployeeId,
   })
 
-  // Prepare filter variables for the query
   const statusFilter = filterValues.status?.trim() ? filterValues.status : "all"
   const dateFrom = filterValues.dateFrom || undefined
   const dateTo = filterValues.dateTo || undefined
 
-  // 2. Fetch only THIS employee's attendance records
   const { data: attendanceData, isLoading: isLoadingLogs } = useQuery({
     queryKey: [
       "my_attendance_logs",
@@ -134,7 +133,7 @@ export default function MyAttendancePage() {
     queryFn: () =>
       fetchAttendanceLogs({
         pageIndex: 0,
-        pageSize: 500, // Fetch up to 500 to comfortably populate the month view calendar
+        pageSize: 500,
         employeeId: employeeId,
         statusFilter: statusFilter !== "all" ? statusFilter : undefined,
         dateRange:
@@ -143,8 +142,28 @@ export default function MyAttendancePage() {
     enabled: !!employeeId,
   })
 
-  // FIXED: Extract the raw data into a local variable first to satisfy the React Compiler
   const logs = attendanceData?.data
+
+  // --- Virtualizer Setup ---
+  // We use a ref for the scrollable container and initialize the virtualizer
+  const tableContainerRef = React.useRef<HTMLDivElement>(null)
+
+  const rowVirtualizer = useVirtualizer({
+    count: logs?.length || 0,
+    getScrollElement: () => tableContainerRef.current,
+    estimateSize: () => 48, // Estimated height of a row in pixels
+    overscan: 10, // Render a few extra rows above/below for smooth scrolling
+  })
+
+  const virtualItems = rowVirtualizer.getVirtualItems()
+
+  // Calculate paddings to maintain standard HTML table dimensions
+  const paddingTop = virtualItems.length > 0 ? virtualItems[0]?.start || 0 : 0
+  const paddingBottom =
+    virtualItems.length > 0
+      ? rowVirtualizer.getTotalSize() -
+        (virtualItems[virtualItems.length - 1]?.end || 0)
+      : 0
 
   // 3. Map the raw logs into FullCalendar Event objects
   const calendarEvents = React.useMemo(() => {
@@ -168,19 +187,16 @@ export default function MyAttendancePage() {
         extendedProps: { log },
       }
     })
-  }, [logs]) // <-- Pass the clean local variable without optional chaining
+  }, [logs])
 
-  // Helper to format date strings cleanly
   const formatDateTime = (isoString: string | null) => {
     if (!isoString) return "—"
     const date = new Date(isoString)
     return (
-      <div className="flex flex-col">
-        <span className="text-sm font-medium">{date.toLocaleDateString()}</span>
-        <span className="text-xs text-muted-foreground">
-          {date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-        </span>
-      </div>
+      <span className="text-xs text-muted-foreground">
+        {date.toLocaleDateString()}{" "}
+        {date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+      </span>
     )
   }
 
@@ -193,298 +209,281 @@ export default function MyAttendancePage() {
   }
 
   return (
-    <div className="flex flex-col space-y-6 px-4 py-8">
+    <div className="flex flex-col space-y-6">
       <div>
         <h1 className="text-md font-bold tracking-tight">My Attendance</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           View your shift history, GPS logs, and attached photos.
         </p>
       </div>
 
-      {/* Dynamic Filter Toolbar */}
-      <DynamicFilter
-        title="Filter Attendance"
-        description="Narrow down your shifts by date range or status."
-        fields={filterFields}
-        values={filterValues}
-        onApply={handleApplyFilters}
-        onClear={handleClearFilters}
-      />
+      <div className="w-full">
+        <Tabs defaultValue="list" className="w-full space-y-4">
+          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+            <DynamicFilter
+              title="Filter Attendance"
+              description="Narrow down your shifts by date range or status."
+              fields={filterFields}
+              values={filterValues}
+              onApply={handleApplyFilters}
+              onClear={handleClearFilters}
+            />
 
-      <Tabs defaultValue="list" className="w-full">
-        <TabsList className="mb-4">
-          <TabsTrigger value="calendar" className="gap-2">
-            <CalendarIcon className="h-4 w-4" />
-          </TabsTrigger>
-          <TabsTrigger value="list" className="gap-2">
-            <ListIcon className="h-4 w-4" />
-          </TabsTrigger>
-        </TabsList>
+            <TabsList>
+              <TabsTrigger value="calendar" className="gap-2">
+                <CalendarIcon className="h-4 w-4" />
+              </TabsTrigger>
+              <TabsTrigger value="list" className="gap-2">
+                <ListIcon className="h-4 w-4" />
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
-        {/* --- CALENDAR VIEW --- */}
-        <TabsContent value="calendar">
-          <Card>
-            <CardHeader>
-              <CardTitle>Attendance Calendar</CardTitle>
-              <CardDescription>
-                Click on any shift block to view the full details and map
-                locations.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {isLoadingLogs ? (
-                <Skeleton className="h-[600px] w-full" />
-              ) : (
-                <div className="overflow-hidden rounded-md border">
-                  <EventCalendar
-                    height="700px"
-                    events={calendarEvents}
-                    eventClick={(info) => {
-                      setSelectedLog(
-                        info.event.extendedProps.log as AttendanceLogType
-                      )
-                    }}
-                    availableViews={[
-                      "dayGridMonth",
-                      "timeGridWeek",
-                      "listWeek",
-                    ]}
-                  />
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+          <TabsContent value="calendar">
+            {isLoadingLogs ? (
+              <Skeleton className="h-[600px] w-full" />
+            ) : (
+              <div className="overflow-hidden rounded-md border">
+                <EventCalendar
+                  height="700px"
+                  events={calendarEvents}
+                  eventClick={(info) => {
+                    setSelectedLog(
+                      info.event.extendedProps.log as AttendanceLogType
+                    )
+                  }}
+                  availableViews={["dayGridMonth", "timeGridWeek", "listWeek"]}
+                />
+              </div>
+            )}
+          </TabsContent>
 
-        {/* --- LIST VIEW --- */}
-        <TabsContent value="list">
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Shifts</CardTitle>
-              <CardDescription>
-                A chronological list of your filtered time logs.
-              </CardDescription>
-            </CardHeader>
-            <div className="rounded-md border-y">
-              <Table>
-                <TableHeader className="bg-muted/50">
+          <TabsContent value="list">
+            {/* 1. Changed h-[600px] to max-h-[600px] so it shrinks when empty/small */}
+            <div
+              ref={tableContainerRef}
+              className="relative max-h-[600px] w-full overflow-auto rounded-md border bg-background"
+            >
+              <table className="w-full caption-bottom text-sm">
+                <TableHeader className="sticky top-0 z-10 shadow-sm">
                   <TableRow>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Time In</TableHead>
-                    <TableHead>Time Out</TableHead>
+                    {/* 2. Reduced header height from h-12 to h-10 and tightened padding */}
+                    <TableHead className="h-8 px-3 text-left align-middle text-xs font-semibold text-muted-foreground">
+                      Status
+                    </TableHead>
+                    <TableHead className="h-8 px-3 text-left align-middle text-xs font-semibold text-muted-foreground">
+                      Time In
+                    </TableHead>
+                    <TableHead className="h-8 px-3 text-left align-middle text-xs font-semibold text-muted-foreground">
+                      Time In Location
+                    </TableHead>
+                    <TableHead className="h-8 px-3 text-left align-middle text-xs font-semibold text-muted-foreground">
+                      Time Out
+                    </TableHead>
+                    <TableHead className="h-8 px-3 text-left align-middle text-xs font-semibold text-muted-foreground">
+                      Time Out Location
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
+
                 <TableBody>
                   {isLoadingLogs ? (
                     Array.from({ length: 5 }).map((_, i) => (
                       <TableRow key={i}>
-                        <TableCell colSpan={3}>
-                          <Skeleton className="h-12 w-full" />
+                        <TableCell colSpan={5} className="py-2">
+                          <Skeleton className="h-8 w-full" />
                         </TableCell>
                       </TableRow>
                     ))
                   ) : logs?.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={3}
+                        colSpan={5}
                         className="h-24 text-center text-muted-foreground"
                       >
                         No attendance records found.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    logs?.map((log) => {
-                      const isCompleted = !!log.time_out
-                      return (
-                        <TableRow
-                          key={log.id}
-                          className="cursor-pointer transition-colors hover:bg-muted/50"
-                          onClick={() => setSelectedLog(log)}
-                        >
-                          <TableCell>
-                            <Badge
-                              variant={isCompleted ? "secondary" : "default"}
-                              className={
-                                !isCompleted
-                                  ? "border-emerald-200 bg-emerald-500/10 text-emerald-600"
-                                  : ""
-                              }
-                            >
+                    <>
+                      {/* Top spacer to push visible rows down */}
+                      {paddingTop > 0 && (
+                        <tr>
+                          <td style={{ height: `${paddingTop}px` }} />
+                        </tr>
+                      )}
+
+                      {/* Only render rows currently in view */}
+                      {virtualItems.map((virtualRow) => {
+                        const log = logs![virtualRow.index]
+                        const isCompleted = !!log.time_out
+                        return (
+                          <TableRow
+                            key={log.id}
+                            data-index={virtualRow.index}
+                            ref={rowVirtualizer.measureElement}
+                            className="cursor-pointer transition-colors hover:bg-muted/50"
+                            onClick={() => setSelectedLog(log)}
+                          >
+                            {/* 3. Added px-3 py-1.5 to override standard spacious shadcn padding */}
+                            <TableCell className="px-3 py-1.5 text-xs">
                               {isCompleted ? "Completed" : "Active Shift"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex flex-col gap-1">
+                            </TableCell>
+                            <TableCell className="px-3 py-1.5 text-xs">
                               {formatDateTime(log.time_in)}
+                            </TableCell>
+                            <TableCell className="px-3 py-1.5">
                               {log.time_in_lat && log.time_in_long && (
-                                <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                                  <MapPin className="h-3 w-3" />{" "}
-                                  {log.time_in_lat.toFixed(4)},{" "}
-                                  {log.time_in_long.toFixed(4)}
-                                </div>
+                                <CoordinateHoverMap
+                                  lat={log.time_in_lat}
+                                  long={log.time_in_long}
+                                />
                               )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex flex-col gap-1">
+                            </TableCell>
+                            <TableCell className="px-3 py-1.5 text-xs">
                               {formatDateTime(log.time_out)}
+                            </TableCell>
+                            <TableCell className="px-3 py-1.5">
                               {log.time_out_lat && log.time_out_long && (
-                                <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                                  <MapPin className="h-3 w-3" />{" "}
-                                  {log.time_out_lat.toFixed(4)},{" "}
-                                  {log.time_out_long.toFixed(4)}
-                                </div>
+                                <CoordinateHoverMap
+                                  lat={log.time_out_lat}
+                                  long={log.time_out_long}
+                                />
                               )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      )
-                    })
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })}
+
+                      {/* Bottom spacer to preserve standard scroll height */}
+                      {paddingBottom > 0 && (
+                        <tr>
+                          <td style={{ height: `${paddingBottom}px` }} />
+                        </tr>
+                      )}
+                    </>
                   )}
                 </TableBody>
-              </Table>
+              </table>
             </div>
-            {/* Show a helpful message since we are fetching up to 500 flat items for the calendar */}
-            <div className="flex items-center justify-center border-t p-4 text-sm text-muted-foreground">
-              Showing the most recent filtered records (up to 500).
-            </div>
-          </Card>
-        </TabsContent>
-      </Tabs>
 
-      {/* --- Detail Viewer Sheet (Slide-out Panel) --- */}
-      <Sheet
+            <div className="mt-4 flex items-center justify-center text-xs text-muted-foreground">
+              Showing {logs?.length || 0} records
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
+
+      {/* --- Detail Viewer Modal (Unchanged) --- */}
+      <Dialog
         open={!!selectedLog}
         onOpenChange={(open) => !open && setSelectedLog(null)}
       >
-        <SheetContent className="flex w-full flex-col overflow-hidden p-0 sm:max-w-2xl">
+        <DialogContent className="flex max-h-[90vh] w-full flex-col overflow-hidden p-0 sm:max-w-4xl lg:max-w-5xl">
           {selectedLog && (
-            <div className="flex h-full flex-col">
-              <div className="border-b bg-muted/30 p-6">
-                <SheetHeader>
-                  <SheetTitle className="text-xl">Shift Details</SheetTitle>
-                  <SheetDescription>
-                    Review your time-in and time-out data for this shift.
-                  </SheetDescription>
-                </SheetHeader>
-              </div>
+            <>
+              <DialogHeader className="p-4">
+                <DialogTitle className="text-sm">Shift Details</DialogTitle>
+              </DialogHeader>
 
-              <ScrollArea className="flex-1 p-6">
-                <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
-                  {/* Time In Column */}
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2 border-b pb-2">
-                      <LogIn className="h-5 w-5 text-emerald-500" />
-                      <h3 className="text-lg font-semibold">Time In</h3>
-                    </div>
-                    <div>{formatDateTime(selectedLog.time_in)}</div>
+              <ScrollArea className="flex-1 px-4">
+                <div>
+                  <p>
+                    <span className="font-semibold">Time In: </span>
+                    {formatDateTime(selectedLog.time_out)}
+                  </p>
 
-                    {/* Time In Map */}
-                    {selectedLog.time_in_lat && selectedLog.time_in_long ? (
-                      <MapViewer
-                        lat={selectedLog.time_in_lat}
-                        long={selectedLog.time_in_long}
-                      />
-                    ) : (
-                      <div className="flex h-24 items-center justify-center rounded-md border bg-muted/50 text-sm text-muted-foreground">
-                        No Location Data
-                      </div>
-                    )}
-
-                    {/* Time In Attachment */}
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium text-muted-foreground">
-                        Attachment
-                      </Label>
-                      {selectedLog.time_in_attachment ? (
-                        <div className="overflow-hidden rounded-md border bg-muted">
-                          <img
-                            src={selectedLog.time_in_attachment}
-                            alt="Time In Proof"
-                            className="h-auto max-h-64 w-full object-contain"
-                            onError={(e) =>
-                              (e.currentTarget.style.display = "none")
-                            }
-                          />
-                        </div>
-                      ) : (
-                        <div className="flex h-32 flex-col items-center justify-center gap-2 rounded-md border bg-muted/50 text-muted-foreground">
-                          <ImageIcon className="h-8 w-8 opacity-20" />
-                          <span className="text-sm">No photo uploaded</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Time Out Column */}
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2 border-b pb-2">
-                      <LogOut className="h-5 w-5 text-orange-500" />
-                      <h3 className="text-lg font-semibold">Time Out</h3>
-                    </div>
-
+                  <p>
+                    <span className="font-semibold">Time Out: </span>
                     {!selectedLog.time_out ? (
-                      <div className="flex h-48 flex-col items-center justify-center rounded-md border border-dashed bg-muted/30 text-muted-foreground">
+                      <div className="flex inline h-48 flex-col items-center justify-center rounded-md border border-dashed bg-muted/30 text-muted-foreground">
                         <Activity className="mb-2 h-8 w-8 animate-pulse opacity-20" />
                         <span className="text-sm font-medium">
                           Shift is still active
                         </span>
                       </div>
                     ) : (
-                      <>
-                        <div>{formatDateTime(selectedLog.time_out)}</div>
-
-                        {/* Time Out Map */}
-                        {selectedLog.time_out_lat &&
-                        selectedLog.time_out_long ? (
-                          <MapViewer
-                            lat={selectedLog.time_out_lat}
-                            long={selectedLog.time_out_long}
-                          />
-                        ) : (
-                          <div className="flex h-24 items-center justify-center rounded-md border bg-muted/50 text-sm text-muted-foreground">
-                            No Location Data
-                          </div>
-                        )}
-
-                        {/* Time Out Attachment */}
-                        <div className="space-y-2">
-                          <Label className="text-sm font-medium text-muted-foreground">
-                            Attachment
-                          </Label>
-                          {selectedLog.time_out_attachment ? (
-                            <div className="overflow-hidden rounded-md border bg-muted">
-                              <img
-                                src={selectedLog.time_out_attachment}
-                                alt="Time Out Proof"
-                                className="h-auto max-h-64 w-full object-contain"
-                                onError={(e) =>
-                                  (e.currentTarget.style.display = "none")
-                                }
-                              />
-                            </div>
-                          ) : (
-                            <div className="flex h-32 flex-col items-center justify-center gap-2 rounded-md border bg-muted/50 text-muted-foreground">
-                              <ImageIcon className="h-8 w-8 opacity-20" />
-                              <span className="text-sm">No photo uploaded</span>
-                            </div>
-                          )}
-                        </div>
-                      </>
+                      <>{formatDateTime(selectedLog.time_out)}</>
                     )}
+                  </p>
+
+                  <p>
+                    <span className="font-semibold">Time In Location: </span>
+                    <CoordinateHoverMap
+                      lat={selectedLog.time_in_lat}
+                      long={selectedLog.time_in_long}
+                    />
+                  </p>
+
+                  <p>
+                    <span className="font-semibold">Time Out Location: </span>
+                    <CoordinateHoverMap
+                      lat={selectedLog.time_out_lat}
+                      long={selectedLog.time_out_long}
+                    />
+                  </p>
+
+                  <div className="mt-4 grid grid-cols-2 gap-4">
+                    {/* Time In Attachment */}
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-muted-foreground">
+                        Time In
+                      </Label>
+                      {selectedLog.time_in_attachment ? (
+                        <div className="overflow-hidden rounded-md border bg-muted">
+                          <img
+                            src={selectedLog.time_in_attachment}
+                            alt="Time In Proof"
+                            className="h-auto max-h-56 w-full object-contain"
+                            onError={(e) =>
+                              (e.currentTarget.style.display = "none")
+                            }
+                          />
+                        </div>
+                      ) : (
+                        <div className="flex h-28 flex-col items-center justify-center gap-2 rounded-md border bg-muted/50 text-muted-foreground">
+                          <ImageIcon className="h-6 w-6 opacity-20" />
+                          <span className="text-sm">No photo uploaded</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Time Out Attachment */}
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-muted-foreground">
+                        Time Out
+                      </Label>
+                      {selectedLog.time_out_attachment ? (
+                        <div className="overflow-hidden rounded-md border bg-muted">
+                          <img
+                            src={selectedLog.time_out_attachment}
+                            alt="Time Out Proof"
+                            className="h-auto max-h-56 w-full object-contain"
+                            onError={(e) =>
+                              (e.currentTarget.style.display = "none")
+                            }
+                          />
+                        </div>
+                      ) : (
+                        <div className="flex h-28 flex-col items-center justify-center gap-2 rounded-md border bg-muted/50 text-muted-foreground">
+                          <ImageIcon className="h-6 w-6 opacity-20" />
+                          <span className="text-sm">No photo uploaded</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </ScrollArea>
 
-              <div className="flex justify-end border-t bg-muted/30 p-4">
-                <Button variant="outline" onClick={() => setSelectedLog(null)}>
+              <div className="flex justify-end border-t bg-muted/30 px-6 py-3">
+                <Button variant="default" onClick={() => setSelectedLog(null)}>
                   Close
                 </Button>
               </div>
-            </div>
+            </>
           )}
-        </SheetContent>
-      </Sheet>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -229,8 +229,12 @@ export function DynamicFilter({
         }}
       >
         <SheetTrigger asChild>
-          <Button variant="outline" className="flex items-center gap-2">
-            <Filter className="h-4 w-4" />
+          <Button
+            variant="outline"
+            size={"sm"}
+            className="flex items-center gap-2"
+          >
+            <Filter className="h-2 w-2" />
             Filters
             {activeCount > 0 && (
               <Badge
@@ -341,7 +345,7 @@ export function DynamicFilter({
             className="h-6 px-2 text-xs text-muted-foreground"
             onClick={onClear}
           >
-            Clear all
+            Clear
           </Button>
         </div>
       )}
