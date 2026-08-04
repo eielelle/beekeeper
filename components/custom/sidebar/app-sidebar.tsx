@@ -111,11 +111,11 @@ const data = {
       items: [
         {
           title: "My Leaves",
-          url: "#",
+          url: "/d/leaves/my-leaves",
         },
         {
           title: "Leaves",
-          url: "#",
+          url: "/d/leaves/leaves-log",
         },
       ],
     },

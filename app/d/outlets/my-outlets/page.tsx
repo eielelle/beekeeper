@@ -3,70 +3,202 @@
 import * as React from "react"
 import { useQuery } from "@tanstack/react-query"
 import {
-  Search,
-  ChevronLeft,
-  ChevronRight,
-  Loader2,
-  MapPin,
-} from "lucide-react"
+  ColumnDef,
+  SortingState,
+  PaginationState,
+  Updater,
+} from "@tanstack/react-table"
+import { MapPin, ArrowUpDown } from "lucide-react"
+import { useRouter, usePathname, useSearchParams } from "next/navigation"
 
-import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { DataTable } from "@/components/custom/data-table/table"
 
 // Queries
 import { OutletStoreType } from "@/forms/queries/outlet.query"
 import { fetchMyAssignedOutlets } from "@/forms/queries/employee-outlet.query"
 
 export default function MyOutletsPage() {
-  // TODO: Replace this with your actual logged-in user's employee ID
-  const MOCK_CURRENT_EMPLOYEE_ID = "1"
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
 
-  // --- Pagination & Search State ---
+  // --- URL-based Pagination State ---
+  const pageIndex = Number(searchParams.get("page") ?? "0")
+  const pageSize = Number(searchParams.get("size") ?? "10")
+
+  const pagination = React.useMemo<PaginationState>(
+    () => ({ pageIndex, pageSize }),
+    [pageIndex, pageSize]
+  )
+
+  const setPagination = React.useCallback(
+    (updater: Updater<PaginationState>) => {
+      const newPagination =
+        typeof updater === "function" ? updater(pagination) : updater
+      const params = new URLSearchParams(searchParams.toString())
+      params.set("page", newPagination.pageIndex.toString())
+      params.set("size", newPagination.pageSize.toString())
+      router.push(`${pathname}?${params.toString()}`, { scroll: false })
+    },
+    [pagination, searchParams, pathname, router]
+  )
+
+  // --- Table Control States ---
   const [globalFilter, setGlobalFilter] = React.useState("")
-  const [pageIndex, setPageIndex] = React.useState(0)
-  const pageSize = 10
+  const [sorting, setSorting] = React.useState<SortingState>([])
 
   // --- Data Fetching ---
+  // The server automatically identifies the user making the request.
   const { data: outletsData, isLoading } = useQuery({
     queryKey: [
       "my-outlets",
-      MOCK_CURRENT_EMPLOYEE_ID,
-      pageIndex,
-      pageSize,
+      pagination.pageIndex,
+      pagination.pageSize,
       globalFilter,
     ],
     queryFn: () =>
       fetchMyAssignedOutlets({
-        employeeId: MOCK_CURRENT_EMPLOYEE_ID,
-        pageIndex,
-        pageSize,
+        pageIndex: pagination.pageIndex,
+        pageSize: pagination.pageSize,
         globalFilter,
       }),
-    enabled: !!MOCK_CURRENT_EMPLOYEE_ID, // Only run if we have an employee ID
   })
 
   const displayOutlets = (outletsData?.data as OutletStoreType[]) || []
   const totalCount = outletsData?.rowCount ?? 0
-  const totalPages = Math.ceil(totalCount / pageSize)
+
+  // --- Table Columns ---
+  const columns = React.useMemo<ColumnDef<OutletStoreType>[]>(
+    () => [
+      {
+        accessorKey: "outlet_code",
+        header: () => (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="-ml-3 h-8 text-xs font-semibold text-gray-700 dark:text-gray-300"
+            onClick={() => {
+              setSorting([
+                {
+                  id: "outlet_code",
+                  desc:
+                    sorting[0]?.id === "outlet_code" ? !sorting[0].desc : false,
+                },
+              ])
+              setPagination((prev) => ({ ...prev, pageIndex: 0 }))
+            }}
+          >
+            Code
+            <ArrowUpDown className="ml-2 h-3.5 w-3.5" />
+          </Button>
+        ),
+        cell: ({ row }) => (
+          <span className="font-mono text-xs font-semibold whitespace-nowrap text-muted-foreground">
+            {row.getValue("outlet_code")}
+          </span>
+        ),
+      },
+      {
+        accessorKey: "outlet_name",
+        header: () => (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="-ml-3 h-8 text-xs font-semibold text-gray-700 dark:text-gray-300"
+            onClick={() => {
+              setSorting([
+                {
+                  id: "outlet_name",
+                  desc:
+                    sorting[0]?.id === "outlet_name" ? !sorting[0].desc : false,
+                },
+              ])
+              setPagination((prev) => ({ ...prev, pageIndex: 0 }))
+            }}
+          >
+            Outlet Name
+            <ArrowUpDown className="ml-2 h-3.5 w-3.5" />
+          </Button>
+        ),
+        cell: ({ row }) => {
+          const distributor = row.original.distributor
+          return (
+            <div className="flex max-w-[200px] flex-col truncate sm:max-w-[300px]">
+              {distributor && (
+                <span className="mb-0.5 truncate text-[9px] font-bold tracking-wider text-muted-foreground uppercase">
+                  {distributor.outlet_name}
+                </span>
+              )}
+              <span className="truncate text-sm font-medium text-foreground">
+                {row.getValue("outlet_name")}
+              </span>
+            </div>
+          )
+        },
+      },
+      {
+        accessorKey: "address",
+        header: () => (
+          <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+            Address
+          </span>
+        ),
+        cell: ({ row }) => (
+          <span
+            className="block max-w-[150px] truncate text-xs text-muted-foreground sm:max-w-[250px]"
+            title={row.getValue("address")}
+          >
+            {row.getValue("address") || "—"}
+          </span>
+        ),
+      },
+      {
+        accessorKey: "region",
+        header: () => (
+          <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+            Region
+          </span>
+        ),
+        cell: ({ row }) => (
+          <span className="text-xs text-muted-foreground">
+            {row.getValue("region") || "—"}
+          </span>
+        ),
+      },
+      {
+        accessorKey: "province",
+        header: () => (
+          <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+            Province
+          </span>
+        ),
+        cell: ({ row }) => (
+          <span className="text-xs text-muted-foreground">
+            {row.getValue("province") || "—"}
+          </span>
+        ),
+      },
+      {
+        accessorKey: "city",
+        header: () => (
+          <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+            City
+          </span>
+        ),
+        cell: ({ row }) => (
+          <span className="text-xs text-muted-foreground">
+            {row.getValue("city") || "—"}
+          </span>
+        ),
+      },
+    ],
+    [sorting, setPagination]
+  )
 
   return (
-    <div className="flex flex-col space-y-6">
+    <div className="flex h-full min-h-[calc(100vh-6rem)] flex-col space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-sm font-bold tracking-tight">My Outlets</h2>
@@ -80,120 +212,23 @@ export default function MyOutletsPage() {
         </Badge>
       </div>
 
-      {/* Search Toolbar */}
-      <div className="flex items-center">
-        <div className="relative w-full sm:w-80">
-          <Search className="absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by code or name..."
-            value={globalFilter}
-            onChange={(e) => {
-              setGlobalFilter(e.target.value)
-              setPageIndex(0) // Reset to page 1 on search
-            }}
-            className="pl-9"
-          />
-        </div>
-      </div>
-
-      {/* Data Table */}
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Code</TableHead>
-              <TableHead>Outlet Name</TableHead>
-              <TableHead>Address</TableHead>
-              <TableHead>Region</TableHead>
-              <TableHead>Province</TableHead>
-              <TableHead>City</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={6} className="h-32 text-center">
-                  <div className="flex flex-col items-center justify-center text-muted-foreground">
-                    <Loader2 className="mb-2 h-6 w-6 animate-spin" />
-                    <span>Loading your assignments...</span>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ) : displayOutlets.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={6}
-                  className="h-32 text-center text-muted-foreground"
-                >
-                  {globalFilter
-                    ? "No assigned outlets match your search."
-                    : "You currently have no outlets assigned to you."}
-                </TableCell>
-              </TableRow>
-            ) : (
-              displayOutlets.map((outlet) => (
-                <TableRow key={outlet.id} className="hover:bg-muted/50">
-                  <TableCell className="font-mono font-semibold">
-                    {outlet.outlet_code}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-col">
-                      {outlet.distributor && (
-                        <span className="mb-0.5 text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
-                          {outlet.distributor.outlet_name}
-                        </span>
-                      )}
-                      <span className="font-medium text-foreground">
-                        {outlet.outlet_name}
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell
-                    className="max-w-[200px] truncate text-muted-foreground"
-                    title={outlet.address}
-                  >
-                    {outlet.address || "—"}
-                  </TableCell>
-                  <TableCell>{outlet.region || "—"}</TableCell>
-                  <TableCell>{outlet.province || "—"}</TableCell>
-                  <TableCell>{outlet.city || "—"}</TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {/* Pagination Controls */}
-      <div className="flex items-center justify-between text-sm">
-        <span className="text-xs text-muted-foreground">
-          Showing {displayOutlets.length} items (Total: {totalCount})
-        </span>
-        <div className="flex items-center space-x-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setPageIndex((p) => Math.max(0, p - 1))}
-            disabled={pageIndex === 0 || isLoading}
-          >
-            <ChevronLeft className="mr-1 h-4 w-4" />
-            Previous
-          </Button>
-          <span className="px-2 text-xs font-medium text-muted-foreground">
-            Page {pageIndex + 1} of {totalPages || 1}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setPageIndex((p) => p + 1)}
-            disabled={
-              pageIndex >= totalPages - 1 || isLoading || totalPages === 0
-            }
-          >
-            Next
-            <ChevronRight className="ml-1 h-4 w-4" />
-          </Button>
-        </div>
+      <div className="flex-1 pb-6">
+        <DataTable
+          columns={columns}
+          data={displayOutlets}
+          rowCount={totalCount}
+          isLoading={isLoading}
+          searchPlaceholder="Search by code or name..."
+          globalFilter={globalFilter}
+          onSearchChange={(val) => {
+            setGlobalFilter(val)
+            setPagination((prev) => ({ ...prev, pageIndex: 0 }))
+          }}
+          pagination={pagination}
+          onPaginationChange={setPagination}
+          sorting={sorting}
+          onSortingChange={setSorting}
+        />
       </div>
     </div>
   )

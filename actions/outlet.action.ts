@@ -8,6 +8,55 @@ import {
   OutletStoreType,
 } from "@/forms/queries/outlet.query"
 
+export async function fetchMyAssignedOutletsAction(params: {
+  pageIndex: number
+  pageSize: number
+  globalFilter?: string
+}) {
+  // 1. Securely identify the current authenticated employee
+  const { employeeId } = await fetchUserPermissions()
+
+  if (!employeeId) {
+    throw new Error("Employee profile not found.")
+  }
+
+  const supabase = await createClient()
+
+  // 2. Find the outlet IDs assigned to this employee
+  const { data: assigned } = await supabase
+    .from("employee_outlets")
+    .select("outlet_id")
+    .eq("employee_id", employeeId)
+
+  const assignedIds = assigned?.map((a) => a.outlet_id) || []
+
+  // If no assignments, return early
+  if (assignedIds.length === 0) {
+    return { data: [], rowCount: 0 }
+  }
+
+  // 3. Fetch the actual outlet details for those IDs
+  let query = supabase
+    .from("outlets")
+    .select("*, distributor:distributor_id(outlet_name)", { count: "exact" })
+    .in("id", assignedIds)
+
+  if (params.globalFilter) {
+    query = query.or(
+      `outlet_name.ilike.%${params.globalFilter}%,outlet_code.ilike.%${params.globalFilter}%`
+    )
+  }
+
+  const from = params.pageIndex * params.pageSize
+  const to = from + params.pageSize - 1
+  query = query.range(from, to).order("outlet_name", { ascending: true })
+
+  const { data, error, count } = await query
+  if (error) throw new Error(error.message)
+
+  return { data, rowCount: count || 0 }
+}
+
 // ==========================================
 // 1. FETCH ALL OUTLETS (PAGINATED & SCOPED)
 // ==========================================
@@ -56,8 +105,21 @@ export async function fetchOutletsAction(params: FetchOutletsParams) {
       `outlet_name.ilike.%${params.globalFilter}%,outlet_code.ilike.%${params.globalFilter}%`
     )
   }
-  if (params.distributorFilter)
-    query = query.eq("distributor_id", params.distributorFilter)
+
+  // --- FIX: Semantic Filter Logic for Distributors ---
+  if (params.distributorFilter) {
+    if (params.distributorFilter === "distributors") {
+      query = query.eq("is_distributor", true)
+    } else if (params.distributorFilter === "no_distributor") {
+      query = query.is("distributor_id", null)
+    } else if (params.distributorFilter === "has_distributor") {
+      query = query.not("distributor_id", "is", null)
+    } else {
+      // Fallback just in case a numeric ID is passed in the future
+      query = query.eq("distributor_id", params.distributorFilter)
+    }
+  }
+
   if (params.region) query = query.ilike("region", `%${params.region}%`)
   if (params.province) query = query.ilike("province", `%${params.province}%`)
   if (params.city) query = query.ilike("city", `%${params.city}%`)

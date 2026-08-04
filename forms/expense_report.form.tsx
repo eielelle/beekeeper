@@ -1,43 +1,25 @@
 "use client"
 
 import * as React from "react"
-import { useForm } from "@tanstack/react-form"
+import { useForm, useStore } from "@tanstack/react-form"
 import * as z from "zod"
 import { useParams } from "next/navigation"
-import { useMutation, useQuery } from "@tanstack/react-query"
-import { Check, ChevronsUpDown, Plus, Trash2, Paperclip } from "lucide-react"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { Loader2, Receipt } from "lucide-react"
 
-import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Field, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command"
+import { Checkbox } from "@/components/ui/checkbox"
 
 import {
   createExpenseReport,
   getExpenseReport,
   updateExpenseReport,
-  fetchExpenseTypesOptions,
-  ExpenseRecord,
-  ExpenseAttachmentRecord,
+  fetchAvailableExpenses,
 } from "./queries/expense_report.query"
-import {
-  ExpenseAttachmentValues,
-  expenseReportSchema,
-} from "./schemas/expense_report.schema"
+import { expenseReportSchema } from "./schemas/expense_report.schema"
 
 export function ExpenseReportForm({
   editId,
@@ -47,87 +29,60 @@ export function ExpenseReportForm({
   onClose?: () => void
 }) {
   const params = useParams()
+  const queryClient = useQueryClient()
   let id = editId
   if (!id && params?.id) {
     id = Array.isArray(params.id) ? params.id[0] : params.id
   }
   const isEditMode = !!id
 
-  // 1. Queries
+  // 1. Fetch existing report if editing
   const { data: reportData, isLoading: isReportLoading } = useQuery({
     queryKey: ["expense_reports", id],
     queryFn: () => getExpenseReport(id!),
     enabled: isEditMode,
   })
 
-  const { data: expenseTypes = [] } = useQuery({
-    queryKey: ["expense_types_options"],
-    queryFn: fetchExpenseTypesOptions,
+  // 2. Setup Form
+  const form = useForm({
+    defaultValues: {
+      report_title: reportData?.report_title ?? "",
+      report_description: reportData?.report_description ?? "",
+      date_from: reportData?.date_from ?? "",
+      date_to: reportData?.date_to ?? "",
+      expense_ids: reportData?.expenses?.map((e: any) => e.id) ?? [],
+    } as z.input<typeof expenseReportSchema>,
+    validators: { onSubmit: expenseReportSchema },
+    onSubmit: async ({ value }) => {
+      mutation.mutate(value)
+    },
   })
 
-  // 2. Mutations
+  // 3. Watch dates to fetch available expenses dynamically
+  const dateFrom = useStore(form.store, (state) => state.values.date_from)
+  const dateTo = useStore(form.store, (state) => state.values.date_to)
+
+  const { data: availableExpenses = [], isLoading: isExpensesLoading } =
+    useQuery({
+      queryKey: ["available-expenses", dateFrom, dateTo, id],
+      queryFn: () => fetchAvailableExpenses(dateFrom, dateTo, id),
+      enabled: !!dateFrom && !!dateTo,
+    })
+
+  // 4. Mutation
   const mutation = useMutation<any, Error, z.infer<typeof expenseReportSchema>>(
     {
       mutationFn: async (values) => {
-        if (isEditMode) {
-          return await updateExpenseReport(id!, values)
-        }
+        if (isEditMode) return await updateExpenseReport(id!, values)
         return await createExpenseReport(values)
       },
       onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["my-expense-reports"] })
         form.reset()
         if (onClose) onClose()
       },
     }
   )
-
-  // 3. Define typed default values object using Zod's input type inference
-  const dv: z.input<typeof expenseReportSchema> = {
-    report_title: reportData?.report_title ?? "",
-    report_description: reportData?.report_description ?? "",
-    date_from: reportData?.date_from ?? "",
-    date_to: reportData?.date_to ?? "",
-    entries: reportData?.expenses?.map((e: ExpenseRecord) => ({
-      id: e.id,
-      expense_type_id: e.expense_type_id,
-      date_from: e.date_from,
-      date_to: e.date_to,
-      amount: e.amount,
-      notes: e.notes ?? "",
-      attachments:
-        e.expense_attachments?.map((a: ExpenseAttachmentRecord) => ({
-          id: a.id,
-          url_link: a.url_link,
-          file: undefined, // Keeps shape identical for TypeScript
-        })) ?? [],
-    })) ?? [
-      {
-        expense_type_id: 0,
-        date_from: "",
-        date_to: "",
-        amount: 0,
-        notes: "",
-        attachments: [],
-      },
-    ],
-  }
-
-  // 4. Pass `dv` into TanStack `useForm`
-  const form = useForm({
-    defaultValues: dv,
-    validators: {
-      onSubmit: expenseReportSchema,
-    },
-    onSubmit: async ({ value }) => {
-      mutation.mutate({
-        ...value,
-        entries: value.entries.map((entry) => ({
-          ...entry,
-          attachments: entry.attachments ?? [],
-        })),
-      })
-    },
-  })
 
   if (isEditMode && isReportLoading) {
     return (
@@ -146,89 +101,80 @@ export function ExpenseReportForm({
         form.handleSubmit()
       }}
     >
-      {/* Remove in production - helpful for debugging Zod validation */}
-      {/* <pre className="text-xs">{JSON.stringify(form.state.errorMap, null, 2)}</pre> */}
-
-      {/* --- REPORT HEADER DETAILS --- */}
       <div className="space-y-4 rounded-lg border bg-muted/20 p-4">
         <h3 className="text-sm font-semibold">Report Information</h3>
         <form.Field name="report_title">
-          {(field) => {
-            const isInvalid =
-              field.state.meta.isTouched && !field.state.meta.isValid
-            return (
-              <Field data-invalid={isInvalid}>
-                <FieldLabel htmlFor={field.name}>
-                  Report Title <span className="text-red-500">*</span>
-                </FieldLabel>
-                <Input
-                  id={field.name}
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  placeholder="e.g., Client Visit - Q3 Manila"
-                  disabled={mutation.isPending}
-                />
-                {isInvalid && <FieldError errors={field.state.meta.errors} />}
-              </Field>
-            )
-          }}
+          {(field) => (
+            <Field
+              data-invalid={
+                field.state.meta.isTouched && !field.state.meta.isValid
+              }
+            >
+              <FieldLabel>
+                Report Title <span className="text-red-500">*</span>
+              </FieldLabel>
+              <Input
+                value={field.state.value}
+                onBlur={field.handleBlur}
+                onChange={(e) => field.handleChange(e.target.value)}
+                placeholder="e.g., Client Visit - Q3 Manila"
+                disabled={mutation.isPending}
+              />
+              <FieldError errors={field.state.meta.errors} />
+            </Field>
+          )}
         </form.Field>
 
         <div className="grid grid-cols-2 gap-4">
           <form.Field name="date_from">
-            {(field) => {
-              const isInvalid =
-                field.state.meta.isTouched && !field.state.meta.isValid
-              return (
-                <Field data-invalid={isInvalid}>
-                  <FieldLabel htmlFor={field.name}>
-                    Date From <span className="text-red-500">*</span>
-                  </FieldLabel>
-                  <Input
-                    id={field.name}
-                    type="date"
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    disabled={mutation.isPending}
-                  />
-                  {isInvalid && <FieldError errors={field.state.meta.errors} />}
-                </Field>
-              )
-            }}
+            {(field) => (
+              <Field
+                data-invalid={
+                  field.state.meta.isTouched && !field.state.meta.isValid
+                }
+              >
+                <FieldLabel>
+                  Date From <span className="text-red-500">*</span>
+                </FieldLabel>
+                <Input
+                  type="date"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  disabled={mutation.isPending}
+                />
+                <FieldError errors={field.state.meta.errors} />
+              </Field>
+            )}
           </form.Field>
-
           <form.Field name="date_to">
-            {(field) => {
-              const isInvalid =
-                field.state.meta.isTouched && !field.state.meta.isValid
-              return (
-                <Field data-invalid={isInvalid}>
-                  <FieldLabel htmlFor={field.name}>
-                    Date To <span className="text-red-500">*</span>
-                  </FieldLabel>
-                  <Input
-                    id={field.name}
-                    type="date"
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    disabled={mutation.isPending}
-                  />
-                  {isInvalid && <FieldError errors={field.state.meta.errors} />}
-                </Field>
-              )
-            }}
+            {(field) => (
+              <Field
+                data-invalid={
+                  field.state.meta.isTouched && !field.state.meta.isValid
+                }
+              >
+                <FieldLabel>
+                  Date To <span className="text-red-500">*</span>
+                </FieldLabel>
+                <Input
+                  type="date"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  disabled={mutation.isPending}
+                />
+                <FieldError errors={field.state.meta.errors} />
+              </Field>
+            )}
           </form.Field>
         </div>
 
         <form.Field name="report_description">
           {(field) => (
             <Field>
-              <FieldLabel htmlFor={field.name}>Description</FieldLabel>
+              <FieldLabel>Description</FieldLabel>
               <Textarea
-                id={field.name}
                 value={field.state.value}
                 onChange={(e) => field.handleChange(e.target.value)}
                 placeholder="Business purpose or general notes..."
@@ -239,274 +185,83 @@ export function ExpenseReportForm({
         </form.Field>
       </div>
 
-      {/* --- EXPENSE ENTRIES (DYNAMIC ARRAY) --- */}
-      <form.Field name="entries" mode="array">
-        {(field) => (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold">Expense Items</h3>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  field.pushValue({
-                    expense_type_id: 0,
-                    date_from: "",
-                    date_to: "",
-                    amount: 0,
-                    notes: "",
-                    attachments: [],
-                  })
-                }
-              >
-                <Plus className="mr-2 h-4 w-4" /> Add Expense
-              </Button>
-            </div>
+      {/* EXPENSE SELECTION (Shows only if dates are valid) */}
+      <div className="space-y-4 rounded-lg border bg-background p-4 shadow-sm">
+        <h3 className="flex items-center gap-2 text-sm font-semibold">
+          <Receipt className="h-4 w-4" />
+          Select Expenses to Include
+        </h3>
 
-            {field.state.value.map((_, index) => (
-              <div
-                key={index}
-                className="relative space-y-4 rounded-lg border bg-background p-4 shadow-sm"
-              >
-                <div className="flex items-center justify-between border-b pb-2">
-                  <span className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
-                    Item #{index + 1}
-                  </span>
-                  {field.state.value.length > 1 && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-destructive"
-                      onClick={() => field.removeValue(index)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  {/* Combobox Searchable Expense Type */}
-                  <form.Field
-                    name={`entries[${index}].expense_type_id` as const}
-                  >
-                    {(subField) => {
-                      const isInvalid =
-                        subField.state.meta.isTouched &&
-                        !subField.state.meta.isValid
-                      return (
-                        <Field data-invalid={isInvalid}>
-                          <FieldLabel>
-                            Expense Type <span className="text-red-500">*</span>
-                          </FieldLabel>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant="outline"
-                                role="combobox"
-                                className="w-full justify-between"
-                              >
-                                {subField.state.value
-                                  ? expenseTypes.find(
-                                      (t) => t.id === subField.state.value
-                                    )?.type_name
-                                  : "Select Type..."}
-                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-[250px] p-0">
-                              <Command>
-                                <CommandInput placeholder="Search type..." />
-                                <CommandList>
-                                  <CommandEmpty>
-                                    No expense type found.
-                                  </CommandEmpty>
-                                  <CommandGroup>
-                                    {expenseTypes.map((type) => (
-                                      <CommandItem
-                                        key={type.id}
-                                        value={type.type_name}
-                                        onSelect={() => {
-                                          subField.handleChange(type.id)
-                                        }}
-                                      >
-                                        <Check
-                                          className={cn(
-                                            "mr-2 h-4 w-4",
-                                            subField.state.value === type.id
-                                              ? "opacity-100"
-                                              : "opacity-0"
-                                          )}
-                                        />
-                                        {type.type_name}
-                                      </CommandItem>
-                                    ))}
-                                  </CommandGroup>
-                                </CommandList>
-                              </Command>
-                            </PopoverContent>
-                          </Popover>
-                          {isInvalid && (
-                            <FieldError errors={subField.state.meta.errors} />
-                          )}
-                        </Field>
-                      )
-                    }}
-                  </form.Field>
-
-                  <form.Field name={`entries[${index}].amount` as const}>
-                    {(subField) => {
-                      const isInvalid =
-                        subField.state.meta.isTouched &&
-                        !subField.state.meta.isValid
-                      return (
-                        <Field data-invalid={isInvalid}>
-                          <FieldLabel htmlFor={subField.name}>
-                            Amount <span className="text-red-500">*</span>
-                          </FieldLabel>
-                          <Input
-                            id={subField.name}
-                            type="number"
-                            step="0.01"
-                            value={subField.state.value}
-                            onBlur={subField.handleBlur}
-                            onChange={(e) =>
-                              subField.handleChange(e.target.valueAsNumber || 0)
-                            }
-                            disabled={mutation.isPending}
-                          />
-                          {isInvalid && (
-                            <FieldError errors={subField.state.meta.errors} />
-                          )}
-                        </Field>
-                      )
-                    }}
-                  </form.Field>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <form.Field name={`entries[${index}].date_from` as const}>
-                    {(subField) => {
-                      const isInvalid =
-                        subField.state.meta.isTouched &&
-                        !subField.state.meta.isValid
-                      return (
-                        <Field data-invalid={isInvalid}>
-                          <FieldLabel htmlFor={subField.name}>
-                            Date From <span className="text-red-500">*</span>
-                          </FieldLabel>
-                          <Input
-                            id={subField.name}
-                            type="date"
-                            value={subField.state.value}
-                            onBlur={subField.handleBlur}
-                            onChange={(e) =>
-                              subField.handleChange(e.target.value)
-                            }
-                          />
-                          {isInvalid && (
-                            <FieldError errors={subField.state.meta.errors} />
-                          )}
-                        </Field>
-                      )
-                    }}
-                  </form.Field>
-
-                  <form.Field name={`entries[${index}].date_to` as const}>
-                    {(subField) => {
-                      const isInvalid =
-                        subField.state.meta.isTouched &&
-                        !subField.state.meta.isValid
-                      return (
-                        <Field data-invalid={isInvalid}>
-                          <FieldLabel htmlFor={subField.name}>
-                            Date To <span className="text-red-500">*</span>
-                          </FieldLabel>
-                          <Input
-                            id={subField.name}
-                            type="date"
-                            value={subField.state.value}
-                            onBlur={subField.handleBlur}
-                            onChange={(e) =>
-                              subField.handleChange(e.target.value)
-                            }
-                          />
-                          {isInvalid && (
-                            <FieldError errors={subField.state.meta.errors} />
-                          )}
-                        </Field>
-                      )
-                    }}
-                  </form.Field>
-                </div>
-
-                <form.Field name={`entries[${index}].notes` as const}>
-                  {(subField) => (
-                    <Field>
-                      <FieldLabel htmlFor={subField.name}>Notes</FieldLabel>
-                      <Input
-                        id={subField.name}
-                        value={subField.state.value}
-                        onChange={(e) => subField.handleChange(e.target.value)}
-                        placeholder="Additional details..."
-                      />
-                    </Field>
-                  )}
-                </form.Field>
-
-                <form.Field name={`entries[${index}].attachments` as const}>
-                  {(subField) => {
-                    const attachments = subField.state.value ?? []
-
-                    return (
-                      <Field>
-                        <FieldLabel
-                          htmlFor={subField.name}
-                          className="flex items-center gap-1"
-                        >
-                          <Paperclip className="h-3.5 w-3.5" /> Attachments
-                        </FieldLabel>
-
-                        <Input
-                          id={subField.name}
-                          type="file"
-                          multiple
-                          onChange={(e) => {
-                            const files = Array.from(e.target.files ?? [])
-                            const fileObjs: ExpenseAttachmentValues[] =
-                              files.map((file) => ({
-                                id: undefined,
-                                url_link: undefined,
-                                file,
-                              }))
-                            subField.handleChange([...attachments, ...fileObjs])
-                          }}
-                        />
-
-                        {attachments.length > 0 && (
-                          <div className="mt-2 text-xs text-muted-foreground">
-                            {attachments.length} attachment(s) selected
-                          </div>
-                        )}
-                      </Field>
-                    )
-                  }}
-                </form.Field>
-              </div>
-            ))}
-            {field.state.meta.errors && field.state.meta.errors.length > 0 && (
-              <p className="text-sm font-medium text-destructive">
-                {field.state.meta.errors
-                  .map((err: any) =>
-                    typeof err === "string" ? err : err.message
-                  )
-                  .join(", ")}
-              </p>
-            )}
+        {!dateFrom || !dateTo ? (
+          <p className="rounded-md bg-muted/50 py-4 text-center text-sm text-muted-foreground">
+            Please enter a Date Range above to see available expenses.
+          </p>
+        ) : isExpensesLoading ? (
+          <div className="flex items-center justify-center py-4">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
+        ) : availableExpenses.length === 0 ? (
+          <p className="rounded-md bg-muted/50 py-4 text-center text-sm text-muted-foreground">
+            No pending expenses found for this date range.
+          </p>
+        ) : (
+          <form.Field name="expense_ids" mode="array">
+            {(field) => (
+              <div className="space-y-2">
+                {availableExpenses.map((exp: any) => {
+                  const isSelected = field.state.value.includes(exp.id)
+                  return (
+                    <label
+                      key={exp.id}
+                      className="flex cursor-pointer items-start gap-3 rounded-md border p-3 transition-colors hover:bg-muted/50"
+                    >
+                      <Checkbox
+                        className="mt-1"
+                        checked={isSelected}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            field.pushValue(exp.id)
+                          } else {
+                            const index = field.state.value.indexOf(exp.id)
+                            if (index > -1) field.removeValue(index)
+                          }
+                        }}
+                      />
+                      <div className="flex flex-1 flex-col gap-1 leading-none">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium">
+                            {exp.expense_types?.type_name || "Expense"}
+                          </span>
+                          <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                            {new Intl.NumberFormat("en-PH", {
+                              style: "currency",
+                              currency: "PHP",
+                            }).format(exp.amount)}
+                          </span>
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(exp.date_from).toLocaleDateString()}
+                        </span>
+                        {exp.notes && (
+                          <span className="line-clamp-1 text-xs text-muted-foreground">
+                            {exp.notes}
+                          </span>
+                        )}
+                      </div>
+                    </label>
+                  )
+                })}
+                {field.state.meta.errors &&
+                  field.state.meta.errors.length > 0 && (
+                    <p className="mt-2 text-sm font-medium text-destructive">
+                      {field.state.meta.errors.join(", ")}
+                    </p>
+                  )}
+              </div>
+            )}
+          </form.Field>
         )}
-      </form.Field>
+      </div>
 
       <Button type="submit" className="w-full" disabled={mutation.isPending}>
         {mutation.isPending

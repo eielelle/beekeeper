@@ -24,10 +24,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 
 import { DataTable } from "@/components/custom/data-table/table"
-import {
-  DynamicFilter,
-  FilterField,
-} from "@/components/custom/filter/dynamic-filter"
+import { FilterField } from "@/components/custom/filter/dynamic-filter"
+import { SortOption } from "@/components/custom/sort/dynamic-sorter"
+
 import {
   deleteOutlet,
   fetchOutlets,
@@ -61,7 +60,17 @@ const filterFields: FilterField[] = [
   },
 ]
 
-export default function Page() {
+// Define sort options for the DynamicSorter
+const sortOptions: SortOption[] = [
+  { label: "Outlet Name (A-Z)", value: "outlet_name-false" },
+  { label: "Outlet Name (Z-A)", value: "outlet_name-true" },
+  { label: "Outlet Code (A-Z)", value: "outlet_code-false" },
+  { label: "Outlet Code (Z-A)", value: "outlet_code-true" },
+  { label: "Created (Newest)", value: "created_at-true" },
+  { label: "Created (Oldest)", value: "created_at-false" },
+]
+
+export default function OutletsPage() {
   const queryClient = useQueryClient()
 
   // --- Next.js Navigation ---
@@ -71,7 +80,7 @@ export default function Page() {
 
   // --- URL-based Pagination State ---
   const pageIndex = Number(searchParams.get("page") ?? "0")
-  const pageSize = Number(searchParams.get("size") ?? "10")
+  const pageSize = Number(searchParams.get("size") ?? "15")
 
   const pagination = React.useMemo<PaginationState>(
     () => ({ pageIndex, pageSize }),
@@ -94,7 +103,9 @@ export default function Page() {
 
   // --- Table Control States ---
   const [globalFilter, setGlobalFilter] = React.useState("")
-  const [sorting, setSorting] = React.useState<SortingState>([])
+  const [sorting, setSorting] = React.useState<SortingState>([
+    { id: "created_at", desc: true },
+  ])
 
   // --- Unified Filter State for DynamicFilter ---
   const [filterValues, setFilterValues] = React.useState<
@@ -111,12 +122,17 @@ export default function Page() {
     setPagination((prev) => ({ ...prev, pageIndex: 0 }))
   }
 
-  // Extract variables for the query payload
-  // The DynamicFilter returns " " for the 'All' option on selects, so we fallback to "all" for the DB query
+  const handleSortingChange = (updater: Updater<SortingState>) => {
+    setSorting(updater)
+    setPagination((prev) => ({ ...prev, pageIndex: 0 }))
+  }
+
+  // --- FILTER FIX: Use undefined instead of "all" so Supabase ignores it ---
   const distributorFilter =
     filterValues.type && filterValues.type.trim() !== ""
       ? filterValues.type
-      : "all"
+      : undefined
+
   const dateFrom = filterValues.dateFrom || ""
   const dateTo = filterValues.dateTo || ""
 
@@ -168,12 +184,12 @@ export default function Page() {
     () => [
       {
         accessorKey: "outlet_code",
-        header: ({ column }) => (
+        header: () => (
           <Button
             variant="ghost"
             size="sm"
-            className="-ml-3 h-8"
-            onClick={() =>
+            className="-ml-3 h-8 text-xs font-semibold text-gray-700 dark:text-gray-300"
+            onClick={() => {
               setSorting([
                 {
                   id: "outlet_code",
@@ -181,26 +197,27 @@ export default function Page() {
                     sorting[0]?.id === "outlet_code" ? !sorting[0].desc : false,
                 },
               ])
-            }
+              setPagination((prev) => ({ ...prev, pageIndex: 0 }))
+            }}
           >
             Code
             <ArrowUpDown className="ml-2 h-3.5 w-3.5" />
           </Button>
         ),
         cell: ({ row }) => (
-          <span className="font-mono font-semibold">
+          <span className="font-mono text-xs font-semibold whitespace-nowrap text-muted-foreground">
             {row.getValue("outlet_code")}
           </span>
         ),
       },
       {
         accessorKey: "outlet_name",
-        header: ({ column }) => (
+        header: () => (
           <Button
             variant="ghost"
             size="sm"
-            className="-ml-3 h-8"
-            onClick={() =>
+            className="-ml-3 h-8 text-xs font-semibold text-gray-700 dark:text-gray-300"
+            onClick={() => {
               setSorting([
                 {
                   id: "outlet_name",
@@ -208,7 +225,8 @@ export default function Page() {
                     sorting[0]?.id === "outlet_name" ? !sorting[0].desc : false,
                 },
               ])
-            }
+              setPagination((prev) => ({ ...prev, pageIndex: 0 }))
+            }}
           >
             Outlet Name
             <ArrowUpDown className="ml-2 h-3.5 w-3.5" />
@@ -217,23 +235,30 @@ export default function Page() {
         cell: ({ row }) => {
           const distributor = row.original.distributor
           return (
-            <div className="flex flex-col">
+            <div className="flex max-w-[200px] flex-col truncate sm:max-w-[300px]">
               {distributor && (
-                <span className="mb-0.5 text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
+                <span className="mb-0.5 truncate text-[9px] font-bold tracking-wider text-muted-foreground uppercase">
                   {distributor.outlet_name}
                 </span>
               )}
-              <span className="font-medium">{row.getValue("outlet_name")}</span>
+              <span className="truncate text-sm font-medium text-foreground">
+                {row.getValue("outlet_name")}
+              </span>
             </div>
           )
         },
       },
       {
         accessorKey: "is_distributor",
-        header: "Type",
+        header: () => (
+          <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+            Type
+          </span>
+        ),
         cell: ({ row }) => (
           <Badge
             variant={row.getValue("is_distributor") ? "default" : "secondary"}
+            className="h-5 px-1.5 py-0 text-[10px] whitespace-nowrap"
           >
             {row.getValue("is_distributor") ? "Distributor" : "Outlet"}
           </Badge>
@@ -241,10 +266,19 @@ export default function Page() {
       },
       {
         accessorKey: "is_active",
-        header: "Status",
+        header: () => (
+          <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+            Status
+          </span>
+        ),
         cell: ({ row }) => (
           <Badge
             variant={row.getValue("is_active") ? "outline" : "destructive"}
+            className={`h-5 px-1.5 py-0 text-[10px] whitespace-nowrap ${
+              row.getValue("is_active")
+                ? "border-emerald-500/30 bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400"
+                : ""
+            }`}
           >
             {row.getValue("is_active") ? "Active" : "Inactive"}
           </Badge>
@@ -252,34 +286,44 @@ export default function Page() {
       },
       {
         accessorKey: "created_at",
-        header: "Created At",
+        header: () => (
+          <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+            Created At
+          </span>
+        ),
         cell: ({ row }) => {
           const raw = row.getValue("created_at") as string
-          return raw ? new Date(raw).toLocaleDateString() : "—"
+          return raw ? (
+            <span className="text-xs whitespace-nowrap text-muted-foreground">
+              {new Date(raw).toLocaleDateString()}
+            </span>
+          ) : (
+            "—"
+          )
         },
       },
     ],
-    [sorting]
+    [sorting, setPagination]
   )
 
   return (
-    <div className="flex flex-col space-y-6">
+    <div className="flex h-full min-h-[calc(100vh-6rem)] flex-col space-y-6">
       {/* Stats Section */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="bg-primary">
+        <Card className="bg-primary text-primary-foreground">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Outlets</CardTitle>
-            <Store className="h-4 w-4" />
+            <Store className="h-4 w-4 text-primary-foreground/80" />
           </CardHeader>
           <CardContent>
             {isLoadingStats ? (
-              <Skeleton className="h-8 w-[60px]" />
+              <Skeleton className="h-8 w-[60px] bg-primary-foreground/20" />
             ) : (
               <>
                 <div className="text-2xl font-bold">
                   {statsData?.outlets ?? 0}
                 </div>
-                <p className="mt-1 flex items-center text-xs">
+                <p className="mt-1 flex items-center text-xs text-primary-foreground/80">
                   Total mapped locations
                 </p>
               </>
@@ -352,45 +396,48 @@ export default function Page() {
         </Card>
       </div>
 
-      {/* Dynamic Filters Toolbar Container */}
-      <DynamicFilter
-        title="Filter Outlets"
-        description="Narrow down the outlets and distributors by type or creation date."
-        fields={filterFields}
-        values={filterValues}
-        onApply={handleApplyFilters}
-        onClear={handleClearFilters}
-      />
+      {/* Main Data Table */}
+      <div className="flex-1 pb-6">
+        <DataTable
+          title="Outlets"
+          description="Manage your business outlets and distributors."
+          entityName="Outlet"
+          columns={columns}
+          data={data?.data ?? []}
+          rowCount={data?.rowCount ?? 0}
+          isLoading={isLoading}
+          searchPlaceholder="Search by code or name..."
 
-      {/* Data Table */}
-      <DataTable
-        title="Outlets"
-        description="Manage your outlets here"
-        entityName="Outlet"
-        columns={columns}
-        data={data?.data ?? []}
-        rowCount={data?.rowCount ?? 0}
-        isLoading={isLoading}
-        searchPlaceholder="Search outlets by code or name..."
-        globalFilter={globalFilter}
-        onSearchChange={setGlobalFilter}
-        pagination={pagination}
-        onPaginationChange={setPagination}
-        sorting={sorting}
-        onSortingChange={setSorting}
-        renderForm={({ id, onClose }) => (
-          <div className="max-h-[80vh] overflow-y-auto pr-1">
-            <OutletForm editId={id?.toString()} onClose={onClose} />
-          </div>
-        )}
-        onDelete={async (id) => {
-          await deleteMutation.mutateAsync(id)
-        }}
-        isDeleting={deleteMutation.isPending}
-        getItemDisplayName={(item) =>
-          `${item.outlet_code} (${item.outlet_name})`
-        }
-      />
+          // Data Table State Props
+          globalFilter={globalFilter}
+          onSearchChange={setGlobalFilter}
+          pagination={pagination}
+          onPaginationChange={setPagination}
+          sorting={sorting}
+          onSortingChange={handleSortingChange}
+
+          // Dynamic Toolbars
+          sortOptions={sortOptions}
+          filterFields={filterFields}
+          filterValues={filterValues}
+          onFilterChange={handleApplyFilters}
+          onFilterClear={handleClearFilters}
+
+          // Form & Actions
+          renderForm={({ id, onClose }) => (
+            <div className="max-h-[80vh] overflow-y-auto pr-1">
+              <OutletForm editId={id?.toString()} onClose={onClose} />
+            </div>
+          )}
+          onDelete={async (id) => {
+            await deleteMutation.mutateAsync(id)
+          }}
+          isDeleting={deleteMutation.isPending}
+          getItemDisplayName={(item) =>
+            `${item.outlet_code} (${item.outlet_name})`
+          }
+        />
+      </div>
     </div>
   )
 }

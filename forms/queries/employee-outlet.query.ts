@@ -1,80 +1,43 @@
-import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
+import {
+  getAssignedOutletsAction,
+  getOutletsByIdsAction,
+  assignOutletsToEmployeeAction,
+  fetchMyAssignedOutletsAction,
+} from "@/actions/employee_outlets.action"
 
-// 1. Fetch currently assigned outlet IDs for a specific employee (Fast, lightweight IDs only)
+// 1. Admin Query
 export async function getAssignedOutlets(employeeId: string) {
-  const { data, error } = await supabase
-    .from("employee_outlets")
-    .select("outlet_id")
-    .eq("employee_id", employeeId)
-    // Explicitly raise limit in case an employee has thousands of assigned outlets
-    .limit(10000)
-
-  if (error) {
+  try {
+    return await getAssignedOutletsAction(employeeId)
+  } catch (error: any) {
     toast.error(`ERR: ${error.message}`)
     return []
   }
-
-  return data.map((record) => String(record.outlet_id))
 }
 
-// 2. Fetch full details ONLY for a specific page of IDs (Prevents URL overflow)
+// 2. Admin Query
 export async function getOutletsByIds(ids: string[]) {
   if (!ids || ids.length === 0) return []
-
-  const { data, error } = await supabase
-    .from("outlets")
-    .select("*, distributor:distributor_id(outlet_name)")
-    .in("id", ids)
-
-  if (error) {
+  try {
+    return await getOutletsByIdsAction(ids)
+  } catch (error: any) {
     toast.error(`ERR: ${error.message}`)
     return []
   }
-
-  return data
 }
 
-// 3. Transactional update: clear old assignments and insert new ones (Batched)
-export async function assignOutletsToEmployee({
-  employeeId,
-  outletIds,
-}: {
+// 3. Admin Mutation
+export async function assignOutletsToEmployee(payload: {
   employeeId: string
   outletIds: string[]
 }) {
   const t = toast.loading("Updating assignments...")
-
   try {
-    // 1. Remove existing assignments for this employee
-    const { error: deleteError } = await supabase
-      .from("employee_outlets")
-      .delete()
-      .eq("employee_id", employeeId)
-
-    if (deleteError) throw deleteError
-
-    // 2. Insert new assignments in chunks of 500 to prevent REST payload limits
-    if (outletIds.length > 0) {
-      const insertPayload = outletIds.map((outletId) => ({
-        employee_id: employeeId,
-        outlet_id: outletId,
-      }))
-
-      const chunkSize = 500
-      for (let i = 0; i < insertPayload.length; i += chunkSize) {
-        const batch = insertPayload.slice(i, i + chunkSize)
-        const { error: insertError } = await supabase
-          .from("employee_outlets")
-          .insert(batch)
-
-        if (insertError) throw insertError
-      }
-    }
-
+    const success = await assignOutletsToEmployeeAction(payload)
     toast.dismiss(t)
     toast.success("Outlets successfully assigned.")
-    return true
+    return success
   } catch (error: any) {
     toast.dismiss(t)
     toast.error(`ERR: ${error.message}`)
@@ -82,48 +45,17 @@ export async function assignOutletsToEmployee({
   }
 }
 
-// Add to "@/forms/queries/employee-outlet.query.ts"
-
-export async function fetchMyAssignedOutlets({
-  employeeId,
-  pageIndex,
-  pageSize,
-  globalFilter,
-}: {
-  employeeId: string
+// 4. Employee Query
+export async function fetchMyAssignedOutlets(params: {
   pageIndex: number
   pageSize: number
   globalFilter?: string
 }) {
-  // Use !inner join to strictly filter Outlets by the junction table
-  let query = supabase
-    .from("outlets")
-    .select(
-      "*, distributor:distributor_id(outlet_name), employee_outlets!inner(employee_id)",
-      { count: "exact" }
-    )
-    .eq("employee_outlets.employee_id", employeeId)
-
-  if (globalFilter) {
-    query = query.or(
-      `outlet_name.ilike.%${globalFilter}%,outlet_code.ilike.%${globalFilter}%`
-    )
-  }
-
-  const from = pageIndex * pageSize
-  const to = from + pageSize - 1
-
-  query = query.range(from, to).order("outlet_name", { ascending: true })
-
-  const { data, error, count } = await query
-
-  if (error) {
+  try {
+    return await fetchMyAssignedOutletsAction(params)
+  } catch (error: any) {
     console.error("Error fetching my outlets:", error.message)
+    toast.error(`ERR: ${error.message}`)
     return { data: [], rowCount: 0 }
-  }
-
-  return {
-    data: data || [],
-    rowCount: count || 0,
   }
 }

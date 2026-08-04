@@ -7,13 +7,9 @@ import {
   ChevronsUpDown,
   Loader2,
   Save,
-  Search,
-  ChevronLeft,
-  ChevronRight,
-  Filter,
-  X,
   ListChecks,
   Globe,
+  ArrowUpDown,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -38,32 +34,6 @@ import {
   CommandList,
 } from "@/components/ui/command"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Input } from "@/components/ui/input"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { cn } from "@/lib/utils"
 
 import {
@@ -74,6 +44,11 @@ import {
   Province,
   City,
 } from "select-philippines-address"
+
+import { ColumnDef, PaginationState, SortingState } from "@tanstack/react-table"
+import { DataTable } from "@/components/custom/data-table/table"
+import { FilterField } from "@/components/custom/filter/dynamic-filter"
+import { SortOption } from "@/components/custom/sort/dynamic-sorter"
 
 // Queries
 import { fetchOutlets, OutletStoreType } from "@/forms/queries/outlet.query"
@@ -111,15 +86,6 @@ export default function OutletAssignmentPage() {
   const [provincesData, setProvincesData] = React.useState<Province[]>([])
   const [citiesData, setCitiesData] = React.useState<City[]>([])
 
-  const regionCodeMap = React.useMemo(
-    () => new Map(regionsData.map((r) => [r.region_name, r.region_code])),
-    [regionsData]
-  )
-  const provinceCodeMap = React.useMemo(
-    () => new Map(provincesData.map((p) => [p.province_name, p.province_code])),
-    [provincesData]
-  )
-
   React.useEffect(() => {
     ;(async () => {
       const data = await regions()
@@ -127,10 +93,16 @@ export default function OutletAssignmentPage() {
     })()
   }, [])
 
-  // --- View Mode & Core State ---
+  // --- View Mode & Table Control State ---
   const [viewMode, setViewMode] = React.useState<"all" | "assigned">("all")
-  const [pageIndex, setPageIndex] = React.useState(0)
-  const pageSize = 10
+  const [globalFilter, setGlobalFilter] = React.useState("")
+  const [sorting, setSorting] = React.useState<SortingState>([
+    { id: "outlet_name", desc: false },
+  ])
+  const [pagination, setPagination] = React.useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 15,
+  })
 
   // Lightweight Record holding ONLY the IDs { "1": true, "2": true }
   const [selectedOutlets, setSelectedOutlets] = React.useState<
@@ -165,59 +137,86 @@ export default function OutletAssignmentPage() {
   }, [assignedIdsData, selectedEmployeeId])
 
   // --- Filter State ---
-  const [isFilterOpen, setIsFilterOpen] = React.useState(false)
-  const [globalFilter, setGlobalFilter] = React.useState("")
-  const [appliedFilters, setAppliedFilters] = React.useState({
-    type: "",
-    region: "",
-    province: "",
-    city: "",
-  })
-  const [draftFilters, setDraftFilters] = React.useState(appliedFilters)
+  const [filterValues, setFilterValues] = React.useState<
+    Record<string, string>
+  >({})
 
+  // FIX 1: Safely load Provinces without infinite loops
   React.useEffect(() => {
-    if (isFilterOpen) setDraftFilters(appliedFilters)
-  }, [isFilterOpen, appliedFilters])
+    const loadProvinces = async () => {
+      if (filterValues.region && regionsData.length > 0) {
+        const r = regionsData.find((x) => x.region_name === filterValues.region)
+        if (r) {
+          const data = await provinces(r.region_code)
+          setProvincesData(data)
+        }
+      } else {
+        setProvincesData([])
+      }
+    }
+    loadProvinces()
+  }, [filterValues.region, regionsData])
 
-  const handleApplyFilters = () => {
-    setAppliedFilters(draftFilters)
-    setPageIndex(0)
-    setIsFilterOpen(false)
-    setViewMode("all") // If they filter, jump back to All view
-  }
+  // FIX 2: Safely load Cities without infinite loops
+  React.useEffect(() => {
+    const loadCities = async () => {
+      if (filterValues.province && provincesData.length > 0) {
+        const p = provincesData.find(
+          (x) => x.province_name === filterValues.province
+        )
+        if (p) {
+          const data = await cities(p.province_code)
+          setCitiesData(data)
+        }
+      } else {
+        setCitiesData([])
+      }
+    }
+    loadCities()
+  }, [filterValues.province, provincesData])
 
-  const handleClearFilters = () => {
-    setAppliedFilters({ type: "", region: "", province: "", city: "" })
-    setDraftFilters({ type: "", region: "", province: "", city: "" })
-    setProvincesData([])
-    setCitiesData([])
-    setPageIndex(0)
-    setIsFilterOpen(false)
-  }
+  const handleApplyFilters = React.useCallback(
+    (newValues: Record<string, string>) => {
+      const updatedValues = { ...newValues }
+      if (newValues.region !== filterValues.region) {
+        delete updatedValues.province
+        delete updatedValues.city
+      } else if (newValues.province !== filterValues.province) {
+        delete updatedValues.city
+      }
 
-  const removeFilter = (key: keyof typeof appliedFilters) => {
-    setAppliedFilters((prev) => ({ ...prev, [key]: "" }))
-    setPageIndex(0)
-  }
+      setFilterValues(updatedValues)
+      setPagination((prev) => ({ ...prev, pageIndex: 0 }))
+      setViewMode("all")
+    },
+    [filterValues.region, filterValues.province]
+  )
+
+  const handleClearFilters = React.useCallback(() => {
+    setFilterValues({})
+    setPagination((prev) => ({ ...prev, pageIndex: 0 }))
+  }, [])
 
   // --- Data Fetching: ALL Mode ---
   const { data: allOutletsData, isLoading: isLoadingAll } = useQuery({
     queryKey: [
       "outlets-assignment-all",
-      pageIndex,
-      pageSize,
+      pagination.pageIndex,
+      pagination.pageSize,
       globalFilter,
-      appliedFilters,
+      filterValues,
+      sorting,
     ],
     queryFn: () =>
       fetchOutlets({
-        pageIndex,
-        pageSize,
+        pageIndex: pagination.pageIndex,
+        pageSize: pagination.pageSize,
         globalFilter,
-        distributorFilter: appliedFilters.type || "all",
-        region: appliedFilters.region || undefined,
-        province: appliedFilters.province || undefined,
-        city: appliedFilters.city || undefined,
+        sorting: sorting as { id: string; desc: boolean }[],
+        distributorFilter: filterValues.type || undefined,
+        region: filterValues.region || undefined,
+        province: filterValues.province || undefined,
+        city: filterValues.city || undefined,
       }),
     enabled: viewMode === "all" && !!selectedEmployeeId,
   })
@@ -228,14 +227,13 @@ export default function OutletAssignmentPage() {
       queryKey: [
         "outlets-assignment-chunk",
         selectedIdsArray,
-        pageIndex,
-        pageSize,
+        pagination.pageIndex,
+        pagination.pageSize,
       ],
       queryFn: async () => {
-        // Grab just the 10 IDs needed for the current page
         const chunkIds = selectedIdsArray.slice(
-          pageIndex * pageSize,
-          (pageIndex + 1) * pageSize
+          pagination.pageIndex * pagination.pageSize,
+          (pagination.pageIndex + 1) * pagination.pageSize
         )
         if (chunkIds.length === 0) return []
         return getOutletsByIds(chunkIds)
@@ -243,7 +241,6 @@ export default function OutletAssignmentPage() {
       enabled: viewMode === "assigned" && !!selectedEmployeeId,
     })
 
-  // Determine what is currently visible on the table based on the tab
   const displayOutlets = React.useMemo(() => {
     if (viewMode === "assigned") {
       return (assignedChunkData as OutletStoreType[]) || []
@@ -255,31 +252,34 @@ export default function OutletAssignmentPage() {
     viewMode === "assigned"
       ? selectedIdsArray.length
       : (allOutletsData?.rowCount ?? 0)
-  const totalPages = Math.ceil(currentTotalCount / pageSize)
+
   const isTableLoading =
     viewMode === "assigned" ? isLoadingAssignedChunk : isLoadingAll
 
-  // --- Checkbox Handlers ---
-  const toggleRow = (id: string, checked: boolean) => {
+  // FIX 3: Stabilize checkbox toggles with useCallback
+  const toggleRow = React.useCallback((id: string, checked: boolean) => {
     setSelectedOutlets((prev) => {
       const next = { ...prev }
       if (checked) next[id] = true
       else delete next[id]
       return next
     })
-  }
+  }, [])
 
-  const toggleAllOnPage = (checked: boolean) => {
-    setSelectedOutlets((prev) => {
-      const next = { ...prev }
-      displayOutlets.forEach((outlet) => {
-        if (!outlet.id) return
-        if (checked) next[outlet.id] = true
-        else delete next[outlet.id]
+  const toggleAllOnPage = React.useCallback(
+    (checked: boolean) => {
+      setSelectedOutlets((prev) => {
+        const next = { ...prev }
+        displayOutlets.forEach((outlet) => {
+          if (!outlet.id) return
+          if (checked) next[outlet.id] = true
+          else delete next[outlet.id]
+        })
+        return next
       })
-      return next
-    })
-  }
+    },
+    [displayOutlets]
+  )
 
   const isAllPageSelected =
     displayOutlets.length > 0 &&
@@ -307,10 +307,204 @@ export default function OutletAssignmentPage() {
   const selectedEmployeeName = employeeOptions.find(
     (opt) => opt.value === selectedEmployeeId
   )?.label
-  const activeFilterCount = Object.values(appliedFilters).filter(Boolean).length
+
+  // --- DataTable Config ---
+  const sortOptions: SortOption[] = [
+    { label: "Outlet Name (A-Z)", value: "outlet_name-false" },
+    { label: "Outlet Name (Z-A)", value: "outlet_name-true" },
+    { label: "Outlet Code (A-Z)", value: "outlet_code-false" },
+    { label: "Outlet Code (Z-A)", value: "outlet_code-true" },
+  ]
+
+  const filterFields: FilterField[] = [
+    {
+      id: "type",
+      label: "Outlet Type",
+      type: "select",
+      options: [
+        { label: "Distributors", value: "distributors" },
+        { label: "Outlets with no Distributor", value: "no_distributor" },
+        { label: "Outlets with Distributor", value: "has_distributor" },
+      ],
+      placeholder: "All Types",
+    },
+    {
+      id: "region",
+      label: "Region",
+      type: "select",
+      options: regionsData.map((r) => ({
+        label: r.region_name,
+        value: r.region_name,
+      })),
+      placeholder: "All Regions",
+    },
+    {
+      id: "province",
+      label: "Province",
+      type: "select",
+      options: provincesData.map((p) => ({
+        label: p.province_name,
+        value: p.province_name,
+      })),
+      placeholder: "All Provinces",
+    },
+    {
+      id: "city",
+      label: "City",
+      type: "select",
+      options: citiesData.map((c) => ({
+        label: c.city_name,
+        value: c.city_name,
+      })),
+      placeholder: "All Cities",
+    },
+  ]
+
+  const columns = React.useMemo<ColumnDef<OutletStoreType>[]>(
+    () => [
+      {
+        id: "select",
+        header: () => (
+          <Checkbox
+            checked={
+              isAllPageSelected ||
+              (isSomePageSelected ? "indeterminate" : false)
+            }
+            onCheckedChange={(val) => toggleAllOnPage(!!val)}
+            aria-label="Select all on page"
+          />
+        ),
+        cell: ({ row }) => (
+          <Checkbox
+            checked={!!selectedOutlets[row.original.id as string]}
+            onCheckedChange={(val) =>
+              toggleRow(row.original.id as string, !!val)
+            }
+            aria-label="Select row"
+          />
+        ),
+        enableSorting: false,
+        enableHiding: false,
+      },
+      {
+        accessorKey: "outlet_code",
+        header: () => (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="-ml-3 h-8 text-xs font-semibold text-gray-700 dark:text-gray-300"
+            onClick={() => {
+              setSorting([
+                {
+                  id: "outlet_code",
+                  desc:
+                    sorting[0]?.id === "outlet_code" ? !sorting[0].desc : false,
+                },
+              ])
+              setPagination((prev) => ({ ...prev, pageIndex: 0 }))
+            }}
+          >
+            Code
+            <ArrowUpDown className="ml-2 h-3.5 w-3.5" />
+          </Button>
+        ),
+        cell: ({ row }) => (
+          <span className="font-mono text-xs font-semibold whitespace-nowrap text-muted-foreground">
+            {row.getValue("outlet_code")}
+          </span>
+        ),
+      },
+      {
+        accessorKey: "outlet_name",
+        header: () => (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="-ml-3 h-8 text-xs font-semibold text-gray-700 dark:text-gray-300"
+            onClick={() => {
+              setSorting([
+                {
+                  id: "outlet_name",
+                  desc:
+                    sorting[0]?.id === "outlet_name" ? !sorting[0].desc : false,
+                },
+              ])
+              setPagination((prev) => ({ ...prev, pageIndex: 0 }))
+            }}
+          >
+            Outlet Name
+            <ArrowUpDown className="ml-2 h-3.5 w-3.5" />
+          </Button>
+        ),
+        cell: ({ row }) => {
+          const distributor = row.original.distributor
+          return (
+            <div className="flex max-w-[200px] flex-col truncate sm:max-w-[300px]">
+              {distributor && (
+                <span className="mb-0.5 truncate text-[9px] font-bold tracking-wider text-muted-foreground uppercase">
+                  {distributor.outlet_name}
+                </span>
+              )}
+              <span className="truncate text-sm font-medium text-foreground">
+                {row.getValue("outlet_name")}
+              </span>
+            </div>
+          )
+        },
+      },
+      {
+        accessorKey: "region",
+        header: () => (
+          <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+            Region
+          </span>
+        ),
+        cell: ({ row }) => (
+          <span className="text-sm text-muted-foreground">
+            {row.getValue("region") || "—"}
+          </span>
+        ),
+      },
+      {
+        accessorKey: "province",
+        header: () => (
+          <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+            Province
+          </span>
+        ),
+        cell: ({ row }) => (
+          <span className="text-sm text-muted-foreground">
+            {row.getValue("province") || "—"}
+          </span>
+        ),
+      },
+      {
+        accessorKey: "city",
+        header: () => (
+          <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+            City
+          </span>
+        ),
+        cell: ({ row }) => (
+          <span className="text-sm text-muted-foreground">
+            {row.getValue("city") || "—"}
+          </span>
+        ),
+      },
+    ],
+    [
+      sorting,
+      setPagination,
+      selectedOutlets,
+      isAllPageSelected,
+      isSomePageSelected,
+      toggleAllOnPage,
+      toggleRow,
+    ]
+  )
 
   return (
-    <div className="flex flex-col space-y-6">
+    <div className="flex h-full min-h-[calc(100vh-6rem)] flex-col space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-sm font-bold tracking-tight">
@@ -335,8 +529,8 @@ export default function OutletAssignmentPage() {
       </div>
 
       {/* 1. EMPLOYEE SELECTOR */}
-      <Card>
-        <CardHeader>
+      <Card className="rounded-xl border shadow-sm">
+        <CardHeader className="pb-4">
           <CardTitle>1. Select Employee</CardTitle>
           <CardDescription>
             Choose the employee you want to assign outlets to.
@@ -403,21 +597,21 @@ export default function OutletAssignmentPage() {
         </CardContent>
       </Card>
 
-      {/* 2. OUTLET TABLE WITH FILTERS & VIEW MODE */}
-      <Card
+      {/* 2. OUTLET TABLE */}
+      <div
         className={cn(
-          "transition-opacity",
+          "flex-1 pb-6 transition-opacity",
           !selectedEmployeeId && "pointer-events-none opacity-50"
         )}
       >
-        <CardHeader className="flex flex-col gap-4 border-b pb-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mb-4 flex items-center justify-between">
           <div>
-            <CardTitle>2. Manage Assignments</CardTitle>
-            <CardDescription>
+            <h3 className="text-lg font-semibold">2. Manage Assignments</h3>
+            <p className="text-sm text-muted-foreground">
               {selectedEmployeeId
                 ? `Currently managing territory for ${selectedEmployeeName}.`
                 : "Select an employee above to manage their outlets."}
-            </CardDescription>
+            </p>
           </div>
 
           {/* VIEW MODE TOGGLE */}
@@ -425,10 +619,13 @@ export default function OutletAssignmentPage() {
             <Button
               variant={viewMode === "all" ? "default" : "ghost"}
               size="sm"
-              className={cn("h-8 text-xs", viewMode === "all" && "shadow-sm")}
+              className={cn(
+                "h-8 text-xs",
+                viewMode === "all" && "bg-white shadow-sm dark:bg-zinc-800"
+              )}
               onClick={() => {
                 setViewMode("all")
-                setPageIndex(0)
+                setPagination((prev) => ({ ...prev, pageIndex: 0 }))
               }}
             >
               <Globe className="mr-2 h-3.5 w-3.5" />
@@ -439,374 +636,49 @@ export default function OutletAssignmentPage() {
               size="sm"
               className={cn(
                 "h-8 text-xs",
-                viewMode === "assigned" && "shadow-sm"
+                viewMode === "assigned" && "bg-white shadow-sm dark:bg-zinc-800"
               )}
               onClick={() => {
                 setViewMode("assigned")
-                setPageIndex(0)
+                setPagination((prev) => ({ ...prev, pageIndex: 0 }))
               }}
             >
               <ListChecks className="mr-2 h-3.5 w-3.5" />
               Assigned ({selectedIdsArray.length})
             </Button>
           </div>
-        </CardHeader>
+        </div>
 
-        <CardContent className="space-y-4 pt-4">
-          {/* Filters & Search Toolbar (Only visible in 'All' mode) */}
-          {viewMode === "all" && (
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-              <div className="relative w-full sm:w-72">
-                <Search className="absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search outlets by code or name..."
-                  value={globalFilter}
-                  onChange={(e) => {
-                    setGlobalFilter(e.target.value)
-                    setPageIndex(0)
-                  }}
-                  className="pl-9 text-sm"
-                />
-              </div>
+        {/* REUSABLE DATATABLE */}
+        <DataTable
+          columns={columns}
+          data={displayOutlets}
+          rowCount={currentTotalCount}
+          isLoading={isTableLoading}
+          searchPlaceholder="Search by code or name..."
 
-              <div className="flex flex-wrap items-center gap-4">
-                <Sheet open={isFilterOpen} onOpenChange={setIsFilterOpen}>
-                  <SheetTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="flex items-center gap-2"
-                    >
-                      <Filter className="h-4 w-4" />
-                      Filters
-                      {activeFilterCount > 0 && (
-                        <Badge
-                          variant="secondary"
-                          className="ml-1 rounded-full px-1.5 py-0.5 text-xs"
-                        >
-                          {activeFilterCount}
-                        </Badge>
-                      )}
-                    </Button>
-                  </SheetTrigger>
-                  <SheetContent className="flex w-[350px] flex-col sm:w-[450px]">
-                    <SheetHeader>
-                      <SheetTitle>Filter Outlets</SheetTitle>
-                      <SheetDescription>
-                        Narrow down available geographic locations.
-                      </SheetDescription>
-                    </SheetHeader>
+          // Data Table State Props
+          globalFilter={globalFilter}
+          onSearchChange={(val) => {
+            setGlobalFilter(val)
+            setPagination((prev) => ({ ...prev, pageIndex: 0 }))
+          }}
+          pagination={pagination}
+          onPaginationChange={setPagination}
+          sorting={sorting}
+          onSortingChange={(updater) => {
+            setSorting(updater)
+            setPagination((prev) => ({ ...prev, pageIndex: 0 }))
+          }}
 
-                    <div className="space-y-4 overflow-y-auto p-4">
-                      {/* TYPE */}
-                      <div className="flex flex-col gap-2">
-                        <label className="text-xs font-medium">
-                          Outlet Type
-                        </label>
-                        <Select
-                          value={draftFilters.type}
-                          onValueChange={(val) =>
-                            setDraftFilters((p) => ({
-                              ...p,
-                              type: val === "all" ? "" : val,
-                            }))
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="All types" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All Types</SelectItem>
-                            <SelectItem value="distributors">
-                              Distributors
-                            </SelectItem>
-                            <SelectItem value="no_distributor">
-                              No Distributor
-                            </SelectItem>
-                            <SelectItem value="has_distributor">
-                              Has Distributor
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      {/* REGION */}
-                      <div className="flex flex-col gap-2">
-                        <label className="text-xs font-medium">Region</label>
-                        <Select
-                          value={draftFilters.region}
-                          onValueChange={async (val) => {
-                            setDraftFilters((p) => ({
-                              ...p,
-                              region: val === "all" ? "" : val,
-                              province: "",
-                              city: "",
-                            }))
-                            if (val !== "all") {
-                              const code = regionCodeMap.get(val)
-                              if (code) setProvincesData(await provinces(code))
-                            } else {
-                              setProvincesData([])
-                            }
-                            setCitiesData([])
-                          }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="All Regions" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All Regions</SelectItem>
-                            {regionsData.map((r) => (
-                              <SelectItem
-                                key={r.region_code}
-                                value={r.region_name}
-                              >
-                                {r.region_name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      {/* PROVINCE */}
-                      <div className="flex flex-col gap-2">
-                        <label className="text-xs font-medium">Province</label>
-                        <Select
-                          value={draftFilters.province}
-                          disabled={
-                            !draftFilters.region || provincesData.length === 0
-                          }
-                          onValueChange={async (val) => {
-                            setDraftFilters((p) => ({
-                              ...p,
-                              province: val === "all" ? "" : val,
-                              city: "",
-                            }))
-                            if (val !== "all") {
-                              const code = provinceCodeMap.get(val)
-                              if (code) setCitiesData(await cities(code))
-                            } else {
-                              setCitiesData([])
-                            }
-                          }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="All Provinces" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All Provinces</SelectItem>
-                            {provincesData.map((p) => (
-                              <SelectItem
-                                key={p.province_code}
-                                value={p.province_name}
-                              >
-                                {p.province_name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      {/* CITY */}
-                      <div className="flex flex-col gap-2">
-                        <label className="text-xs font-medium">City</label>
-                        <Select
-                          value={draftFilters.city}
-                          disabled={
-                            !draftFilters.province || citiesData.length === 0
-                          }
-                          onValueChange={(val) =>
-                            setDraftFilters((p) => ({
-                              ...p,
-                              city: val === "all" ? "" : val,
-                            }))
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="All Cities" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All Cities</SelectItem>
-                            {citiesData.map((c) => (
-                              <SelectItem key={c.city_code} value={c.city_name}>
-                                {c.city_name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    <SheetFooter>
-                      <div className="flex justify-end gap-2">
-                        <Button variant="ghost" onClick={handleClearFilters}>
-                          Reset
-                        </Button>
-                        <Button onClick={handleApplyFilters}>
-                          Apply Filters
-                        </Button>
-                      </div>
-                    </SheetFooter>
-                  </SheetContent>
-                </Sheet>
-              </div>
-            </div>
-          )}
-
-          {/* Active Filters Inline Tags */}
-          {viewMode === "all" && activeFilterCount > 0 && (
-            <div className="flex flex-wrap items-center gap-2">
-              {Object.entries(appliedFilters).map(([key, val]) => {
-                if (!val) return null
-                return (
-                  <Badge
-                    key={key}
-                    variant="secondary"
-                    className="flex items-center gap-1 pr-1"
-                  >
-                    <span className="capitalize">{key}:</span> {val}
-                    <button
-                      type="button"
-                      className="ml-1 rounded-full p-0.5 hover:bg-secondary-foreground/20 focus:outline-none"
-                      onClick={() =>
-                        removeFilter(key as keyof typeof appliedFilters)
-                      }
-                    >
-                      <X className="h-3 w-3 text-secondary-foreground" />
-                    </button>
-                  </Badge>
-                )
-              })}
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 px-2 text-xs text-muted-foreground"
-                onClick={handleClearFilters}
-              >
-                Clear all
-              </Button>
-            </div>
-          )}
-
-          {/* Native Table */}
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[50px]">
-                    <Checkbox
-                      checked={
-                        isAllPageSelected ||
-                        (isSomePageSelected ? "indeterminate" : false)
-                      }
-                      onCheckedChange={(val) => toggleAllOnPage(!!val)}
-                      aria-label="Select all on page"
-                    />
-                  </TableHead>
-                  <TableHead>Code</TableHead>
-                  <TableHead>Outlet Name</TableHead>
-                  <TableHead>Region</TableHead>
-                  <TableHead>Province</TableHead>
-                  <TableHead>City</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isTableLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center">
-                      <Loader2 className="mx-auto h-5 w-5 animate-spin text-muted-foreground" />
-                    </TableCell>
-                  </TableRow>
-                ) : displayOutlets.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={6}
-                      className="h-24 text-center text-muted-foreground"
-                    >
-                      {viewMode === "assigned"
-                        ? "No outlets currently assigned."
-                        : "No outlets found."}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  displayOutlets.map((outlet) => (
-                    <TableRow
-                      key={outlet.id}
-                      data-state={
-                        selectedOutlets[outlet.id as string]
-                          ? "selected"
-                          : undefined
-                      }
-                    >
-                      <TableCell>
-                        <Checkbox
-                          checked={!!selectedOutlets[outlet.id as string]}
-                          onCheckedChange={(val) =>
-                            toggleRow(outlet.id as string, !!val)
-                          }
-                        />
-                      </TableCell>
-                      <TableCell className="font-mono font-semibold">
-                        {outlet.outlet_code}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col">
-                          {outlet.distributor && (
-                            <span className="mb-0.5 text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
-                              {outlet.distributor.outlet_name}
-                            </span>
-                          )}
-                          <span className="font-medium">
-                            {outlet.outlet_name}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>{outlet.region || "—"}</TableCell>
-                      <TableCell>{outlet.province || "—"}</TableCell>
-                      <TableCell>{outlet.city || "—"}</TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-
-          {/* Manual Pagination Controls */}
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-xs text-muted-foreground">
-              Showing {displayOutlets.length} items (Total in{" "}
-              {viewMode === "assigned" ? "Assigned" : "DB"}: {currentTotalCount}
-              )
-            </span>
-            <div className="flex items-center space-x-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPageIndex((p) => Math.max(0, p - 1))}
-                disabled={pageIndex === 0 || isTableLoading}
-              >
-                <ChevronLeft className="mr-1 h-4 w-4" />
-                Previous
-              </Button>
-              <span className="px-2 text-xs text-muted-foreground">
-                Page {pageIndex + 1} of {totalPages || 1}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPageIndex((p) => p + 1)}
-                disabled={
-                  pageIndex >= totalPages - 1 ||
-                  isTableLoading ||
-                  totalPages === 0
-                }
-              >
-                Next
-                <ChevronRight className="ml-1 h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          // Show filters only in "All" view mode
+          sortOptions={viewMode === "all" ? sortOptions : undefined}
+          filterFields={viewMode === "all" ? filterFields : undefined}
+          filterValues={filterValues}
+          onFilterChange={handleApplyFilters}
+          onFilterClear={handleClearFilters}
+        />
+      </div>
     </div>
   )
 }
