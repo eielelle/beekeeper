@@ -117,6 +117,10 @@ const data = {
           title: "Leaves",
           url: "/d/leaves/leaves-log",
         },
+        {
+          title: "Leave Approvals",
+          url: "/d/leaves/leaves-log",
+        },
       ],
     },
     {
@@ -148,19 +152,11 @@ const data = {
           url: "#",
         },
         {
-          title: "My Sales-to-Trade",
-          url: "#",
-        },
-        {
-          title: "Inventory",
+          title: "Inventories",
           url: "#",
         },
         {
           title: "Bad Orders",
-          url: "#",
-        },
-        {
-          title: "Sales-to-Trade",
           url: "#",
         },
       ],
@@ -176,7 +172,11 @@ const data = {
           url: "#",
         },
         {
-          title: "MCP",
+          title: "My Visit Plans",
+          url: "#",
+        },
+        {
+          title: "Visit Plans",
           url: "#",
         },
         {
@@ -192,11 +192,19 @@ const data = {
       isActive: false,
       items: [
         {
-          title: "Expenses",
+          title: "My Expenses",
           url: "#",
         },
         {
-          title: "Reports",
+          title: "My Expense Reports",
+          url: "#",
+        },
+        {
+          title: "Expense Reports",
+          url: "#",
+        },
+        {
+          title: "Report Approvals",
           url: "#",
         },
       ],
@@ -235,6 +243,10 @@ const data = {
           title: "My Bookings",
           url: "#",
         },
+        {
+          title: "Bookings",
+          url: "#",
+        },
       ],
     },
     {
@@ -262,19 +274,23 @@ const data = {
       isActive: false,
       items: [
         {
-          title: "Overview",
+          title: "Feed",
           url: "#",
         },
         {
-          title: "Reports",
+          title: "My Daily Reports",
           url: "#",
         },
         {
-          title: "Production Summary",
+          title: "My Production Entries",
           url: "#",
         },
         {
-          title: "New Production Entry",
+          title: "Production Entries",
+          url: "#",
+        },
+        {
+          title: "Daily Reports",
           url: "#",
         },
       ],

@@ -8,10 +8,9 @@ import {
   PaginationState,
   Updater,
 } from "@tanstack/react-table"
-import { MapPin, ArrowUpDown } from "lucide-react"
+import { ArrowUpDown } from "lucide-react"
 import { useRouter, usePathname, useSearchParams } from "next/navigation"
 
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { DataTable } from "@/components/custom/data-table/table"
 
@@ -77,8 +76,7 @@ export default function MyOutletsPage() {
         header: () => (
           <Button
             variant="ghost"
-            size="sm"
-            className="-ml-3 h-8 text-xs font-semibold text-gray-700 dark:text-gray-300"
+            className="-ml-3 !h-6 !px-2 text-xs font-semibold text-gray-700 dark:text-gray-300"
             onClick={() => {
               setSorting([
                 {
@@ -91,7 +89,7 @@ export default function MyOutletsPage() {
             }}
           >
             Code
-            <ArrowUpDown className="ml-2 h-3.5 w-3.5" />
+            <ArrowUpDown className="ml-1.5 h-3 w-3" />
           </Button>
         ),
         cell: ({ row }) => (
@@ -105,8 +103,7 @@ export default function MyOutletsPage() {
         header: () => (
           <Button
             variant="ghost"
-            size="sm"
-            className="-ml-3 h-8 text-xs font-semibold text-gray-700 dark:text-gray-300"
+            className="-ml-3 !h-6 !px-2 text-xs font-semibold text-gray-700 dark:text-gray-300"
             onClick={() => {
               setSorting([
                 {
@@ -119,7 +116,7 @@ export default function MyOutletsPage() {
             }}
           >
             Outlet Name
-            <ArrowUpDown className="ml-2 h-3.5 w-3.5" />
+            <ArrowUpDown className="ml-1.5 h-3 w-3" />
           </Button>
         ),
         cell: ({ row }) => {
@@ -199,21 +196,10 @@ export default function MyOutletsPage() {
 
   return (
     <div className="flex h-full min-h-[calc(100vh-6rem)] flex-col space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-sm font-bold tracking-tight">My Outlets</h2>
-          <p className="text-xs text-muted-foreground">
-            View the geographic territories and locations assigned to you.
-          </p>
-        </div>
-        <Badge variant="default" className="h-8 px-4 text-xs font-medium">
-          <MapPin className="mr-2 h-3.5 w-3.5" />
-          {totalCount} Total Assignments
-        </Badge>
-      </div>
-
       <div className="flex-1 pb-6">
         <DataTable
+          title="My Outlets"
+          description="View the geographic territories and locations assigned to you."
           columns={columns}
           data={displayOutlets}
           rowCount={totalCount}

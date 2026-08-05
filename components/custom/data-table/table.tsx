@@ -17,20 +17,13 @@ import {
   Trash2,
   ChevronLeft,
   ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
   Loader2,
-  LayoutGrid,
-  KanbanSquare,
-  List as ListIcon,
-  Download,
-  Settings2,
-  EyeOff,
+  X,
+  Eye, // Added Eye icon for the view action
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Table,
@@ -97,18 +90,44 @@ interface DataTableProps<TData, TValue> {
   onFilterChange?: (values: Record<string, string>) => void
   onFilterClear?: () => void
 
+  // --- Actions ---
   renderForm?: (props: {
     id?: string | number
     onClose: () => void
   }) => React.ReactNode
+  onAdd?: () => void // Added onAdd action prop
+  onView?: (item: TData) => void // Added onView action prop
   onDelete?: (id: string | number) => Promise<void>
   isDeleting?: boolean
   getItemDisplayName?: (item: TData) => string
 }
 
+// Helper for dynamic pagination numbers
+const getPaginationItems = (currentPage: number, pageCount: number) => {
+  const total = Math.max(1, pageCount)
+  if (total <= 5) {
+    return Array.from({ length: total }, (_, i) => i)
+  }
+  if (currentPage <= 2) {
+    return [0, 1, 2, "...", total - 2, total - 1]
+  }
+  if (currentPage >= total - 3) {
+    return [0, "...", total - 3, total - 2, total - 1]
+  }
+  return [
+    0,
+    "...",
+    currentPage - 1,
+    currentPage,
+    currentPage + 1,
+    "...",
+    total - 1,
+  ]
+}
+
 export function DataTable<TData, TValue>({
   title,
-  description, // Keeping it available but hidden in this compact layout
+  description,
   entityName = "Item",
   columns,
   data,
@@ -127,6 +146,8 @@ export function DataTable<TData, TValue>({
   onFilterChange,
   onFilterClear,
   renderForm,
+  onAdd, // Destructure onAdd
+  onView, // Destructure onView
   onDelete,
   isDeleting,
   getItemDisplayName,
@@ -137,8 +158,12 @@ export function DataTable<TData, TValue>({
   const [itemToDelete, setItemToDelete] = React.useState<TData | null>(null)
 
   const openAdd = () => {
-    setEditId(undefined)
-    setIsFormOpen(true)
+    if (onAdd) {
+      onAdd() // Call custom function if provided
+    } else {
+      setEditId(undefined)
+      setIsFormOpen(true) // Otherwise open internal form dialog
+    }
   }
 
   const openEdit = (id: string | number) => {
@@ -149,7 +174,7 @@ export function DataTable<TData, TValue>({
   // --- Auto-Inject Actions Column if needed ---
   const tableColumns = React.useMemo(() => {
     const baseCols = [...columns]
-    if (renderForm || onDelete) {
+    if (renderForm || onDelete || onView) {
       baseCols.push({
         id: "actions",
         header: () => (
@@ -162,27 +187,35 @@ export function DataTable<TData, TValue>({
             .id
 
           return (
-            <div className="flex items-center justify-start gap-2">
+            <div className="flex items-center justify-start gap-1.5">
+              {onView && (
+                <Button
+                  variant="ghost"
+                  size={"icon-xs"}
+                  className="!h-6 !px-2 !py-0 text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => onView(row.original)}
+                >
+                  <Eye className="h-3 w-3" />
+                </Button>
+              )}
               {renderForm && (
                 <Button
-                  variant="outline"
-                  size="xs"
-                  className="px-2.5 text-xs text-muted-foreground hover:text-foreground"
+                  variant="ghost"
+                  size={"icon-xs"}
+                  className="!h-6 !px-2 !py-0 text-xs text-muted-foreground hover:text-foreground"
                   onClick={() => openEdit(recordId)}
                 >
-                  <Pencil className="mr-1.5 h-3.5 w-3.5" />
-                  Edit
+                  <Pencil className="h-3 w-3" />
                 </Button>
               )}
               {onDelete && (
                 <Button
-                  variant="outline"
-                  size="xs"
-                  className="px-2.5 text-xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                  variant="ghost"
+                  size={"icon-xs"}
+                  className="!h-6 !px-2 !py-0 text-xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                   onClick={() => setItemToDelete(row.original)}
                 >
-                  <Trash2 className="mr-1.5 h-3.5 w-3.5" />
-                  Delete
+                  <Trash2 className="h-3 w-3" />
                 </Button>
               )}
             </div>
@@ -191,7 +224,7 @@ export function DataTable<TData, TValue>({
       } as ColumnDef<TData, TValue>)
     }
     return baseCols
-  }, [columns, renderForm, onDelete])
+  }, [columns, renderForm, onDelete, onView])
 
   // --- Initialize Table ---
   const table = useReactTable({
@@ -218,27 +251,63 @@ export function DataTable<TData, TValue>({
   const currentSortValue =
     sorting.length > 0 ? `${sorting[0]?.id}-${sorting[0]?.desc}` : ""
 
+  const hasActiveFilters = filterValues && Object.keys(filterValues).length > 0
+  const hasHeader = Boolean(title || description)
+  const paginationItems = getPaginationItems(pagination.pageIndex, totalPages)
+
   return (
     <div className="flex h-full flex-col">
+      {/* --- Header & Title --- */}
+      {hasHeader && (
+        <div className="flex flex-col items-start justify-between gap-2 border-b px-3 py-2 sm:flex-row sm:items-center">
+          <div>
+            {title && (
+              <h2 className="text-sm font-semibold text-foreground">{title}</h2>
+            )}
+            {description && (
+              <p className="text-xs text-muted-foreground">{description}</p>
+            )}
+          </div>
+          {/* Changed: Show add button if either renderForm or onAdd is provided */}
+          {(renderForm || onAdd) && (
+            <Button className="!h-6 !px-2 !py-0 text-xs" onClick={openAdd}>
+              Add {entityName}
+            </Button>
+          )}
+        </div>
+      )}
+
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* --- Top Navigation Toolbar --- */}
-        <div className="flex flex-col items-start justify-between gap-4 border-b px-4 py-3 sm:flex-row sm:items-center">
-          {/* Right: Actions */}
-          <div className="flex w-full items-center gap-2 overflow-x-auto pb-1 sm:w-auto sm:pb-0">
+        <div className="flex flex-col items-start justify-between gap-3 border-b px-3 py-2 sm:flex-row sm:items-center">
+          {/* Left: Search */}
+          <div className="flex w-full items-center gap-2 overflow-x-auto sm:w-auto">
             {onSearchChange && (
               <div className="relative w-full shrink-0 sm:w-56">
-                <Search className="absolute top-1.5 left-2.5 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute top-1/2 left-1.5 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   placeholder={searchPlaceholder}
                   value={globalFilter || ""}
                   onChange={(e) => onSearchChange(e.target.value)}
-                  className="h-7 bg-background pl-9 text-sm"
+                  className="!h-6 !min-h-0 bg-background !py-0 pl-6 text-xs"
                 />
               </div>
             )}
           </div>
 
+          {/* Right: Actions (Filter, Sort, Add) */}
           <div className="flex items-center gap-2">
+            {filterFields && filterFields.length > 0 && (
+              <DynamicFilter
+                title={`Filter ${entityName}s`}
+                description="Narrow down the results."
+                fields={filterFields}
+                values={filterValues || {}}
+                onApply={(vals) => onFilterChange?.(vals)}
+                onClear={() => onFilterClear?.()}
+              />
+            )}
+
             {sortOptions && sortOptions.length > 0 && (
               <DynamicSorter
                 options={sortOptions}
@@ -247,28 +316,59 @@ export function DataTable<TData, TValue>({
                   const [id, descStr] = val.split("-")
                   onSortingChange([{ id, desc: descStr === "true" }])
                 }}
-                className="h-1 w-full bg-white text-xs sm:w-[200px] dark:bg-zinc-950"
+                className="!h-6 w-full bg-white text-xs sm:w-[200px] dark:bg-zinc-950"
               />
             )}
-            {renderForm && <Button onClick={openAdd}>Add {entityName}</Button>}
+
+            {/* Changed: Show add button if either renderForm or onAdd is provided */}
+            {!hasHeader && (renderForm || onAdd) && (
+              <Button className="!h-6 !px-2 !py-0 text-xs" onClick={openAdd}>
+                Add {entityName}
+              </Button>
+            )}
           </div>
         </div>
 
-        {/* --- Second Toolbar: Filters & Sorters --- */}
-        {(filterFields || sortOptions) && (
-          <div className="flex flex-col items-center gap-3 border-b bg-gray-50/30 px-5 py-2.5 sm:flex-row dark:bg-zinc-900/30">
-            {filterFields && filterFields.length > 0 && (
-              <div className="w-full sm:w-auto">
-                <DynamicFilter
-                  title={`Filter ${entityName}s`}
-                  description="Narrow down the results."
-                  fields={filterFields}
-                  values={filterValues || {}}
-                  onApply={(vals) => onFilterChange?.(vals)}
-                  onClear={() => onFilterClear?.()}
-                />
-              </div>
-            )}
+        {/* --- Active Filters Toolbar --- */}
+        {hasActiveFilters && (
+          <div className="flex flex-wrap items-center gap-1.5 border-b bg-gray-50/40 px-3 py-1.5 dark:bg-zinc-900/30">
+            {Object.entries(filterValues).map(([key, val]) => {
+              const field = filterFields?.find((f) => f.id === key)
+              const label = field?.label || key
+              const optionLabel =
+                field?.options?.find((o) => o.value === val)?.label || val
+
+              return (
+                <span
+                  key={key}
+                  className="inline-flex !h-6 items-center gap-1 rounded-md border border-gray-200 bg-white px-2 py-0 text-[11px] text-gray-700 shadow-sm dark:border-zinc-800 dark:bg-zinc-950 dark:text-gray-300"
+                >
+                  <span>
+                    <span className="font-medium">{label}:</span>{" "}
+                    {String(optionLabel)}
+                  </span>
+                  <button
+                    type="button"
+                    className="ml-0.5 rounded-full p-0.5 text-muted-foreground hover:bg-gray-100 hover:text-destructive dark:hover:bg-zinc-800"
+                    onClick={() => {
+                      const newValues = { ...filterValues }
+                      delete newValues[key]
+                      onFilterChange?.(newValues)
+                    }}
+                  >
+                    <X className="h-3 w-3" />
+                    <span className="sr-only">Remove {label} filter</span>
+                  </button>
+                </span>
+              )
+            })}
+            <Button
+              variant="ghost"
+              onClick={onFilterClear}
+              className="!h-6 !px-2 !py-0 text-[10px] text-muted-foreground hover:text-foreground"
+            >
+              Clear all
+            </Button>
           </div>
         )}
 
@@ -277,11 +377,11 @@ export function DataTable<TData, TValue>({
           <Table className="w-full caption-bottom text-xs">
             <TableHeader className="sticky top-0 z-10 bg-gray-50 shadow-sm backdrop-blur dark:bg-zinc-900/80">
               {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id} className="border-b-0">
+                <TableRow key={headerGroup.id} className="!h-6 border-b-0">
                   {headerGroup.headers.map((header) => (
                     <TableHead
                       key={header.id}
-                      className="h-4 px-5 py-0 text-left align-middle text-xs font-semibold text-gray-700 dark:text-gray-300"
+                      className="!h-6 px-3 py-0 text-left align-middle text-xs font-semibold text-gray-700 dark:text-gray-300"
                     >
                       {header.isPlaceholder
                         ? null
@@ -299,10 +399,13 @@ export function DataTable<TData, TValue>({
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow
                     key={i}
-                    className="h-2 border-b border-gray-100 dark:border-zinc-800"
+                    className="!h-6 border-b border-gray-100 dark:border-zinc-800"
                   >
-                    <TableCell colSpan={tableColumns.length} className="px-5">
-                      <Skeleton className="h-6 w-full bg-gray-100 dark:bg-zinc-800" />
+                    <TableCell
+                      colSpan={tableColumns.length}
+                      className="px-3 py-0"
+                    >
+                      <Skeleton className="h-4 w-full bg-gray-100 dark:bg-zinc-800" />
                     </TableCell>
                   </TableRow>
                 ))
@@ -311,10 +414,13 @@ export function DataTable<TData, TValue>({
                   <TableRow
                     key={row.id}
                     data-state={row.getIsSelected() && "selected"}
-                    className="h-4 border-b border-gray-100 transition-colors hover:bg-gray-50/50 dark:border-zinc-800 dark:hover:bg-zinc-900/50"
+                    className="!h-6 border-b border-gray-100 transition-colors hover:bg-gray-50/50 dark:border-zinc-800 dark:hover:bg-zinc-900/50"
                   >
                     {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id} className="px-5 align-middle">
+                      <TableCell
+                        key={cell.id}
+                        className="px-3 py-0 align-middle text-xs"
+                      >
                         {flexRender(
                           cell.column.columnDef.cell,
                           cell.getContext()
@@ -327,7 +433,7 @@ export function DataTable<TData, TValue>({
                 <TableRow>
                   <TableCell
                     colSpan={tableColumns.length}
-                    className="h-32 text-center text-sm text-muted-foreground"
+                    className="h-24 text-center text-xs text-muted-foreground"
                   >
                     No results found.
                   </TableCell>
@@ -338,82 +444,100 @@ export function DataTable<TData, TValue>({
         </div>
 
         {/* --- Bottom Pagination Footer --- */}
-        <div className="flex flex-col items-center justify-between border-t border-gray-200 bg-white px-5 py-3 text-sm sm:flex-row dark:border-zinc-800 dark:bg-zinc-950">
-          {/* Left: Rows Info & Limit Selector */}
-          <div className="flex w-full items-center justify-center gap-3 sm:w-auto sm:justify-start">
-            <span className="text-xs text-muted-foreground">Rows per page</span>
-            <Select
-              value={pageSize.toString()}
-              onValueChange={(val) =>
-                onPaginationChange({ pageIndex: 0, pageSize: Number(val) })
-              }
-            >
-              <SelectTrigger className="h-8 w-[70px] text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="10">10</SelectItem>
-                <SelectItem value="15">15</SelectItem>
-                <SelectItem value="20">20</SelectItem>
-                <SelectItem value="50">50</SelectItem>
-                <SelectItem value="100">100</SelectItem>
-              </SelectContent>
-            </Select>
-            <span className="ml-2 text-xs text-muted-foreground">
-              {data.length ? pagination.pageIndex * pageSize + 1 : 0}-
-              {Math.min((pagination.pageIndex + 1) * pageSize, rowCount)} of{" "}
-              {rowCount} rows
-            </span>
+        <div className="flex flex-col items-center justify-between border-t border-gray-200 bg-white px-3 py-1.5 text-xs sm:flex-row dark:border-zinc-800 dark:bg-zinc-950">
+          {/* Left: Total records */}
+          <div className="text-muted-foreground">
+            Total <span className="font-bold text-foreground">{rowCount}</span>
           </div>
 
-          {/* Right: Pagination Controls */}
-          <div className="mt-4 flex items-center gap-1 sm:mt-0">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-foreground"
-              onClick={() => updatePage(0)}
-              disabled={pagination.pageIndex === 0 || isLoading}
-            >
-              <ChevronsLeft className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-foreground"
-              onClick={() => updatePage(Math.max(0, pagination.pageIndex - 1))}
-              disabled={pagination.pageIndex === 0 || isLoading}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-
-            {/* Dynamic Page Numbers (simplified representation) */}
-            <div className="flex items-center gap-1 px-2 text-xs font-medium">
-              <span className="flex h-8 w-8 items-center justify-center rounded-md bg-gray-100 text-foreground dark:bg-zinc-800">
-                {pagination.pageIndex + 1}
-              </span>
-              <span className="px-1 text-muted-foreground">/</span>
-              <span className="text-muted-foreground">{totalPages || 1}</span>
+          {/* Right: Controls (Limit & Pages) */}
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-4 sm:mt-0">
+            {/* Lines per page */}
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground">Lines per page</span>
+              <Select
+                value={pageSize.toString()}
+                onValueChange={(val) =>
+                  onPaginationChange({ pageIndex: 0, pageSize: Number(val) })
+                }
+              >
+                <SelectTrigger className="!h-6 !min-h-0 w-[55px] !px-2 !py-0 text-xs shadow-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10" className="py-1 text-xs">
+                    10
+                  </SelectItem>
+                  <SelectItem value="15" className="py-1 text-xs">
+                    15
+                  </SelectItem>
+                  <SelectItem value="20" className="py-1 text-xs">
+                    20
+                  </SelectItem>
+                  <SelectItem value="50" className="py-1 text-xs">
+                    50
+                  </SelectItem>
+                  <SelectItem value="100" className="py-1 text-xs">
+                    100
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-foreground"
-              onClick={() => updatePage(pagination.pageIndex + 1)}
-              disabled={pagination.pageIndex >= totalPages - 1 || isLoading}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-foreground"
-              onClick={() => updatePage(Math.max(0, totalPages - 1))}
-              disabled={pagination.pageIndex >= totalPages - 1 || isLoading}
-            >
-              <ChevronsRight className="h-4 w-4" />
-            </Button>
+            {/* Pagination Controls */}
+            <div className="flex items-center gap-1 text-muted-foreground">
+              <Button
+                variant="ghost"
+                className="!h-6 !w-6 p-0 text-muted-foreground hover:text-foreground"
+                onClick={() =>
+                  updatePage(Math.max(0, pagination.pageIndex - 1))
+                }
+                disabled={pagination.pageIndex === 0 || isLoading}
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </Button>
+
+              <div className="flex items-center gap-1 font-medium">
+                {paginationItems.map((page, idx) => {
+                  if (page === "...") {
+                    return (
+                      <span
+                        key={`ellipsis-${idx}`}
+                        className="px-1 tracking-widest text-muted-foreground"
+                      >
+                        ..
+                      </span>
+                    )
+                  }
+
+                  const isCurrent = page === pagination.pageIndex
+                  return (
+                    <Button
+                      key={`page-${page}`}
+                      variant={isCurrent ? "default" : "ghost"}
+                      className={`!h-6 min-w-[24px] !px-1.5 !py-0 text-xs ${
+                        isCurrent
+                          ? "font-bold"
+                          : "font-normal text-muted-foreground hover:text-foreground"
+                      }`}
+                      onClick={() => updatePage(page as number)}
+                      disabled={isLoading}
+                    >
+                      {(page as number) + 1}
+                    </Button>
+                  )
+                })}
+              </div>
+
+              <Button
+                variant="ghost"
+                className="!h-6 !w-6 p-0 text-muted-foreground hover:text-foreground"
+                onClick={() => updatePage(pagination.pageIndex + 1)}
+                disabled={pagination.pageIndex >= totalPages - 1 || isLoading}
+              >
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -423,7 +547,7 @@ export function DataTable<TData, TValue>({
         <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
           <DialogContent className="flex flex-col gap-0 overflow-hidden border-0 p-0 sm:max-w-md">
             <DialogHeader className="p-4">
-              <DialogTitle>
+              <DialogTitle className="text-sm">
                 {editId ? `Edit ${entityName}` : `Add ${entityName}`}
               </DialogTitle>
             </DialogHeader>
@@ -445,8 +569,10 @@ export function DataTable<TData, TValue>({
         >
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Delete {entityName}</AlertDialogTitle>
-              <AlertDialogDescription>
+              <AlertDialogTitle className="text-sm">
+                Delete {entityName}
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-xs">
                 Are you sure you want to delete{" "}
                 {getItemDisplayName && itemToDelete ? (
                   <strong>{getItemDisplayName(itemToDelete)}</strong>
@@ -457,11 +583,16 @@ export function DataTable<TData, TValue>({
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel disabled={isDeleting}>
+              <AlertDialogCancel
+                className="!h-6 !px-3 !py-0 text-xs"
+                disabled={isDeleting}
+                size={"xs"}
+              >
                 Cancel
               </AlertDialogCancel>
               <AlertDialogAction
-                className="text-destructive-foreground bg-destructive hover:bg-destructive/90"
+                className="text-destructive-foreground !h-6 bg-destructive !px-3 !py-0 text-xs hover:bg-destructive/90"
+                size={"xs"}
                 disabled={isDeleting}
                 onClick={async (e) => {
                   e.preventDefault()
@@ -475,11 +606,10 @@ export function DataTable<TData, TValue>({
                 }}
               >
                 {isDeleting ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
                 ) : (
-                  <Trash2 className="mr-2 h-4 w-4" />
+                  <span>Delete</span>
                 )}
-                Delete
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

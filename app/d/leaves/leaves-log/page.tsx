@@ -15,6 +15,12 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
 import { DataTable } from "@/components/custom/data-table/table"
 import { FilterField } from "@/components/custom/filter/dynamic-filter"
@@ -83,6 +89,9 @@ export default function LeavesPage() {
   const [filterValues, setFilterValues] = React.useState<
     Record<string, string>
   >({})
+
+  // --- Viewing State ---
+  const [viewItem, setViewItem] = React.useState<LeaveStoreType | null>(null)
 
   const handleApplyFilters = (newValues: Record<string, string>) => {
     setFilterValues(newValues)
@@ -364,6 +373,7 @@ export default function LeavesPage() {
               <LeaveForm editId={id?.toString()} onClose={onClose} />
             </div>
           )}
+          onView={(item) => setViewItem(item)}
           onDelete={async (id) => {
             await deleteMutation.mutateAsync(id)
           }}
@@ -373,6 +383,106 @@ export default function LeavesPage() {
           }
         />
       </div>
+
+      {/* View Item Dialog */}
+      <Dialog
+        open={!!viewItem}
+        onOpenChange={(open) => !open && setViewItem(null)}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Leave Request Details</DialogTitle>
+          </DialogHeader>
+          {viewItem && (
+            <div className="space-y-4 pt-4 text-sm">
+              <div className="grid grid-cols-[100px_1fr] items-start gap-2">
+                <span className="font-semibold text-muted-foreground">
+                  Employee:
+                </span>
+                <span>
+                  {viewItem.employee
+                    ? `${viewItem.employee.first_name} ${viewItem.employee.last_name}`
+                    : "Unknown Employee"}
+                </span>
+              </div>
+              <div className="grid grid-cols-[100px_1fr] items-start gap-2">
+                <span className="font-semibold text-muted-foreground">
+                  Date:
+                </span>
+                <span>
+                  {new Date(viewItem.leave_date).toLocaleDateString()}
+                </span>
+              </div>
+              <div className="grid grid-cols-[100px_1fr] items-start gap-2">
+                <span className="font-semibold text-muted-foreground">
+                  Filed On:
+                </span>
+                <span>
+                  {new Date(viewItem.created_at).toLocaleDateString()}
+                </span>
+              </div>
+              <div className="grid grid-cols-[100px_1fr] items-start gap-2">
+                <span className="font-semibold text-muted-foreground">
+                  Reason:
+                </span>
+                <span className="whitespace-pre-wrap">{viewItem.reason}</span>
+              </div>
+
+              <div className="flex flex-col gap-2 border-t pt-2">
+                <span className="font-semibold text-muted-foreground">
+                  Approval Pipeline:
+                </span>
+                <div className="flex flex-col gap-3">
+                  {viewItem.approval_logs?.length ? (
+                    viewItem.approval_logs.map((alog: any, idx: number) => {
+                      const emp = Array.isArray(alog.approver)
+                        ? alog.approver[0]
+                        : alog.approver
+                      const name = emp
+                        ? `${emp.first_name} ${emp.last_name}`
+                        : "Unknown"
+
+                      return (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between border-l-2 border-primary pl-3"
+                        >
+                          <div className="flex flex-col">
+                            <span className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
+                              Step {alog.step_level}
+                            </span>
+                            <span className="font-medium">{name}</span>
+                          </div>
+                          <div>
+                            {alog.status === "approved" ? (
+                              <Badge className="bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400">
+                                Approved
+                              </Badge>
+                            ) : alog.status === "rejected" ? (
+                              <Badge variant="destructive">Rejected</Badge>
+                            ) : (
+                              <Badge
+                                variant="outline"
+                                className="border-amber-500/30 bg-amber-50 text-amber-600 dark:bg-amber-950/30 dark:text-amber-400"
+                              >
+                                Pending
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })
+                  ) : (
+                    <span className="text-sm text-muted-foreground italic">
+                      No approvers assigned to this request.
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

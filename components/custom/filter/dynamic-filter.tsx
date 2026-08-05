@@ -41,11 +41,10 @@ export interface FilterField {
   id: string
   label: string
   type: FilterType
-  options?: { label: string; value: string; description?: string }[] // Required for select/combobox
+  options?: { label: string; value: string; description?: string }[]
   placeholder?: string
-  // Combobox specific props
-  onSearchChange?: (val: string) => void // Allows parent to fetch options dynamically
-  isLoading?: boolean // Shows a spinner while searching
+  onSearchChange?: (val: string) => void
+  isLoading?: boolean
 }
 
 interface DynamicFilterProps {
@@ -55,9 +54,9 @@ interface DynamicFilterProps {
   values: Record<string, string>
   onApply: (values: Record<string, string>) => void
   onClear: () => void
+  showActiveFiltersInline?: boolean
 }
 
-// Internal component to manage individual combobox popover state cleanly
 function FilterCombobox({
   field,
   value,
@@ -68,8 +67,6 @@ function FilterCombobox({
   onChange: (val: string, label?: string) => void
 }) {
   const [open, setOpen] = React.useState(false)
-
-  // Find the selected option to display its label
   const selectedOption = field.options?.find((o) => o.value === value)
 
   return (
@@ -161,16 +158,12 @@ export function DynamicFilter({
   values,
   onApply,
   onClear,
+  showActiveFiltersInline = false,
 }: DynamicFilterProps) {
   const [isOpen, setIsOpen] = React.useState(false)
   const [draftValues, setDraftValues] =
     React.useState<Record<string, string>>(values)
-
-  // Cache labels for async comboboxes so badges don't revert to raw IDs when search results change
   const [labelCache, setLabelCache] = React.useState<Record<string, string>>({})
-
-  // --- FIXED: Removed the useEffect that caused the cascading render warning ---
-  // Instead, we handle the state sync inside the `onOpenChange` of the Sheet below.
 
   const handleApply = () => {
     onApply(draftValues)
@@ -196,11 +189,9 @@ export function DynamicFilter({
     }
   }
 
-  // Count active filters (ignoring empty strings or undefined)
   const activeKeys = Object.keys(values).filter((key) => Boolean(values[key]))
   const activeCount = activeKeys.filter((k) => values[k] !== " ").length
 
-  // Helper to get human-readable labels for badges
   const getBadgeDisplay = (key: string, val: string) => {
     const field = fields.find((f) => f.id === key)
     if (!field) return val
@@ -214,11 +205,7 @@ export function DynamicFilter({
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-4">
-      {/* 
-        FIXED: We sync the draft values directly in the onOpenChange event handler. 
-        This is the recommended React pattern (Event Handlers instead of Effects).
-      */}
+    <div className="flex flex-wrap items-center gap-2">
       <Sheet
         open={isOpen}
         onOpenChange={(open) => {
@@ -231,15 +218,13 @@ export function DynamicFilter({
         <SheetTrigger asChild>
           <Button
             variant="outline"
-            size={"sm"}
-            className="flex items-center gap-2"
+            className="flex !h-6 items-center gap-1 !px-2 !py-0 !text-xs"
           >
-            <Filter className="h-2 w-2" />
-            Filters
+            <Filter className="h-2.5 w-2.5" /> <span>Filter</span>
             {activeCount > 0 && (
               <Badge
                 variant="secondary"
-                className="ml-1 rounded-full px-1.5 py-0.5 text-xs"
+                className="ml-0.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 py-0 text-[10px] leading-none"
               >
                 {activeCount}
               </Badge>
@@ -314,22 +299,21 @@ export function DynamicFilter({
       </Sheet>
 
       {/* Active Filters Inline Row */}
-      {activeCount > 0 && (
-        <div className="flex flex-wrap items-center gap-2">
+      {showActiveFiltersInline && activeCount > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5">
           {activeKeys.map((key) => {
-            // Treat literal space string as empty to allow deselecting
             if (values[key] === " ") return null
 
             return (
               <Badge
                 key={key}
                 variant="secondary"
-                className="flex items-center gap-1 pr-1 font-normal"
+                className="flex !h-6 items-center gap-1 !px-2 !py-0 text-xs leading-none font-normal"
               >
                 {getBadgeDisplay(key, values[key])}
                 <button
                   type="button"
-                  className="ml-1 rounded-full p-0.5 hover:bg-secondary-foreground/20 focus:outline-none"
+                  className="ml-0.5 rounded-full p-0.5 hover:bg-secondary-foreground/20 focus:outline-none"
                   onClick={() => removeFilter(key)}
                 >
                   <X className="h-3 w-3 text-secondary-foreground" />
@@ -341,8 +325,7 @@ export function DynamicFilter({
 
           <Button
             variant="ghost"
-            size="sm"
-            className="h-6 px-2 text-xs text-muted-foreground"
+            className="!h-6 !px-2 !py-0 !text-xs text-muted-foreground"
             onClick={onClear}
           >
             Clear

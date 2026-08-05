@@ -392,7 +392,7 @@ export default function OutletAssignmentPage() {
           <Button
             variant="ghost"
             size="sm"
-            className="-ml-3 h-8 text-xs font-semibold text-gray-700 dark:text-gray-300"
+            className="-ml-3 h-6 px-2 text-xs font-semibold text-gray-700 dark:text-gray-300"
             onClick={() => {
               setSorting([
                 {
@@ -405,7 +405,7 @@ export default function OutletAssignmentPage() {
             }}
           >
             Code
-            <ArrowUpDown className="ml-2 h-3.5 w-3.5" />
+            <ArrowUpDown className="ml-1.5 h-3 w-3" />
           </Button>
         ),
         cell: ({ row }) => (
@@ -420,7 +420,7 @@ export default function OutletAssignmentPage() {
           <Button
             variant="ghost"
             size="sm"
-            className="-ml-3 h-8 text-xs font-semibold text-gray-700 dark:text-gray-300"
+            className="-ml-3 h-6 px-2 text-xs font-semibold text-gray-700 dark:text-gray-300"
             onClick={() => {
               setSorting([
                 {
@@ -433,7 +433,7 @@ export default function OutletAssignmentPage() {
             }}
           >
             Outlet Name
-            <ArrowUpDown className="ml-2 h-3.5 w-3.5" />
+            <ArrowUpDown className="ml-1.5 h-3 w-3" />
           </Button>
         ),
         cell: ({ row }) => {
@@ -460,7 +460,7 @@ export default function OutletAssignmentPage() {
           </span>
         ),
         cell: ({ row }) => (
-          <span className="text-sm text-muted-foreground">
+          <span className="text-xs text-muted-foreground">
             {row.getValue("region") || "—"}
           </span>
         ),
@@ -473,7 +473,7 @@ export default function OutletAssignmentPage() {
           </span>
         ),
         cell: ({ row }) => (
-          <span className="text-sm text-muted-foreground">
+          <span className="text-xs text-muted-foreground">
             {row.getValue("province") || "—"}
           </span>
         ),
@@ -486,7 +486,7 @@ export default function OutletAssignmentPage() {
           </span>
         ),
         cell: ({ row }) => (
-          <span className="text-sm text-muted-foreground">
+          <span className="text-xs text-muted-foreground">
             {row.getValue("city") || "—"}
           </span>
         ),
@@ -504,7 +504,7 @@ export default function OutletAssignmentPage() {
   )
 
   return (
-    <div className="flex h-full min-h-[calc(100vh-6rem)] flex-col space-y-6">
+    <div className="flex h-full min-h-[calc(100vh-6rem)] flex-col space-y-3">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-sm font-bold tracking-tight">
@@ -517,36 +517,37 @@ export default function OutletAssignmentPage() {
         <Button
           onClick={() => assignMutation.mutate()}
           disabled={!selectedEmployeeId || assignMutation.isPending}
-          size={"sm"}
+          size="sm"
+          className="!h-7 !px-3 text-xs"
         >
           {assignMutation.isPending ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
           ) : (
-            <Save className="mr-2 h-4 w-4" />
+            <Save className="mr-1.5 h-3.5 w-3.5" />
           )}
           Save Assignments
         </Button>
       </div>
 
       {/* 1. EMPLOYEE SELECTOR */}
-      <Card className="rounded-xl border shadow-sm">
-        <CardHeader className="pb-4">
-          <CardTitle>1. Select Employee</CardTitle>
-          <CardDescription>
+      <Card className="rounded-lg border shadow-sm">
+        <CardHeader className="p-3 pb-1.5">
+          <CardTitle className="text-sm">1. Select Employee</CardTitle>
+          <CardDescription className="text-xs">
             Choose the employee you want to assign outlets to.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-3 pt-0">
           <Popover open={employeeOpen} onOpenChange={setEmployeeOpen}>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
                 role="combobox"
                 aria-expanded={employeeOpen}
-                className="w-full justify-between"
+                className="!h-7 w-full justify-between px-2 text-xs"
               >
                 {selectedEmployeeName || "Search employee..."}
-                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
             <PopoverContent
@@ -558,21 +559,25 @@ export default function OutletAssignmentPage() {
                   placeholder="Search employee by name/ID..."
                   value={employeeSearch}
                   onValueChange={setEmployeeSearch}
+                  className="h-8 text-xs"
                 />
                 <CommandList>
                   {isSearchingEmployees && (
-                    <div className="flex justify-center p-4">
+                    <div className="flex justify-center p-3">
                       <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                     </div>
                   )}
                   {!isSearchingEmployees && employeeOptions.length === 0 && (
-                    <CommandEmpty>No employees found.</CommandEmpty>
+                    <CommandEmpty className="py-2 text-center text-xs">
+                      No employees found.
+                    </CommandEmpty>
                   )}
                   <CommandGroup>
                     {employeeOptions.map((option) => (
                       <CommandItem
                         key={option.value}
                         value={option.label}
+                        className="text-xs"
                         onSelect={() => {
                           setSelectedEmployeeId(option.value)
                           setEmployeeOpen(false)
@@ -580,7 +585,7 @@ export default function OutletAssignmentPage() {
                       >
                         <Check
                           className={cn(
-                            "mr-2 h-4 w-4",
+                            "mr-2 h-3.5 w-3.5",
                             selectedEmployeeId === option.value
                               ? "opacity-100"
                               : "opacity-0"
@@ -600,27 +605,18 @@ export default function OutletAssignmentPage() {
       {/* 2. OUTLET TABLE */}
       <div
         className={cn(
-          "flex-1 pb-6 transition-opacity",
+          "flex-1 pb-4 transition-opacity",
           !selectedEmployeeId && "pointer-events-none opacity-50"
         )}
       >
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-semibold">2. Manage Assignments</h3>
-            <p className="text-sm text-muted-foreground">
-              {selectedEmployeeId
-                ? `Currently managing territory for ${selectedEmployeeName}.`
-                : "Select an employee above to manage their outlets."}
-            </p>
-          </div>
-
-          {/* VIEW MODE TOGGLE */}
-          <div className="flex rounded-lg border bg-muted/50 p-1">
+        {/* VIEW MODE TOGGLE */}
+        <div className="mb-2 flex justify-end">
+          <div className="flex rounded-md border bg-muted/50 p-0.5">
             <Button
               variant={viewMode === "all" ? "default" : "ghost"}
               size="sm"
               className={cn(
-                "h-8 text-xs",
+                "!h-6 !px-3 !text-xs",
                 viewMode === "all" && "bg-white shadow-sm dark:bg-zinc-800"
               )}
               onClick={() => {
@@ -628,14 +624,14 @@ export default function OutletAssignmentPage() {
                 setPagination((prev) => ({ ...prev, pageIndex: 0 }))
               }}
             >
-              <Globe className="mr-2 h-3.5 w-3.5" />
+              <Globe className="mr-1.5 h-3 w-3" />
               All Outlets
             </Button>
             <Button
               variant={viewMode === "assigned" ? "default" : "ghost"}
               size="sm"
               className={cn(
-                "h-8 text-xs",
+                "!h-6 !px-3 !text-xs",
                 viewMode === "assigned" && "bg-white shadow-sm dark:bg-zinc-800"
               )}
               onClick={() => {
@@ -643,14 +639,20 @@ export default function OutletAssignmentPage() {
                 setPagination((prev) => ({ ...prev, pageIndex: 0 }))
               }}
             >
-              <ListChecks className="mr-2 h-3.5 w-3.5" />
-              Assigned ({selectedIdsArray.length})
+              <ListChecks className="mr-1.5 h-3 w-3" />
+              Assigned
             </Button>
           </div>
         </div>
 
         {/* REUSABLE DATATABLE */}
         <DataTable
+          title="2. Manage Assignments"
+          description={
+            selectedEmployeeId
+              ? `Currently managing territory for ${selectedEmployeeName}.`
+              : "Select an employee above to manage their outlets."
+          }
           columns={columns}
           data={displayOutlets}
           rowCount={currentTotalCount}

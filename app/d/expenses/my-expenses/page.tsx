@@ -316,9 +316,7 @@ export default function MyExpensesPage() {
           onFilterClear={handleClearFilters}
 
           // Form Handling
-          renderForm={({ id, onClose }) => (
-            <ExpenseForm editId={id?.toString()} onClose={onClose} />
-          )}
+          // onAdd={route}
         />
       </div>
     </div>
