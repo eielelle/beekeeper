@@ -20,6 +20,7 @@ import { SortOption } from "@/components/custom/sort/dynamic-sorter"
 
 import { ExpenseForm } from "@/forms/expense.form"
 import { supabase } from "@/lib/supabase"
+import { useRouter } from "next/navigation"
 
 // Define Filter Options
 const filterFields: FilterField[] = [
@@ -57,6 +58,8 @@ const sortOptions: SortOption[] = [
 ]
 
 export default function MyExpensesPage() {
+  const router = useRouter()
+
   // --- Table Control States ---
   const [pagination, setPagination] = React.useState<PaginationState>({
     pageIndex: 0,
@@ -314,9 +317,6 @@ export default function MyExpensesPage() {
           filterValues={filterValues}
           onFilterChange={handleApplyFilters}
           onFilterClear={handleClearFilters}
-
-          // Form Handling
-          // onAdd={route}
         />
       </div>
     </div>

@@ -1,5 +1,5 @@
-import { ExpenseReportForm } from "@/forms/expense_report.form"
+import { ExpenseForm } from "@/forms/expense.form"
 
 export default function Page() {
-  return <ExpenseReportForm />
+  return <ExpenseForm />
 }
