@@ -1,4 +1,6 @@
-import { createClient } from "@/lib/supabase/server"
+// lib/casl/server.ts
+import { SupabaseClient } from "@supabase/supabase-js"
+import { createClient as createSSRClient } from "@/lib/supabase/server"
 import { AbilityBuilder, createMongoAbility } from "@casl/ability"
 import { AppAbility, AppAction, AppSubject } from "./factory" // Ensure this matches your file name
 
@@ -6,27 +8,40 @@ type PermissionRecord = { name: string }
 type RolePermissionRecord = { permissions: PermissionRecord | null }
 type RoleRecord = { role_permissions: RolePermissionRecord[] | null }
 
-// 1. Exported helper used by Root Layout
-export async function fetchUserPermissions() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+// 1. Exported helper used by Root Layout and Ability Builder
+// Accepts an optional client and userId for API (Flutter) usage. Defaults to SSR (Web) usage.
+export async function fetchUserPermissions(
+  customClient?: SupabaseClient,
+  customUserId?: string
+) {
+  // Use the injected API client OR fallback to the Web SSR cookie client
+  const supabase = customClient ?? (await createSSRClient())
 
-  if (!user)
-    return {
-      permissions: [],
-      isSuperuser: false,
-      employeeId: null,
-      userId: null,
+  let currentUserId = customUserId
+
+  // If no userId was provided, fetch it using the active client
+  if (!currentUserId) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+      return {
+        permissions: [],
+        isSuperuser: false,
+        employeeId: null,
+        userId: null,
+      }
     }
+    currentUserId = user.id
+  }
 
   const { data: employee, error } = await supabase
     .from("employees")
     .select(
       `id, is_superuser, roles ( role_permissions ( permissions ( name ) ) )`
     )
-    .eq("user_id", user.id)
+    .eq("user_id", currentUserId)
     .single()
 
   if (error || !employee)
@@ -34,7 +49,7 @@ export async function fetchUserPermissions() {
       permissions: [],
       isSuperuser: false,
       employeeId: null,
-      userId: user.id,
+      userId: currentUserId,
     }
 
   const rawRoles = employee.roles as unknown as RoleRecord | RoleRecord[] | null
@@ -49,7 +64,7 @@ export async function fetchUserPermissions() {
     permissions,
     isSuperuser: !!employee.is_superuser,
     employeeId: employee.id,
-    userId: user.id,
+    userId: currentUserId,
   }
 }
 
@@ -175,10 +190,20 @@ const standardRules: Record<string, [AppAction, Extract<AppSubject, string>]> =
   }
 
 // 2. Server Ability builder
-export async function getServerAbility(): Promise<AppAbility> {
+// Accepts optional client and userId to seamlessly support Flutter API endpoints
+export async function getServerAbility(
+  customClient?: SupabaseClient,
+  customUserId?: string
+): Promise<AppAbility> {
   const { can, build } = new AbilityBuilder<AppAbility>(createMongoAbility)
-  const { permissions, isSuperuser, employeeId, userId } =
-    await fetchUserPermissions()
+
+  // Pass along the client/userId so fetchUserPermissions uses the right context
+  const {
+    permissions,
+    isSuperuser,
+    employeeId,
+    userId: resolvedUserId,
+  } = await fetchUserPermissions(customClient, customUserId)
 
   // Superusers bypass all rules
   if (isSuperuser) {
@@ -211,7 +236,8 @@ export async function getServerAbility(): Promise<AppAbility> {
         if (employeeId) can("read", "leaves", { employee_id: employeeId })
         break
       case "read_my_inventory":
-        if (userId) can("read", "inventories", { created_by: userId })
+        if (resolvedUserId)
+          can("read", "inventories", { created_by: resolvedUserId })
         break
       case "read_my_visits":
         can("read", "visits", { is_assigned: true })

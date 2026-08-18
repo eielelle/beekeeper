@@ -218,7 +218,7 @@ export function DynamicFilter({
         <SheetTrigger asChild>
           <Button
             variant="outline"
-            className="flex !h-6 items-center gap-1 !px-2 !py-0 !text-xs"
+            className="flex items-center gap-1 !px-2 !py-0 !text-xs"
           >
             <Filter className="h-2.5 w-2.5" /> <span>Filter</span>
             {activeCount > 0 && (

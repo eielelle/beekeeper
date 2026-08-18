@@ -1,14 +1,21 @@
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 
-export async function createClient() {
-  // In Next.js 15+, cookies() is asynchronous
+export async function createClient(accessToken?: string) {
   const cookieStore = await cookies()
 
   return createServerClient(
     process.env.SUPABASE_URL!,
     process.env.SUPABASE_ANON_KEY!,
     {
+      global: accessToken
+        ? {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
+          }
+        : undefined,
+
       cookies: {
         getAll() {
           return cookieStore.getAll()
@@ -19,8 +26,7 @@ export async function createClient() {
               cookieStore.set(name, value, options)
             )
           } catch {
-            // The `setAll` method was called from a Server Component.
-            // This can be safely ignored in this architecture.
+            // Server Component — safe to ignore
           }
         },
       },
