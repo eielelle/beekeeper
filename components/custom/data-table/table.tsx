@@ -270,7 +270,7 @@ export function DataTable<TData, TValue>({
           </div>
           {/* Changed: Show add button if either renderForm or onAdd is provided */}
           {(renderForm || onAdd) && (
-            <Button className="!h-6 !px-2 !py-0 text-xs" onClick={openAdd}>
+            <Button className="!px-2 !py-0" onClick={openAdd}>
               Add {entityName}
             </Button>
           )}
@@ -289,7 +289,7 @@ export function DataTable<TData, TValue>({
                   placeholder={searchPlaceholder}
                   value={globalFilter || ""}
                   onChange={(e) => onSearchChange(e.target.value)}
-                  className="!h-6 !min-h-0 bg-background !py-0 pl-6 text-xs"
+                  className="!min-h-0 bg-background !py-0 pl-6 text-xs"
                 />
               </div>
             )}
@@ -316,7 +316,7 @@ export function DataTable<TData, TValue>({
                   const [id, descStr] = val.split("-")
                   onSortingChange([{ id, desc: descStr === "true" }])
                 }}
-                className="!h-6 w-full bg-white text-xs sm:w-[200px] dark:bg-zinc-950"
+                className="w-full bg-white text-xs sm:w-[200px] dark:bg-zinc-950"
               />
             )}
 
@@ -419,7 +419,7 @@ export function DataTable<TData, TValue>({
                     {row.getVisibleCells().map((cell) => (
                       <TableCell
                         key={cell.id}
-                        className="px-3 py-0 align-middle text-xs"
+                        className="px-3 py-1 align-middle text-xs"
                       >
                         {flexRender(
                           cell.column.columnDef.cell,

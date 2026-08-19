@@ -423,6 +423,10 @@ export default function OutletsPage() {
           onFilterChange={handleApplyFilters}
           onFilterClear={handleClearFilters}
 
+          onAdd={() => {
+            router.push("/d/outlets/add-outlet")
+          }}
+
           // Form & Actions
           renderForm={({ id, onClose }) => (
             <div className="max-h-[80vh] overflow-y-auto pr-1">

@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { ArrowUpDown } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 import {
   Select,
@@ -10,7 +11,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { cn } from "@/lib/utils"
 
 export interface SortOption {
   label: string
@@ -34,34 +34,16 @@ export function DynamicSorter({
 }: DynamicSorterProps) {
   return (
     <Select value={value} onValueChange={onValueChange}>
-      <SelectTrigger
-        className={cn(
-          // Ultra-small constraints: 24px height, 11px font, tiny padding
-          "!h-6 !min-h-0 !px-1.5 !py-0 !text-[11px] sm:w-[120px]",
-          // Force Shadcn's default dropdown chevron to 10px
-          "[&>svg]:!h-2.5 [&>svg]:!w-2.5 [&>svg]:!opacity-70",
-          className
-        )}
-      >
-        <div className="flex items-center gap-1">
-          <ArrowUpDown className="h-2.5 w-2.5 shrink-0 text-muted-foreground" />
-          <span className="truncate pt-[1px] leading-none">
-            <SelectValue placeholder={placeholder} />
-          </span>
+      {/* Added h-10 (40px default) or h-11/h-12 for larger inputs */}
+      <SelectTrigger className={cn("h-[60px] w-[180px]", className)}>
+        <div className="flex items-center gap-2">
+          <ArrowUpDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <SelectValue placeholder={placeholder} />
         </div>
       </SelectTrigger>
-      <SelectContent position="popper" side="bottom" className="min-w-[100px]">
+      <SelectContent>
         {options.map((opt) => (
-          <SelectItem
-            key={opt.value}
-            value={opt.value}
-            className={cn(
-              // Tiny text and padding for the dropdown items
-              "!py-1 !pr-1 !pl-5 !text-[11px]",
-              // Shrink and reposition the active checkmark icon on the left
-              "[&>span]:!left-1 [&>span>svg]:!h-2.5 [&>span>svg]:!w-2.5"
-            )}
-          >
+          <SelectItem key={opt.value} value={opt.value}>
             {opt.label}
           </SelectItem>
         ))}
