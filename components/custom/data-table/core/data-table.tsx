@@ -18,7 +18,8 @@ import {
 import { useAppTable, type DataTableFeatures } from "@/hooks/use-data-table"
 // Optional: Keep this if you plan to use your custom pagination component
 import DataTablePagination from "./data-table-pagination"
-import { useUrlPagination } from "@/hooks/use-url-pagination"
+import { useUrlTableState } from "@/hooks/use-url-table-state"
+import { DataTableViewOptions } from "./data-table-column-visibility"
 
 interface DataTableProps<TData extends RowData> {
   tkey: string
@@ -36,7 +37,7 @@ export function DataTable<TData extends RowData>({
   pageCount = -1,
   rowCount,
 }: DataTableProps<TData>) {
-  const { pagination } = useUrlPagination()
+  const { pagination } = useUrlTableState()
 
   const table = useAppTable({
     key: tkey,
@@ -96,6 +97,8 @@ export function DataTable<TData extends RowData>({
       </div>
 
       <DataTablePagination table={table} />
+
+      <DataTableViewOptions table={table} />
     </div>
   )
 }

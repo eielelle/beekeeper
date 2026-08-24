@@ -7,13 +7,13 @@ import { fetchDepartments } from "@/forms/queries/department.query"
 import { useQuery, keepPreviousData } from "@tanstack/react-query"
 import { useCreateAtom, useSelector } from "@tanstack/react-store"
 import type { PaginationState } from "@tanstack/react-table"
-import { useUrlPagination } from "@/hooks/use-url-pagination"
+import { useUrlTableState } from "@/hooks/use-url-table-state"
 
 export default function Tabletest() {
-  const { page, size } = useUrlPagination()
+  const { page, size } = useUrlTableState()
 
   const attendances = useQuery({
-    queryKey: ["adepartments", page, size],
+    queryKey: ["departments", page, size],
     queryFn: () =>
       fetchDepartments({
         pageIndex: page - 1,
