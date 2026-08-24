@@ -10,14 +10,17 @@ import type { PaginationState } from "@tanstack/react-table"
 import { useUrlTableState } from "@/hooks/use-url-table-state"
 
 export default function Tabletest() {
-  const { page, size } = useUrlTableState()
+  // 1. Extract `sorting` from your URL state hook
+  const { page, size, sorting } = useUrlTableState()
 
   const attendances = useQuery({
-    queryKey: ["departments", page, size],
+    // 2. Add `sorting` to the queryKey so React Query refetches when it changes
+    queryKey: ["departments", page, size, sorting],
     queryFn: () =>
       fetchDepartments({
         pageIndex: page - 1,
         pageSize: size,
+        sorting, // 3. Pass the sorting payload to your query function
       }),
     placeholderData: keepPreviousData,
   })
@@ -25,7 +28,6 @@ export default function Tabletest() {
   const a = attendances?.data
   const d = a?.data ?? []
 
-  // 3. Compute pageCount dynamically based on rowCount and current pageSize
   const rowCount = a?.rowCount ?? 1
   const pageCount = Math.ceil(rowCount / size)
 
