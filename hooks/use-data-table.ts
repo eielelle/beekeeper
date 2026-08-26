@@ -1,8 +1,13 @@
 import {
+  columnOrderingFeature,
+  columnPinningFeature,
+  columnResizingFeature,
+  columnSizingFeature,
   columnVisibilityFeature,
   createSortedRowModel,
   createTableHook,
   rowPaginationFeature,
+  rowPinningFeature,
   rowSelectionFeature,
   rowSortingFeature,
   tableFeatures,
@@ -13,6 +18,11 @@ export const features = tableFeatures({
   rowSelectionFeature,
   columnVisibilityFeature,
   rowPaginationFeature,
+  rowPinningFeature,
+  columnPinningFeature,
+  columnSizingFeature,
+  columnResizingFeature,
+  columnOrderingFeature,
   sortedRowModel: createSortedRowModel(),
 })
 
@@ -20,6 +30,8 @@ export const { useAppTable, createAppColumnHelper } = createTableHook({
   features,
   enableSortingRemoval: false,
   manualPagination: true,
+  manualSorting: true,
+  keepPinnedRows: true,
 })
 
 export type DataTableFeatures = typeof features

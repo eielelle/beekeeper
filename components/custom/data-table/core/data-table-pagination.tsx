@@ -1,10 +1,6 @@
 "use client"
 
 import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
   Pagination,
   PaginationContent,
   PaginationEllipsis,
@@ -21,8 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { DataTableFeatures, useAppTable } from "@/hooks/use-data-table"
-import { useQueryParams } from "@/hooks/use-query-params"
+import { DataTableFeatures } from "@/hooks/use-data-table"
 import { RowData, Table } from "@tanstack/react-table"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 
@@ -33,66 +28,159 @@ interface DataTablePaginationProps<TData extends RowData> {
 export default function DataTablePagination<TData extends RowData>({
   table,
 }: DataTablePaginationProps<TData>) {
-  const { getParam, setParam, removeParam } = useQueryParams()
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
 
-  const page = getParam("page")
+  // 1. Get current state directly from the table (which is synced to URL via useUrlTableState)
+  const { pageIndex, pageSize } = table.store.state.pagination
+  const currentPage = pageIndex + 1
+  const pageCount = table.getPageCount()
+  const rowCount = table.getRowCount()
 
-  function prev() {
-    if (table.getCanPreviousPage()) {
-      const currentPage = Number(page ?? "1")
+  // 2. Math for "Showing X to Y of Z results"
+  const startRow = rowCount === 0 ? 0 : pageIndex * pageSize + 1
+  const endRow = Math.min(rowCount, (pageIndex + 1) * pageSize)
 
-      setParam("page", String(Math.max(1, currentPage - 1)))
-    }
+  // 3. Helper to update URL params safely
+  const updateUrl = (updates: Record<string, string | null>) => {
+    const params = new URLSearchParams(searchParams.toString())
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value === null) params.delete(key)
+      else params.set(key, value)
+    })
+    router.push(`${pathname}?${params.toString()}`)
   }
 
-  function next() {
-    if (table.getCanNextPage()) {
-      const currentPage = Number(page ?? "1")
+  // 4. Handlers
+  const setPage = (newPage: number) => {
+    updateUrl({ page: String(newPage) })
+  }
 
-      setParam("page", String(currentPage + 1))
+  const setSize = (newSize: string) => {
+    // When changing page size, always reset to page 1 to prevent empty states
+    updateUrl({ size: newSize, page: "1" })
+  }
+
+  // 5. Generate page numbers with ellipses
+  const generatePaginationLinks = () => {
+    const pages: (number | "ellipsis")[] = []
+
+    if (pageCount <= 5) {
+      for (let i = 1; i <= pageCount; i++) pages.push(i)
+    } else {
+      if (currentPage <= 3) {
+        pages.push(1, 2, 3, 4, "ellipsis", pageCount)
+      } else if (currentPage >= pageCount - 2) {
+        pages.push(
+          1,
+          "ellipsis",
+          pageCount - 3,
+          pageCount - 2,
+          pageCount - 1,
+          pageCount
+        )
+      } else {
+        pages.push(
+          1,
+          "ellipsis",
+          currentPage - 1,
+          currentPage,
+          currentPage + 1,
+          "ellipsis",
+          pageCount
+        )
+      }
     }
+    return pages
   }
 
   return (
-    <footer className="flex items-center justify-end">
-      {/* 
-        Basic Pagination Controls 
-        (You can swap this section out entirely with <DataTablePagination table={table} />) 
-      */}
-      <div className="flex items-center justify-end space-x-2 py-2">
-        <button
-          className="rounded-md border px-3 py-1 text-sm disabled:opacity-50"
-          onClick={() => prev()}
-          disabled={!table.getCanPreviousPage()}
-        >
-          Previous
-        </button>
-        {/* for loop using table.getPageCount() but only 1, 2, 3, ..., 5 */}
-        <button
-          className="rounded-md border px-3 py-1 text-sm disabled:opacity-50"
-          onClick={() => next()}
-          disabled={!table.getCanNextPage()}
-        >
-          Next Page
-        </button>
+    <div className="flex flex-col items-center justify-between gap-4 px-2 sm:flex-row">
+      {/* LEFT: Showing Results Text */}
+      <div className="text-sm text-muted-foreground">
+        Showing <span className="font-medium text-foreground">{startRow}</span>{" "}
+        to <span className="font-medium text-foreground">{endRow}</span> of{" "}
+        <span className="font-medium text-foreground">{rowCount}</span> results
       </div>
-      <p>
-        Showing {1} to {12} of {table.getRowCount()} results
-      </p>
 
-      <p>Rows per page:</p>
-      <Select value="100">
-        <SelectTrigger className="w-[180px]">
-          <SelectValue placeholder="Page">100</SelectValue>
-        </SelectTrigger>
-        <SelectContent>
-          <SelectGroup>
-            <SelectItem value="100">100</SelectItem>
-            <SelectItem value="200">200</SelectItem>
-            <SelectItem value="500">500</SelectItem>
-          </SelectGroup>
-        </SelectContent>
-      </Select>
-    </footer>
+      <div className="flex flex-col items-center gap-4 sm:flex-row sm:gap-6 lg:gap-8">
+        {/* MIDDLE: Rows per page selector */}
+        <div className="flex items-center space-x-2">
+          <p className="text-sm font-medium">Rows per page</p>
+          <Select value={String(pageSize)} onValueChange={setSize}>
+            <SelectTrigger className="h-8 w-[70px]">
+              <SelectValue placeholder={pageSize} />
+            </SelectTrigger>
+            <SelectContent side="top">
+              <SelectGroup>
+                {[10, 20, 50, 100, 200, 500].map((sizeOption) => (
+                  <SelectItem key={sizeOption} value={String(sizeOption)}>
+                    {sizeOption}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* RIGHT: Shadcn Pagination Controls */}
+        <Pagination className="mx-0 w-auto">
+          <PaginationContent>
+            {/* Previous Button */}
+            <PaginationItem>
+              <PaginationPrevious
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault()
+                  if (table.getCanPreviousPage()) setPage(currentPage - 1)
+                }}
+                className={
+                  !table.getCanPreviousPage()
+                    ? "pointer-events-none opacity-50"
+                    : ""
+                }
+              />
+            </PaginationItem>
+
+            {/* Page Numbers */}
+            {generatePaginationLinks().map((pageNumber, index) => (
+              <PaginationItem key={index}>
+                {pageNumber === "ellipsis" ? (
+                  <PaginationEllipsis />
+                ) : (
+                  <PaginationLink
+                    href="#"
+                    isActive={pageNumber === currentPage}
+                    onClick={(e) => {
+                      e.preventDefault()
+                      setPage(pageNumber)
+                    }}
+                  >
+                    {pageNumber}
+                  </PaginationLink>
+                )}
+              </PaginationItem>
+            ))}
+
+            {/* Next Button */}
+            <PaginationItem>
+              <PaginationNext
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault()
+                  if (table.getCanNextPage()) setPage(currentPage + 1)
+                }}
+                className={
+                  !table.getCanNextPage()
+                    ? "pointer-events-none opacity-50"
+                    : ""
+                }
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+      </div>
+    </div>
   )
 }

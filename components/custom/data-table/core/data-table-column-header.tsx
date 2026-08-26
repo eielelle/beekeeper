@@ -1,7 +1,16 @@
 "use client"
 
 import type { Column, RowData } from "@tanstack/react-table"
-import { ChevronDown, ChevronsUpDown, ChevronUp, EyeOff, X } from "lucide-react"
+import {
+  ArrowLeftToLine,
+  ArrowRightToLine,
+  ChevronDown,
+  ChevronsUpDown,
+  ChevronUp,
+  EyeOff,
+  PinOff,
+  X,
+} from "lucide-react"
 
 import {
   DropdownMenu,
@@ -66,6 +75,29 @@ export function ColumnSort<TData extends RowData, TValue>({
           ))}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-28">
+        {column.getCanPin() && (
+          <>
+            {column.getIsPinned() !== "start" && (
+              <DropdownMenuItem onClick={() => column.pin("start")}>
+                <ArrowLeftToLine className="mr-2 h-4 w-4 text-muted-foreground" />
+                Pin to Left
+              </DropdownMenuItem>
+            )}
+            {column.getIsPinned() !== "end" && (
+              <DropdownMenuItem onClick={() => column.pin("end")}>
+                <ArrowRightToLine className="mr-2 h-4 w-4 text-muted-foreground" />
+                Pin to Right
+              </DropdownMenuItem>
+            )}
+            {column.getIsPinned() && (
+              <DropdownMenuItem onClick={() => column.pin(false)}>
+                <PinOff className="mr-2 h-4 w-4 text-muted-foreground" />
+                Unpin Column
+              </DropdownMenuItem>
+            )}
+          </>
+        )}
+
         {column.getCanSort() && (
           <>
             <DropdownMenuCheckboxItem
