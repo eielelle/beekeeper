@@ -1,4 +1,5 @@
 import {
+  columnFilteringFeature,
   columnOrderingFeature,
   columnPinningFeature,
   columnResizingFeature,
@@ -23,6 +24,7 @@ export const features = tableFeatures({
   columnSizingFeature,
   columnResizingFeature,
   columnOrderingFeature,
+  columnFilteringFeature,
   sortedRowModel: createSortedRowModel(),
 })
 
@@ -32,6 +34,7 @@ export const { useAppTable, createAppColumnHelper } = createTableHook({
   manualPagination: true,
   manualSorting: true,
   keepPinnedRows: true,
+  manualFiltering: true,
 })
 
 export type DataTableFeatures = typeof features

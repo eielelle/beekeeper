@@ -39,12 +39,20 @@ import { DataTableSortList } from "./data-table-sort-list"
 import { cn } from "@/lib/utils"
 import { DataTableSearch } from "./data-table-search"
 import { DataTableGlobalSearch } from "./data-table-global-search"
+import { Input } from "@/components/ui/input"
+import { NumberRangeFilter } from "../filters/value-range-filter"
+import { DateRangeFilter } from "../filters/date-range-filter"
+import { CheckboxFilter } from "../filters/checkbox-multi-select-filter"
+import { DateFilter } from "../filters/single-date-filter"
+import { CustomColumnMeta } from "@/types/filter-payloads"
 
 interface DataTableProps<TData extends RowData> {
   tkey: string
   columns: ColumnDef<DataTableFeatures, TData>[]
   data: TData[]
   paginationAtom?: Atom<PaginationState>
+  pageCount: number
+  rowCount: number
 }
 
 export function DataTable<TData extends RowData>({
@@ -59,9 +67,11 @@ export function DataTable<TData extends RowData>({
     rowPinning,
     columnPinning,
     columnOrder,
+    columnFilters,
     setRowPinning,
     setColumnPinning,
     setColumnOrder,
+    setColumnFilters,
   } = useUrlTableState()
 
   const table = useAppTable({
@@ -71,7 +81,14 @@ export function DataTable<TData extends RowData>({
     rowCount,
     pageCount,
 
-    state: { pagination, rowPinning, columnPinning, columnOrder },
+    state: {
+      pagination,
+      rowPinning,
+      columnPinning,
+      columnOrder,
+      columnFilters,
+    },
+    onColumnFiltersChange: setColumnFilters,
     onRowPinningChange: setRowPinning,
     onColumnPinningChange: setColumnPinning,
     onColumnOrderChange: setColumnOrder,
@@ -201,6 +218,10 @@ export function DataTable<TData extends RowData>({
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => {
+                  const meta = header.column.columnDef.meta as CustomColumnMeta
+                  const filterVariant = meta?.filterVariant
+                  const filterOptions = meta?.filterOptions ?? []
+
                   return (
                     <TableHead
                       key={header.id}
@@ -238,7 +259,28 @@ export function DataTable<TData extends RowData>({
                       )}
                     >
                       {header.isPlaceholder ? null : (
-                        <table.FlexRender header={header} />
+                        <div className="flex h-full w-full flex-col py-2">
+                          <div className="flex-1 font-semibold">
+                            <table.FlexRender header={header} />
+                          </div>
+
+                          {header.column.getCanFilter() ? (
+                            <div className="mt-2 w-full">
+                              {filterVariant === "number-range" ? (
+                                <NumberRangeFilter column={header.column} />
+                              ) : filterVariant === "date-range" ? (
+                                <DateRangeFilter column={header.column} />
+                              ) : filterVariant === "date" ? (
+                                <DateFilter column={header.column} />
+                              ) : filterVariant === "checkbox" ? (
+                                <CheckboxFilter
+                                  column={header.column}
+                                  options={filterOptions}
+                                />
+                              ) : null}
+                            </div>
+                          ) : null}
+                        </div>
                       )}
 
                       {/* Column Resizer Handle */}

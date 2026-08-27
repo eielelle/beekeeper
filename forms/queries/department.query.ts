@@ -6,6 +6,7 @@ import {
   updateDepartmentAction,
   deleteDepartmentAction,
 } from "@/actions/department.action"
+import { FilterPayload } from "@/types/filter-payloads"
 
 export type DepartmentType = {
   id?: string
@@ -23,6 +24,7 @@ export type FetchDepartmentsParams = {
   pageSize: number
   globalFilter?: string
   sorting?: { id: string; desc: boolean }[]
+  columnFilters?: { id: string; value: FilterPayload }[]
 }
 
 export async function fetchDepartments(params: FetchDepartmentsParams) {

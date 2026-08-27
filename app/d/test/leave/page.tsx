@@ -6,20 +6,23 @@ import { DataTableGlobalSearch } from "@/components/custom/data-table/core/data-
 import { fetchDepartments } from "@/forms/queries/department.query"
 import { useQuery, keepPreviousData } from "@tanstack/react-query"
 import { useUrlTableState } from "@/hooks/use-url-table-state"
+import { FilterPayload } from "@/types/filter-payloads"
 
 export default function Tabletest() {
   // Extract globalFilter from your hook
-  const { page, size, sorting, globalFilter } = useUrlTableState()
+  const { page, size, sorting, globalFilter, columnFilters } =
+    useUrlTableState()
 
   const attendances = useQuery({
     // Add globalFilter to the queryKey so it refetches on change
-    queryKey: ["departments", page, size, sorting, globalFilter],
+    queryKey: ["departments", page, size, sorting, globalFilter, columnFilters],
     queryFn: () =>
       fetchDepartments({
         pageIndex: page - 1,
         pageSize: size,
         sorting,
         globalFilter: globalFilter,
+        columnFilters: columnFilters as { id: string; value: FilterPayload }[],
       }),
     placeholderData: keepPreviousData,
   })

@@ -8,7 +8,9 @@ import type {
   Updater,
   ColumnPinningState,
   ColumnOrderState,
+  ColumnFiltersState,
 } from "@tanstack/react-table"
+import { useMemo } from "react"
 
 export function useUrlTableState() {
   const router = useRouter()
@@ -184,6 +186,29 @@ export function useUrlTableState() {
     })
   }
 
+  // -----------------------------
+  // Column Filters
+  // -----------------------------
+  const filtersParam = searchParams.get("filters")
+
+  const columnFilters: ColumnFiltersState = useMemo(() => {
+    try {
+      return filtersParam ? JSON.parse(filtersParam) : []
+    } catch {
+      return []
+    }
+  }, [filtersParam])
+
+  const setColumnFilters = (updater: Updater<ColumnFiltersState>) => {
+    const nextFilters =
+      typeof updater === "function" ? updater(columnFilters) : updater
+
+    updateParams({
+      filters: nextFilters.length > 0 ? JSON.stringify(nextFilters) : null,
+      page: "1", // Always reset to page 1 when a filter changes
+    })
+  }
+
   return {
     page,
     size,
@@ -208,5 +233,8 @@ export function useUrlTableState() {
 
     globalFilter,
     setGlobalFilter,
+
+    columnFilters,
+    setColumnFilters,
   }
 }
