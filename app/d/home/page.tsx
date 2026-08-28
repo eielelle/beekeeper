@@ -1,3 +1,4 @@
+import { DaylistHeader } from "@/components/custom/header/welcome-header"
 import ActiveUsersMap, {
   ActiveUser,
 } from "@/components/custom/maps/active-users-map"
@@ -48,7 +49,8 @@ export default function Page() {
 
   return (
     <section>
-      <header className="flex items-center justify-between">
+      <DaylistHeader />
+      {/* <header className="flex items-center justify-between">
         <h1>JUL 12, 2026, WEDNESDAY</h1>
 
         <div className="flex items-center gap-2">
@@ -89,7 +91,7 @@ export default function Page() {
           <p>Inventory</p>
           <p>Online Activity</p>
         </div>
-      </div>
+      </div> */}
     </section>
   )
 }
