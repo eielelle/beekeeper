@@ -19,7 +19,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar"
 
-import { Bell, Icon } from "lucide-react"
+import { Bell, Icon, Inbox } from "lucide-react"
 import { createClient } from "@/lib/supabase-server"
 import Logo from "@/components/custom/assets/logo"
 
@@ -43,11 +43,15 @@ export default async function DashboardLayout({
 
       <SidebarInset>
         <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
-          <SidebarTrigger className="-ml-1" />
-
           <span className="text-xs">
             <Logo />
           </span>
+
+          <SidebarTrigger className="-ml-1" />
+
+          <Button variant={"ghost"}>
+            <Inbox className="h-5 w-5" />
+          </Button>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild className="ml-auto">

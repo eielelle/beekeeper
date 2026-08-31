@@ -2,595 +2,729 @@
 
 import * as React from "react"
 import { useForm } from "@tanstack/react-form"
-import * as z from "zod"
-import { useParams, useRouter } from "next/navigation"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Camera, Info, Loader2, User } from "lucide-react"
+import { Plus, Trash2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { Field, FieldError, FieldLabel } from "@/components/ui/field"
+import { Field, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "sonner"
+import {
+  BLOOD_TYPE_OPTIONS,
+  CIVIL_STATUS_OPTIONS,
+  employeeSchema,
+  GENDER_OPTIONS,
+  ACCOUNT_STATUS_OPTIONS,
+  type EmployeeFormValues,
+} from "./schemas/employee.schema"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from "@/components/ui/combobox"
 
-import { supabase } from "@/lib/supabase"
-import { getEmployee, updateEmployee } from "./queries/employee.query"
-import { employeeSchema } from "./schemas/employee.schema"
-// 1. Import your secure fetchRoles wrapper
-import { fetchRoles } from "./queries/role.query"
-
-export function EmployeeForm({
-  editId,
-  onClose,
+export function AllInOneEmployeeForm({
+  initialData,
+  onSubmitAction,
 }: {
-  editId?: string
-  onClose?: () => void
+  initialData?: Partial<EmployeeFormValues>
+  onSubmitAction: (data: EmployeeFormValues) => Promise<void>
 }) {
-  const queryClient = useQueryClient()
-  const params = useParams()
-  const router = useRouter()
+  const [isSubmitting, setIsSubmitting] = React.useState(false)
+  const [isSameAddress, setIsSameAddress] = React.useState(false)
 
-  let id = params?.id as string | undefined
-  if (editId) {
-    id = editId
-  }
-  const isEditMode = !!id
-
-  // Fetch Employee details for edit mode
-  const { data: employeeData, isLoading: isLoadingEmployee } = useQuery({
-    queryKey: ["employees", id],
-    queryFn: () => getEmployee(id!),
-    enabled: isEditMode,
-  })
-
-  // 2. Fetch Available Roles for the Dropdown
-  const { data: roles = [], isLoading: isLoadingRoles } = useQuery({
-    queryKey: ["roles"],
-    queryFn: () => fetchRoles(),
-  })
-
-  // --- PROFILE PICTURE STATE ---
-  const fileInputRef = React.useRef<HTMLInputElement>(null)
-  const [avatarFile, setAvatarFile] = React.useState<File | null>(null)
-  const [avatarPreview, setAvatarPreview] = React.useState<string | null>(null)
-
-  React.useEffect(() => {
-    if (employeeData?.avatar_url) {
-      setAvatarPreview(employeeData.avatar_url)
-    }
-  }, [employeeData?.avatar_url])
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      setAvatarFile(file)
-      setAvatarPreview(URL.createObjectURL(file))
-    }
-  }
-
-  // --- MUTATION ---
-  const mutation = useMutation({
-    mutationFn: async (
-      values: z.infer<typeof employeeSchema> & {
-        gender?: string
-        employment_start?: string
-        birthdate?: string
-        is_superuser?: boolean
-        avatar_url?: string
-        role_id?: string // Added role_id to payload type
-      }
-    ) => {
-      let finalAvatarUrl = employeeData?.avatar_url || null
-
-      if (avatarFile) {
-        const fileExt = avatarFile.name.split(".").pop()
-        const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExt}`
-        const filePath = `avatars/${fileName}`
-
-        const { error: uploadError } = await supabase.storage
-          .from("images")
-          .upload(filePath, avatarFile)
-
-        if (uploadError)
-          throw new Error(`Image upload failed: ${uploadError.message}`)
-
-        const { data: urlData } = supabase.storage
-          .from("images")
-          .getPublicUrl(filePath)
-        finalAvatarUrl = urlData.publicUrl
-      }
-
-      // Convert role_id string back to number for the database if provided
-      const payload = {
-        ...values,
-        avatar_url: finalAvatarUrl,
-        role_id: values.role_id ? Number(values.role_id) : null,
-      }
-
-      if (isEditMode) {
-        return updateEmployee({
-          ...payload,
-          id,
-        })
-      } else {
-        const formattedDate = payload.birthdate
-          ? payload.birthdate.replace(/-/g, "")
-          : ""
-        const generatedPassword = `${payload.last_name.toLowerCase().replace(/\s+/g, "")}${formattedDate}`
-
-        const apiPayload = {
-          ...payload,
-          password: generatedPassword,
-        }
-
-        const res = await fetch("/api/v1/users", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(apiPayload),
-        })
-
-        if (!res.ok) {
-          const errData = await res.json()
-          throw new Error(errData.error || "Failed to create user account.")
-        }
-
-        return await res.json()
-      }
+  // Explicit defaults based on your updated schema
+  const defaultValues: EmployeeFormValues = {
+    employee_no: "",
+    first_name: "",
+    middle_name: "",
+    last_name: "",
+    maiden_name: "",
+    suffix: "",
+    nickname: "",
+    gender: undefined,
+    civil_status: undefined,
+    date_of_birth: "",
+    nationality: "Filipino",
+    blood_type: undefined,
+    work_email: "",
+    work_phone: "",
+    personal_email: "",
+    personal_mobile: "",
+    account_status: "Active",
+    role_id: "",
+    employee_status: "Hired",
+    department_id: "",
+    job_position_id: "",
+    reports_to_id: "",
+    employment_type: "Regular",
+    work_arrangement: "On-site",
+    effective_start_date: "",
+    lifecycles: {
+      original_hire_date: "",
+      current_hire_date: "",
+      probation_end_date: "",
+      regularization_date: "",
+      contract_expiry_date: "",
     },
-    onSuccess: (data) => {
-      toast.success(
-        isEditMode ? "Employee updated." : "User account created successfully."
-      )
-      queryClient.invalidateQueries({ queryKey: ["employees"] })
-
-      if (!isEditMode && data?.employee?.id) {
-        router.push(`/d/employees/edit/${data.employee.id}/work-information`)
-      } else {
-        form.reset()
-        setAvatarFile(null)
-        if (onClose) onClose()
-      }
+    statutory: {
+      sss_number: "",
+      tin: "",
+      rdo_code: "",
+      philhealth_number: "",
+      pagibig_number: "",
+      national_id: "",
     },
-    onError: (error: any) => {
-      toast.error(error.message)
+    present_address: {
+      full_address: "",
+      street_unit: "",
+      barangay: "",
+      city: "",
+      province: "",
+      region: "",
+      zip_code: "",
+      is_active: true,
     },
-  })
-
-  // --- FORM SETUP ---
-  const dv = {
-    employee_no: employeeData?.employee_no ?? "",
-    first_name: employeeData?.first_name ?? "",
-    middle_name: employeeData?.middle_name ?? "",
-    last_name: employeeData?.last_name ?? "",
-    email: employeeData?.email ?? "",
-    phone: employeeData?.phone ?? "",
-    gender: employeeData?.gender ?? "",
-    employment_start: employeeData?.employment_start ?? "",
-    birthdate: employeeData?.birthdate ?? "",
-    is_superuser: employeeData?.is_superuser ?? false,
-    // Add role_id to default values (convert to string for the Select component)
-    role_id: employeeData?.role_id ? String(employeeData.role_id) : "",
-  }
+    permanent_address: {
+      full_address: "",
+      street_unit: "",
+      barangay: "",
+      city: "",
+      province: "",
+      region: "",
+      zip_code: "",
+      is_active: true,
+    },
+    emergency_contacts: [
+      {
+        full_name: "",
+        relationship: "",
+        mobile_number: "",
+        is_primary: true,
+      },
+    ],
+    banks: [],
+    ...initialData,
+  } as EmployeeFormValues
 
   const form = useForm({
-    defaultValues: dv,
+    defaultValues,
     validators: {
-      onSubmit: employeeSchema as any,
+      onSubmit: employeeSchema,
     },
     onSubmit: async ({ value }) => {
-      mutation.mutate(value)
+      try {
+        setIsSubmitting(true)
+
+        // If the toggle is active, overwrite permanent_address with present_address before submitting
+        const submissionData = {
+          ...value,
+          permanent_address: isSameAddress
+            ? value.present_address
+            : value.permanent_address,
+        }
+
+        await onSubmitAction(submissionData)
+        toast.success("Employee saved successfully")
+      } catch (error: any) {
+        toast.error(error.message || "Failed to save employee")
+      } finally {
+        setIsSubmitting(false)
+      }
     },
   })
 
-  if (isEditMode && isLoadingEmployee) {
-    return (
-      <div className="flex items-center space-x-2 p-4 text-sm text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        <span>Loading employee details...</span>
-      </div>
-    )
-  }
-
   return (
-    <form
-      className="space-y-6"
-      onSubmit={(e) => {
-        e.preventDefault()
-        e.stopPropagation()
-        form.handleSubmit()
-      }}
-    >
-      {/* DEFAULT PASSWORD ALERT BANNER (Create mode only) */}
-      {!isEditMode && (
-        <form.Subscribe
-          selector={(state) => [state.values.last_name, state.values.birthdate]}
-        >
-          {([lastName, birthdate]) => {
-            const formattedDate = birthdate
-              ? birthdate.replace(/-/g, "")
-              : "YYYYMMDD"
-            const exampleName = lastName
-              ? lastName.toLowerCase().replace(/\s+/g, "")
-              : "cruz"
-            const generatedExample = `${exampleName}${formattedDate}`
+    <Card>
+      <CardContent className="space-y-4 pt-4">
+        {/* Basic Identity */}
+        <Card className="pt-0">
+          <CardHeader className="bg-primary p-2">
+            <CardTitle>Basic Identity</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="mt-4 grid grid-cols-3 gap-4">
+              <Field>
+                <FieldLabel>Employee No.</FieldLabel>
+                <Input placeholder="EMP-001" type="text" />
+              </Field>
+              <Field>
+                <FieldLabel>Email</FieldLabel>
+                <Input placeholder="Email" type="email" />
+              </Field>
+              <Field>
+                <FieldLabel>Phone</FieldLabel>
+                <Input placeholder="Phone" type="text" />
+              </Field>
+              <Field>
+                <FieldLabel>First Name</FieldLabel>
+                <Input placeholder="First Name" type="text" />
+              </Field>
+              <Field>
+                <FieldLabel>Middle Name</FieldLabel>
+                <Input placeholder="Middle Name" type="text" />
+              </Field>
+              <Field>
+                <FieldLabel>Last Name</FieldLabel>
+                <Input placeholder="Last Name" type="text" />
+              </Field>
+              <Field>
+                <FieldLabel>Maiden Name</FieldLabel>
+                <Input placeholder="First Name" type="text" />
+              </Field>
+              <Field>
+                <FieldLabel>Suffix</FieldLabel>
+                <Input placeholder="Suffix" type="text" />
+              </Field>
+              <Field>
+                <FieldLabel>Nickname</FieldLabel>
+                <Input placeholder="Nickname" type="text" />
+              </Field>
+            </div>
+          </CardContent>
+        </Card>
 
-            return (
-              <div className="flex items-start gap-3 rounded-lg border border-blue-500/20 bg-blue-50/50 p-4 text-sm text-blue-900 dark:border-blue-500/30 dark:bg-blue-950/30 dark:text-blue-200">
-                <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
-                <div className="space-y-1">
-                  <p className="font-semibold">Default Password Notice</p>
-                  <p className="text-xs leading-relaxed text-muted-foreground">
-                    An auth account will be created automatically. The initial
-                    password format is{" "}
-                    <code className="rounded bg-blue-100 px-1 py-0.5 font-mono text-xs font-semibold dark:bg-blue-900 dark:text-blue-100">
-                      [lastname][YYYYMMDD]
-                    </code>
-                    .
-                  </p>
-                  <p className="text-xs font-medium">
-                    Current Password Preview:{" "}
-                    <span className="font-mono text-blue-700 dark:text-blue-300">
-                      {generatedExample}
-                    </span>
-                  </p>
+        {/* Personal Information */}
+        <Card className="pt-0">
+          <CardHeader className="bg-primary p-2">
+            <CardTitle>Personal Information</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="mt-4 grid grid-cols-3 gap-4">
+              <Field>
+                <FieldLabel>Gender</FieldLabel>
+                <Combobox
+                  items={GENDER_OPTIONS}
+                  defaultInputValue={GENDER_OPTIONS[0]}
+                >
+                  <ComboboxInput placeholder="Select Gender" />
+                  <ComboboxContent>
+                    <ComboboxEmpty>Nothing found.</ComboboxEmpty>
+                    <ComboboxList>
+                      {(item) => (
+                        <ComboboxItem key={item} value={item}>
+                          {item}
+                        </ComboboxItem>
+                      )}
+                    </ComboboxList>
+                  </ComboboxContent>
+                </Combobox>
+              </Field>
+              <Field>
+                <FieldLabel>Civil Status</FieldLabel>
+                <Combobox
+                  items={CIVIL_STATUS_OPTIONS}
+                  defaultInputValue={CIVIL_STATUS_OPTIONS[0]}
+                >
+                  <ComboboxInput placeholder="Select Civil Status" />
+                  <ComboboxContent>
+                    <ComboboxEmpty>Nothing found.</ComboboxEmpty>
+                    <ComboboxList>
+                      {(item) => (
+                        <ComboboxItem key={item} value={item}>
+                          {item}
+                        </ComboboxItem>
+                      )}
+                    </ComboboxList>
+                  </ComboboxContent>
+                </Combobox>
+              </Field>
+              <Field>
+                <FieldLabel>Nationality</FieldLabel>
+                <Input placeholder="Nationality" type="text" />
+              </Field>
+              <Field>
+                <FieldLabel>Date Of Birth</FieldLabel>
+                <Input type="date" />
+              </Field>
+              <Field>
+                <FieldLabel>Blood Type</FieldLabel>
+                <Combobox
+                  items={BLOOD_TYPE_OPTIONS}
+                  defaultInputValue={BLOOD_TYPE_OPTIONS[0]}
+                >
+                  <ComboboxInput placeholder="Select Blood Type" />
+                  <ComboboxContent>
+                    <ComboboxEmpty>Nothing found.</ComboboxEmpty>
+                    <ComboboxList>
+                      {(item) => (
+                        <ComboboxItem key={item} value={item}>
+                          {item}
+                        </ComboboxItem>
+                      )}
+                    </ComboboxList>
+                  </ComboboxContent>
+                </Combobox>
+              </Field>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Contact Information & Addresses */}
+        <Card className="pt-0">
+          <CardHeader className="bg-primary p-2">
+            <CardTitle>Contact Information</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="mt-4 mb-8 grid grid-cols-2 gap-4">
+              <Field>
+                <FieldLabel>Personal Email</FieldLabel>
+                <Input placeholder="Personal Email" type="email" />
+              </Field>
+              <Field>
+                <FieldLabel>Personal Mobile</FieldLabel>
+                <Input
+                  placeholder="Personal Mobile (e.g. 09171234567)"
+                  type="text"
+                />
+              </Field>
+            </div>
+
+            {/* Present Address */}
+            <div className="mb-8 space-y-4">
+              <h4 className="border-b pb-2 text-sm font-semibold tracking-tight">
+                Present Address
+              </h4>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="col-span-3">
+                  <form.Field name="present_address.full_address">
+                    {(field) => (
+                      <Field>
+                        <FieldLabel>Full Address</FieldLabel>
+                        <Input
+                          placeholder="Full Address"
+                          value={field.state.value as string}
+                          onChange={(e) =>
+                            field.handleChange(e.target.value as any)
+                          }
+                        />
+                      </Field>
+                    )}
+                  </form.Field>
+                </div>
+
+                <form.Field name="present_address.street_unit">
+                  {(field) => (
+                    <Field>
+                      <FieldLabel>Street / Unit</FieldLabel>
+                      <Input
+                        placeholder="Street / Unit"
+                        value={field.state.value as string}
+                        onChange={(e) =>
+                          field.handleChange(e.target.value as any)
+                        }
+                      />
+                    </Field>
+                  )}
+                </form.Field>
+
+                <form.Field name="present_address.barangay">
+                  {(field) => (
+                    <Field>
+                      <FieldLabel>Barangay</FieldLabel>
+                      <Input
+                        placeholder="Barangay"
+                        value={field.state.value as string}
+                        onChange={(e) =>
+                          field.handleChange(e.target.value as any)
+                        }
+                      />
+                    </Field>
+                  )}
+                </form.Field>
+
+                <form.Field name="present_address.city">
+                  {(field) => (
+                    <Field>
+                      <FieldLabel>City</FieldLabel>
+                      <Input
+                        placeholder="City"
+                        value={field.state.value as string}
+                        onChange={(e) =>
+                          field.handleChange(e.target.value as any)
+                        }
+                      />
+                    </Field>
+                  )}
+                </form.Field>
+
+                <form.Field name="present_address.province">
+                  {(field) => (
+                    <Field>
+                      <FieldLabel>Province</FieldLabel>
+                      <Input
+                        placeholder="Province"
+                        value={field.state.value as string}
+                        onChange={(e) =>
+                          field.handleChange(e.target.value as any)
+                        }
+                      />
+                    </Field>
+                  )}
+                </form.Field>
+
+                <form.Field name="present_address.region">
+                  {(field) => (
+                    <Field>
+                      <FieldLabel>Region</FieldLabel>
+                      <Input
+                        placeholder="Region"
+                        value={field.state.value as string}
+                        onChange={(e) =>
+                          field.handleChange(e.target.value as any)
+                        }
+                      />
+                    </Field>
+                  )}
+                </form.Field>
+
+                <form.Field name="present_address.zip_code">
+                  {(field) => (
+                    <Field>
+                      <FieldLabel>Zip Code</FieldLabel>
+                      <Input
+                        placeholder="Zip Code"
+                        value={field.state.value as string}
+                        onChange={(e) =>
+                          field.handleChange(e.target.value as any)
+                        }
+                      />
+                    </Field>
+                  )}
+                </form.Field>
+              </div>
+            </div>
+
+            {/* Permanent Address */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between border-b pb-2">
+                <h4 className="text-sm font-semibold tracking-tight">
+                  Permanent Address
+                </h4>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="same-address"
+                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                    checked={isSameAddress}
+                    onChange={(e) => {
+                      const checked = e.target.checked
+                      setIsSameAddress(checked)
+                      if (checked) {
+                        // Bypass validation by setting optional field to undefined
+                        form.setFieldValue(
+                          "permanent_address",
+                          undefined as any
+                        )
+                      } else {
+                        // Restore empty structure for validation when unchecked
+                        form.setFieldValue("permanent_address", {
+                          full_address: "",
+                          street_unit: "",
+                          barangay: "",
+                          city: "",
+                          province: "",
+                          region: "",
+                          zip_code: "",
+                          is_active: true,
+                        })
+                      }
+                    }}
+                  />
+                  <label
+                    htmlFor="same-address"
+                    className="cursor-pointer text-sm leading-none font-medium"
+                  >
+                    Same as present address
+                  </label>
                 </div>
               </div>
-            )
-          }}
-        </form.Subscribe>
-      )}
 
-      {/* PROFILE PICTURE PICKER */}
-      <div className="flex flex-col items-center justify-center">
-        <div
-          className="group relative flex h-24 w-24 cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 border-muted bg-muted transition-colors hover:border-primary"
-          onClick={() => fileInputRef.current?.click()}
-        >
-          {avatarPreview ? (
-            <img
-              src={avatarPreview}
-              alt="Profile preview"
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <User className="h-10 w-10 text-muted-foreground" />
-          )}
-          <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
-            <Camera className="h-6 w-6 text-white" />
-          </div>
-        </div>
-        <p className="mt-2 text-xs text-muted-foreground">
-          Click to upload photo
-        </p>
-        <input
-          type="file"
-          ref={fileInputRef}
-          className="hidden"
-          accept="image/*"
-          onChange={handleFileChange}
-        />
-      </div>
+              {/* Hide the fields entirely if they selected "Same as present address" */}
+              {!isSameAddress && (
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="col-span-3">
+                    <form.Field
+                      name="permanent_address.full_address"
+                      mode="value"
+                    >
+                      {(field) => (
+                        <Field>
+                          <FieldLabel>Full Address</FieldLabel>
+                          <Input
+                            placeholder="Full Address"
+                            value={(field.state.value || "") as string}
+                            onChange={(e) =>
+                              field.handleChange(e.target.value as any)
+                            }
+                          />
+                        </Field>
+                      )}
+                    </form.Field>
+                  </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {/* EMPLOYEE NO */}
-        <form.Field name="employee_no">
-          {(field) => {
-            const isInvalid =
-              field.state.meta.isTouched && !field.state.meta.isValid
-            return (
-              <Field data-invalid={isInvalid}>
-                <FieldLabel htmlFor={field.name}>
-                  Employee Number{" "}
-                  <span className="font-bold text-destructive">*</span>
-                </FieldLabel>
-                <Input
-                  id={field.name}
-                  name={field.name}
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  aria-invalid={isInvalid}
-                  placeholder="e.g., EMP-001"
-                  disabled={mutation.isPending}
-                />
-                {isInvalid && <FieldError errors={field.state.meta.errors} />}
-              </Field>
-            )
-          }}
-        </form.Field>
+                  <form.Field name="permanent_address.street_unit" mode="value">
+                    {(field) => (
+                      <Field>
+                        <FieldLabel>Street / Unit</FieldLabel>
+                        <Input
+                          placeholder="Street / Unit"
+                          value={(field.state.value || "") as string}
+                          onChange={(e) =>
+                            field.handleChange(e.target.value as any)
+                          }
+                        />
+                      </Field>
+                    )}
+                  </form.Field>
 
-        {/* EMPLOYMENT START */}
-        {!isEditMode && (
-          <form.Field name="employment_start">
-            {(field) => {
-              const isInvalid =
-                field.state.meta.isTouched && !field.state.meta.isValid
-              return (
-                <Field data-invalid={isInvalid}>
-                  <FieldLabel htmlFor={field.name}>
-                    Start Date{" "}
-                    <span className="font-bold text-destructive">*</span>
-                  </FieldLabel>
-                  <Input
-                    id={field.name}
-                    type="date"
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    disabled={mutation.isPending}
-                  />
-                  {isInvalid && <FieldError errors={field.state.meta.errors} />}
-                </Field>
-              )
-            }}
-          </form.Field>
-        )}
-      </div>
+                  <form.Field name="permanent_address.barangay" mode="value">
+                    {(field) => (
+                      <Field>
+                        <FieldLabel>Barangay</FieldLabel>
+                        <Input
+                          placeholder="Barangay"
+                          value={(field.state.value || "") as string}
+                          onChange={(e) =>
+                            field.handleChange(e.target.value as any)
+                          }
+                        />
+                      </Field>
+                    )}
+                  </form.Field>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        {/* FIRST NAME */}
-        <form.Field name="first_name">
-          {(field) => {
-            const isInvalid =
-              field.state.meta.isTouched && !field.state.meta.isValid
-            return (
-              <Field data-invalid={isInvalid}>
-                <FieldLabel htmlFor={field.name}>
-                  First Name{" "}
-                  <span className="font-bold text-destructive">*</span>
-                </FieldLabel>
-                <Input
-                  id={field.name}
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  placeholder="Juan"
-                  disabled={mutation.isPending}
-                />
-                {isInvalid && <FieldError errors={field.state.meta.errors} />}
-              </Field>
-            )
-          }}
-        </form.Field>
+                  <form.Field name="permanent_address.city" mode="value">
+                    {(field) => (
+                      <Field>
+                        <FieldLabel>City</FieldLabel>
+                        <Input
+                          placeholder="City"
+                          value={(field.state.value || "") as string}
+                          onChange={(e) =>
+                            field.handleChange(e.target.value as any)
+                          }
+                        />
+                      </Field>
+                    )}
+                  </form.Field>
 
-        {/* MIDDLE NAME */}
-        <form.Field name="middle_name">
-          {(field) => {
-            const isInvalid =
-              field.state.meta.isTouched && !field.state.meta.isValid
-            return (
-              <Field data-invalid={isInvalid}>
-                <FieldLabel htmlFor={field.name}>Middle Name</FieldLabel>
-                <Input
-                  id={field.name}
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  placeholder="Dela"
-                  disabled={mutation.isPending}
-                />
-                {isInvalid && <FieldError errors={field.state.meta.errors} />}
-              </Field>
-            )
-          }}
-        </form.Field>
+                  <form.Field name="permanent_address.province" mode="value">
+                    {(field) => (
+                      <Field>
+                        <FieldLabel>Province</FieldLabel>
+                        <Input
+                          placeholder="Province"
+                          value={(field.state.value || "") as string}
+                          onChange={(e) =>
+                            field.handleChange(e.target.value as any)
+                          }
+                        />
+                      </Field>
+                    )}
+                  </form.Field>
 
-        {/* LAST NAME */}
-        <form.Field name="last_name">
-          {(field) => {
-            const isInvalid =
-              field.state.meta.isTouched && !field.state.meta.isValid
-            return (
-              <Field data-invalid={isInvalid}>
-                <FieldLabel htmlFor={field.name}>
-                  Last Name{" "}
-                  <span className="font-bold text-destructive">*</span>
-                </FieldLabel>
-                <Input
-                  id={field.name}
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  placeholder="Cruz"
-                  disabled={mutation.isPending}
-                />
-                {isInvalid && <FieldError errors={field.state.meta.errors} />}
-              </Field>
-            )
-          }}
-        </form.Field>
-      </div>
+                  <form.Field name="permanent_address.region" mode="value">
+                    {(field) => (
+                      <Field>
+                        <FieldLabel>Region</FieldLabel>
+                        <Input
+                          placeholder="Region"
+                          value={(field.state.value || "") as string}
+                          onChange={(e) =>
+                            field.handleChange(e.target.value as any)
+                          }
+                        />
+                      </Field>
+                    )}
+                  </form.Field>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {/* EMAIL */}
-        <form.Field name="email">
-          {(field) => {
-            const isInvalid =
-              field.state.meta.isTouched && !field.state.meta.isValid
-            return (
-              <Field data-invalid={isInvalid}>
-                <FieldLabel htmlFor={field.name}>
-                  Email Address{" "}
-                  <span className="font-bold text-destructive">*</span>
-                </FieldLabel>
-                <Input
-                  id={field.name}
-                  type="email"
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  placeholder="juan@example.com"
-                  disabled={mutation.isPending || isEditMode}
-                />
-                {isInvalid && <FieldError errors={field.state.meta.errors} />}
-              </Field>
-            )
-          }}
-        </form.Field>
+                  <form.Field name="permanent_address.zip_code" mode="value">
+                    {(field) => (
+                      <Field>
+                        <FieldLabel>Zip Code</FieldLabel>
+                        <Input
+                          placeholder="Zip Code"
+                          value={(field.state.value || "") as string}
+                          onChange={(e) =>
+                            field.handleChange(e.target.value as any)
+                          }
+                        />
+                      </Field>
+                    )}
+                  </form.Field>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
-        {/* PHONE */}
-        <form.Field name="phone">
-          {(field) => {
-            const isInvalid =
-              field.state.meta.isTouched && !field.state.meta.isValid
-            return (
-              <Field data-invalid={isInvalid}>
-                <FieldLabel htmlFor={field.name}>Phone Number</FieldLabel>
-                <Input
-                  id={field.name}
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  placeholder="09123456789"
-                  disabled={mutation.isPending}
-                />
-                {isInvalid && <FieldError errors={field.state.meta.errors} />}
-              </Field>
-            )
-          }}
-        </form.Field>
-      </div>
+        {/* Dynamic Emergency Contacts */}
+        <Card className="pt-0">
+          <CardHeader className="bg-primary p-2">
+            <CardTitle>Emergency Contacts</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form.Field name="emergency_contacts" mode="array">
+              {(field) => (
+                <div className="mt-4 space-y-4">
+                  {field.state.value.map((_, index) => (
+                    <div
+                      key={index}
+                      className="relative flex items-start gap-4 rounded-md border bg-muted/20 p-4"
+                    >
+                      <div className="grid flex-1 grid-cols-3 gap-4">
+                        <form.Field
+                          name={`emergency_contacts[${index}].full_name` as any}
+                        >
+                          {(subField) => (
+                            <Field>
+                              <FieldLabel>Full Name</FieldLabel>
+                              <Input
+                                placeholder="Full Name"
+                                value={subField.state.value as string}
+                                onChange={(e) =>
+                                  subField.handleChange(e.target.value as any)
+                                }
+                              />
+                            </Field>
+                          )}
+                        </form.Field>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {/* BIRTHDATE */}
-        {!isEditMode && (
-          <form.Field name="birthdate">
-            {(field) => {
-              const isInvalid =
-                field.state.meta.isTouched && !field.state.meta.isValid
-              return (
-                <Field data-invalid={isInvalid}>
-                  <FieldLabel htmlFor={field.name}>
-                    Birthdate{" "}
-                    <span className="font-bold text-destructive">*</span>
-                  </FieldLabel>
-                  <Input
-                    id={field.name}
-                    type="date"
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    disabled={mutation.isPending}
-                  />
-                  {isInvalid && <FieldError errors={field.state.meta.errors} />}
-                </Field>
-              )
-            }}
-          </form.Field>
-        )}
+                        <form.Field
+                          name={
+                            `emergency_contacts[${index}].relationship` as any
+                          }
+                        >
+                          {(subField) => (
+                            <Field>
+                              <FieldLabel>Relationship</FieldLabel>
+                              <Input
+                                placeholder="e.g., Spouse, Parent"
+                                value={subField.state.value as string}
+                                onChange={(e) =>
+                                  subField.handleChange(e.target.value as any)
+                                }
+                              />
+                            </Field>
+                          )}
+                        </form.Field>
 
-        {/* GENDER */}
-        {!isEditMode && (
-          <form.Field name="gender">
-            {(field) => {
-              const isInvalid =
-                field.state.meta.isTouched && !field.state.meta.isValid
-              return (
-                <Field data-invalid={isInvalid}>
-                  <FieldLabel>
-                    Gender <span className="font-bold text-destructive">*</span>
-                  </FieldLabel>
-                  <Select
-                    value={field.state.value}
-                    onValueChange={(val) => field.handleChange(val)}
-                    disabled={mutation.isPending}
+                        <form.Field
+                          name={
+                            `emergency_contacts[${index}].mobile_number` as any
+                          }
+                        >
+                          {(subField) => (
+                            <Field>
+                              <FieldLabel>Mobile Number</FieldLabel>
+                              <Input
+                                placeholder="09xxxxxxxxx"
+                                value={subField.state.value as string}
+                                onChange={(e) =>
+                                  subField.handleChange(e.target.value as any)
+                                }
+                              />
+                            </Field>
+                          )}
+                        </form.Field>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="mt-6 text-destructive hover:bg-destructive/10"
+                        type="button"
+                        onClick={() => field.removeValue(index)}
+                        disabled={field.state.value.length === 1} // Enforce minimum of 1 contact
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    type="button"
+                    className="mt-2"
+                    onClick={() =>
+                      field.pushValue({
+                        full_name: "",
+                        relationship: "",
+                        mobile_number: "",
+                        is_primary: field.state.value.length === 0,
+                      })
+                    }
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select gender" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Male">Male</SelectItem>
-                      <SelectItem value="Female">Female</SelectItem>
-                      <SelectItem value="Other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {isInvalid && <FieldError errors={field.state.meta.errors} />}
-                </Field>
-              )
-            }}
-          </form.Field>
-        )}
-      </div>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Emergency Contact
+                  </Button>
+                </div>
+              )}
+            </form.Field>
+          </CardContent>
+        </Card>
 
-      {/* 3. NEW ROLE & SUPERUSER ROW */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <form.Field name="role_id">
-          {(field) => {
-            const isInvalid =
-              field.state.meta.isTouched && !field.state.meta.isValid
-            return (
-              <Field data-invalid={isInvalid}>
-                <FieldLabel>System Role</FieldLabel>
-                <Select
-                  value={field.state.value}
-                  onValueChange={(val) => field.handleChange(val)}
-                  disabled={mutation.isPending || isLoadingRoles}
-                >
-                  <SelectTrigger>
-                    <SelectValue
-                      placeholder={
-                        isLoadingRoles ? "Loading roles..." : "Select a role"
+        {/* Access Controls */}
+        <Card className="border-destructive/20 pt-0">
+          <CardHeader className="bg-destructive/10 p-2 text-destructive">
+            <CardTitle>System Access & Controls</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="mt-4 grid grid-cols-2 gap-4">
+              <form.Field name="account_status">
+                {(field) => (
+                  <Field>
+                    <FieldLabel>Account Status</FieldLabel>
+                    <Combobox
+                      items={ACCOUNT_STATUS_OPTIONS}
+                      defaultInputValue={field.state.value}
+                    >
+                      <ComboboxInput
+                        placeholder="Select Status"
+                        onChange={(e) =>
+                          field.handleChange(e.target.value as any)
+                        }
+                      />
+                      <ComboboxContent>
+                        <ComboboxEmpty>Nothing found.</ComboboxEmpty>
+                        <ComboboxList>
+                          {ACCOUNT_STATUS_OPTIONS.map((item) => (
+                            <ComboboxItem
+                              key={item}
+                              value={item}
+                              onSelect={() => field.handleChange(item as any)}
+                            >
+                              {item}
+                            </ComboboxItem>
+                          ))}
+                        </ComboboxList>
+                      </ComboboxContent>
+                    </Combobox>
+                  </Field>
+                )}
+              </form.Field>
+
+              <form.Field name="role_id">
+                {(field) => (
+                  <Field>
+                    <FieldLabel>Security Role (Role ID)</FieldLabel>
+                    <Input
+                      placeholder="e.g. uuid-of-role"
+                      value={field.state.value as string}
+                      onChange={(e) =>
+                        field.handleChange(e.target.value as any)
                       }
                     />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {roles.map((role) => (
-                      <SelectItem key={role.id} value={String(role.id)}>
-                        {role.role_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {isInvalid && <FieldError errors={field.state.meta.errors} />}
-              </Field>
-            )
-          }}
-        </form.Field>
-
-        {/* SUPERUSER CHECKBOX */}
-        <form.Field name="is_superuser">
-          {(field) => (
-            <Field className="flex flex-col gap-2 sm:pt-8">
-              <div className="flex items-start gap-3">
-                <Checkbox
-                  id={field.name}
-                  checked={field.state.value}
-                  onCheckedChange={(checked) =>
-                    field.handleChange(checked === true)
-                  }
-                  className="mt-0.5"
-                  disabled={mutation.isPending}
-                />
-                <div className="flex flex-col space-y-1.5 leading-none">
-                  <FieldLabel htmlFor={field.name} className="cursor-pointer">
-                    Superuser Access
-                  </FieldLabel>
-                  <p className="text-xs text-muted-foreground">
-                    Grants full administrative privileges (bypasses Role rules).
-                  </p>
-                </div>
-              </div>
-            </Field>
-          )}
-        </form.Field>
-      </div>
-
-      {/* SUBMIT BUTTON */}
-      <div className="flex justify-end pt-4">
-        <Button type="submit" disabled={mutation.isPending}>
-          {mutation.isPending && (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          )}
-          {isEditMode ? "Update Employee" : "Create Employee Account"}
-        </Button>
-      </div>
-    </form>
+                  </Field>
+                )}
+              </form.Field>
+            </div>
+          </CardContent>
+        </Card>
+      </CardContent>
+    </Card>
   )
 }

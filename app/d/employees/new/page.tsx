@@ -1,5 +1,31 @@
-import { EmployeeForm } from "@/forms/employee.form"
+"use client"
+
+import {
+  Card,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import { AllInOneEmployeeForm } from "@/forms/employee.form"
+import { EmployeeFormValues } from "@/forms/schemas/employee.schema"
 
 export default function Page() {
-  return <EmployeeForm />
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle>Add New Employee</CardTitle>
+          <CardDescription>
+            Enter the details to create a new employee profile.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+
+      <AllInOneEmployeeForm
+        onSubmitAction={function (data: EmployeeFormValues): Promise<void> {
+          throw new Error("Function not implemented.")
+        }}
+      />
+    </>
+  )
 }

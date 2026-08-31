@@ -82,7 +82,23 @@ const data = {
       isActive: false,
       items: [
         {
+          title: "Dashboard",
+          url: "/d/employees",
+        },
+        {
           title: "Employee Directory",
+          url: "/d/employees",
+        },
+        {
+          title: "Organization Chart",
+          url: "/d/employees",
+        },
+        {
+          title: "Policies",
+          url: "/d/employees",
+        },
+        {
+          title: "Configuration",
           url: "/d/employees",
         },
       ],
