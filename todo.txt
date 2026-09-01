@@ -1,0 +1,89 @@
+Pinned
+
+Feed
+AI
+Announcements
+
+Employees
+- Dashboard
+- Employee Directory
+- Organization Chart
+- Policies
+- Disciplinary
+- Configuration
+
+Attendances
+- Dashboard
+- My Attendances
+- Attendances
+
+Leaves
+- Dashboard
+- My Leave Requests
+- Leave Requests
+- Configuration
+
+Recruitment
+- Dashboard
+- Recruitment Pipeline
+- Candidates
+- Interviews
+- Job Openings
+- Configuration
+
+Performance
+- KPI
+
+Assets
+- Dashboard
+- Assets
+
+Help Desk
+- Dashboard
+- Tickets
+- My Tickets
+
+Reports
+
+Inventory
+- Dashboard
+- My Inventory
+- My Bad Orders
+- Inventories
+- Bad Orders
+
+Visits
+- Dashboard
+- My Visits
+- My Visit Plans
+- Visit Plans
+- Visits
+
+Expenses
+- Dashboard
+- My Expenses
+- My Expense Reports
+- My liquidation
+- My Cash Advances
+- My Travel Expense Requests
+- My BDF
+- Expenses
+- Expense Reports
+- Cash Advance Request
+- Travel Expense Request
+- Liquidation
+- BDF
+
+Outlets
+- Dashboard
+- Outlets
+- Assigned Outlets
+- Outlet Assignment
+
+Bookings
+- Dashboard
+- Overview
+- My Bookings
+- Bookings
+
+Production
