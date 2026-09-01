@@ -21,6 +21,7 @@ Leaves
 - Dashboard
 - My Leave Requests
 - Leave Requests
+- Leave Balances
 - Configuration
 
 Recruitment
