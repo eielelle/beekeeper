@@ -7,7 +7,13 @@ import {
   getCurrentEmployeeIdAction,
   searchEmployeeOptionsAction,
 } from "@/actions/employee.action"
+import type {
+  CreateEmployeeFormValues,
+  EmployeeFormValues,
+} from "../schemas/employee.schema" // <-- 1. Import your new schema type
 
+// You can keep this for fetching lists if your table still uses this flat structure,
+// but for mutations (create/update), use the new schema type.
 export type EmployeeStoreType = {
   id?: string | number
   employee_no: string
@@ -67,9 +73,11 @@ export async function getCurrentEmployeeId() {
 
 // --- MUTATIONS ---
 
-export async function createEmployee(value: EmployeeStoreType) {
+// 2. Change the parameter to accept either your new Form Values OR FormData
+export async function createEmployee(value: CreateEmployeeFormValues) {
   const t = toast.loading("Creating Employee. Please wait.")
   try {
+    // If 'value' includes a File, your createEmployeeAction needs to handle it!
     const data = await createEmployeeAction(value)
     toast.dismiss(t)
     toast.success("Employee successfully created.")
@@ -81,10 +89,15 @@ export async function createEmployee(value: EmployeeStoreType) {
   }
 }
 
-export async function updateEmployee(value: EmployeeStoreType) {
+// 3. Update here as well
+export async function updateEmployee(
+  id: string | number,
+  value: Partial<CreateEmployeeFormValues>
+) {
   const t = toast.loading("Updating Employee. Please wait.")
   try {
-    const data = await updateEmployeeAction(value)
+    // Make sure your update action accepts the ID and the new payload
+    const data = await updateEmployeeAction(id, value)
     toast.dismiss(t)
     toast.success("Employee successfully updated.")
     return data

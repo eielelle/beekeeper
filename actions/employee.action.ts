@@ -3,11 +3,36 @@
 import { createClient } from "@/lib/supabase/server"
 import { getServerAbility, fetchUserPermissions } from "@/lib/casl/server"
 import { subject } from "@casl/ability"
+import { FetchEmployeesParams } from "@/forms/queries/employee.query"
+// import { supabaseAdmin } from "@/lib/supabase/admin" // Used for deletion if needed
 import {
-  FetchEmployeesParams,
-  EmployeeStoreType,
-} from "@/forms/queries/employee.query"
-import { supabaseAdmin } from "@/lib/supabase/admin" // Used for deletion if needed
+  CreateEmployeeFormValues,
+  createEmployeeSchema,
+} from "@/forms/schemas/employee.schema"
+
+// Helper to handle profile picture uploads to Supabase Storage
+// Note: Ensure you have a storage bucket named 'avatars' (or change the name below)
+async function uploadProfilePicture(
+  supabase: any,
+  file: File,
+  employeeNo: string
+) {
+  if (!file || file.size === 0) return null
+
+  const fileExt = file.name.split(".").pop()
+  const fileName = `${employeeNo || "emp"}-${Date.now()}.${fileExt}`
+
+  const { error } = await supabase.storage
+    .from("avatars") // <--- Change this to match your Supabase bucket name if different
+    .upload(fileName, file)
+
+  if (error) {
+    throw new Error(`Failed to upload photo: ${error.message}`)
+  }
+
+  const { data } = supabase.storage.from("avatars").getPublicUrl(fileName)
+  return data.publicUrl
+}
 
 // ==========================================
 // 1. FETCH ALL EMPLOYEES (PAGINATED)
@@ -74,11 +99,19 @@ export async function getEmployeeAction(id: string) {
     throw new Error("Forbidden: You cannot view this employee's profile.")
   }
 
+  // Update the select statement to fetch relational data
   const { data, error } = await supabase
     .from("employees")
-    .select("*")
+    .select(
+      `
+      *,
+      employee_addresses (*),
+      employee_emergency_contacts (*)
+    `
+    )
     .eq("id", id)
     .single()
+
   if (error) throw new Error(error.message)
 
   return data
@@ -96,7 +129,7 @@ export async function getCurrentEmployeeIdAction() {
 // ==========================================
 // 4. CREATE EMPLOYEE
 // ==========================================
-export async function createEmployeeAction(value: EmployeeStoreType) {
+export async function createEmployeeAction(values: CreateEmployeeFormValues) {
   const ability = await getServerAbility()
   const supabase = await createClient()
 
@@ -106,35 +139,168 @@ export async function createEmployeeAction(value: EmployeeStoreType) {
     )
   }
 
-  const { data, error } = await supabase
-    .from("employees")
-    .insert([value])
-    .select()
-    .single()
-  if (error) throw new Error(error.message)
+  const validatedFields = createEmployeeSchema.safeParse(values)
+  const validatedValues = validatedFields.data
 
-  return data
+  if (!validatedFields.success) {
+    throw new Error("Validation failed. Please check form errors.")
+  }
+
+  if (validatedValues) {
+    const photoFile = validatedValues.photo as File | null
+    let avatar_url = ""
+    if (photoFile && photoFile.size > 0) {
+      const photoUrl = await uploadProfilePicture(
+        supabase,
+        photoFile,
+        values.employee_no
+      )
+      avatar_url = photoUrl // Adjust if your DB column is named `photo_url`
+    }
+
+    // 1. Separate relational data from core employee data
+    const {
+      emergency_contacts,
+      permanent_address,
+      present_address,
+      ...employeeValues
+    } = values
+
+    // 2. Insert core employee record FIRST to get the new ID
+    const { data: newEmployee, error: employeeError } = await supabase
+      .from("employees")
+      .insert([{ ...employeeValues, avatar_url }])
+      .select()
+      .single()
+
+    if (employeeError) throw new Error(employeeError.message)
+
+    const employeeId = newEmployee.id
+
+    // 3. Insert Addresses
+    const addressesToInsert = []
+
+    // Format Present Address
+    if (present_address && present_address.full_address) {
+      addressesToInsert.push({
+        employee_id: employeeId,
+        address_type: "present",
+        full_address: present_address.full_address,
+        street_unit: present_address.street_unit,
+        barangay: present_address.barangay,
+        city: present_address.city,
+        province: present_address.province,
+        region: present_address.region,
+        zip_code: present_address.zip_code,
+        is_active: present_address.is_active ?? true,
+      })
+    }
+
+    // Format Permanent Address
+    if (permanent_address && permanent_address.full_address) {
+      addressesToInsert.push({
+        employee_id: employeeId,
+        address_type: "permanent",
+        full_address: permanent_address.full_address,
+        street_unit: permanent_address.street_unit,
+        barangay: permanent_address.barangay,
+        city: permanent_address.city,
+        province: permanent_address.province,
+        region: permanent_address.region,
+        zip_code: permanent_address.zip_code,
+        is_active: permanent_address.is_active ?? true,
+      })
+    }
+
+    if (addressesToInsert.length > 0) {
+      const { error: addressError } = await supabase
+        .from("employee_addresses")
+        .insert(addressesToInsert)
+
+      if (addressError) {
+        throw new Error(
+          `Employee created, but failed to save addresses: ${addressError.message}`
+        )
+      }
+    }
+
+    // 4. Insert Emergency Contacts
+    if (emergency_contacts && emergency_contacts.length > 0) {
+      // Map form contacts to database schema requirement
+      const contactsToInsert = emergency_contacts.map((contact) => ({
+        employee_id: employeeId,
+        full_name: contact.full_name,
+        relationship: contact.relationship,
+        mobile_number: contact.mobile_number,
+        is_primary: contact.is_primary ?? false,
+      }))
+
+      const { error: contactsError } = await supabase
+        .from("employee_emergency_contacts")
+        .insert(contactsToInsert)
+
+      if (contactsError) {
+        throw new Error(
+          `Employee created, but failed to save emergency contacts: ${contactsError.message}`
+        )
+      }
+    }
+
+    return newEmployee
+  }
 }
 
 // ==========================================
 // 5. UPDATE EMPLOYEE
 // ==========================================
-export async function updateEmployeeAction(value: EmployeeStoreType) {
+export async function updateEmployeeAction(
+  id: string | number,
+  values: CreateEmployeeFormValues
+) {
   const ability = await getServerAbility()
   const supabase = await createClient()
 
-  if (!value.id) throw new Error("Employee ID is required.")
+  if (!id) throw new Error("Employee ID is required.")
 
   // Security: Check if they can update this specific employee
-  if (
-    ability.cannot("update", subject("employees", { employee_id: value.id }))
-  ) {
+  if (ability.cannot("update", subject("employees", { employee_id: id }))) {
     throw new Error(
       "Forbidden: You do not have permission to update this employee."
     )
   }
 
-  const { id, created_at, ...updates } = value
+  // 1. Validate incoming data
+  const validatedFields = createEmployeeSchema.safeParse(values)
+  if (!validatedFields.success) {
+    throw new Error("Validation failed. Please check form errors.")
+  }
+
+  const {
+    emergency_contacts,
+    permanent_address,
+    present_address,
+    photo,
+    ...employeeValues
+  } = validatedFields.data
+
+  // 2. Handle Photo Upload
+  let avatar_url = undefined
+  if (photo instanceof File && photo.size > 0) {
+    // New file uploaded
+    avatar_url = await uploadProfilePicture(
+      supabase,
+      photo,
+      employeeValues.employee_no || `emp-${id}`
+    )
+  } else if (typeof photo === "string") {
+    // Existing photo URL kept
+    avatar_url = photo
+  }
+
+  const updates: any = { ...employeeValues }
+  if (avatar_url !== undefined) {
+    updates.avatar_url = avatar_url
+  }
 
   // SECURITY PATCH: Do not allow non-superusers to escalate privileges
   const { isSuperuser } = await fetchUserPermissions()
@@ -142,15 +308,98 @@ export async function updateEmployeeAction(value: EmployeeStoreType) {
     delete updates.is_superuser
   }
 
-  const { data, error } = await supabase
+  // Ensure we don't accidentally try to update protected fields
+  delete updates.id
+  delete updates.created_at
+
+  // 3. Update core database
+  const { data: updatedEmployee, error } = await supabase
     .from("employees")
     .update(updates)
     .eq("id", id)
     .select()
     .single()
+
   if (error) throw new Error(error.message)
 
-  return data
+  // 4. Update Addresses (Delete existing, then insert new)
+  if (present_address || permanent_address) {
+    await supabase.from("employee_addresses").delete().eq("employee_id", id)
+
+    const addressesToInsert = []
+
+    if (present_address && present_address.full_address) {
+      addressesToInsert.push({
+        employee_id: id,
+        address_type: "present",
+        full_address: present_address.full_address,
+        street_unit: present_address.street_unit,
+        barangay: present_address.barangay,
+        city: present_address.city,
+        province: present_address.province,
+        region: present_address.region,
+        zip_code: present_address.zip_code,
+        is_active: present_address.is_active ?? true,
+      })
+    }
+
+    if (permanent_address && permanent_address.full_address) {
+      addressesToInsert.push({
+        employee_id: id,
+        address_type: "permanent",
+        full_address: permanent_address.full_address,
+        street_unit: permanent_address.street_unit,
+        barangay: permanent_address.barangay,
+        city: permanent_address.city,
+        province: permanent_address.province,
+        region: permanent_address.region,
+        zip_code: permanent_address.zip_code,
+        is_active: permanent_address.is_active ?? true,
+      })
+    }
+
+    if (addressesToInsert.length > 0) {
+      const { error: addressError } = await supabase
+        .from("employee_addresses")
+        .insert(addressesToInsert)
+
+      if (addressError) {
+        throw new Error(
+          `Employee updated, but failed to save addresses: ${addressError.message}`
+        )
+      }
+    }
+  }
+
+  // 5. Update Emergency Contacts (Delete existing, then insert new)
+  if (emergency_contacts && Array.isArray(emergency_contacts)) {
+    await supabase
+      .from("employee_emergency_contacts")
+      .delete()
+      .eq("employee_id", id)
+
+    if (emergency_contacts.length > 0) {
+      const contactsToInsert = emergency_contacts.map((contact: any) => ({
+        employee_id: id,
+        full_name: contact.full_name,
+        relationship: contact.relationship,
+        mobile_number: contact.mobile_number,
+        is_primary: contact.is_primary ?? false,
+      }))
+
+      const { error: contactsError } = await supabase
+        .from("employee_emergency_contacts")
+        .insert(contactsToInsert)
+
+      if (contactsError) {
+        throw new Error(
+          `Employee updated, but failed to save emergency contacts: ${contactsError.message}`
+        )
+      }
+    }
+  }
+
+  return updatedEmployee
 }
 
 // ==========================================

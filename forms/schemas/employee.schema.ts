@@ -73,8 +73,63 @@ export const emergencyContactSchema = z.object({
 // 2. MAIN EMPLOYEE SCHEMA
 // ---------------------------------------------------------
 
+export const createEmployeeSchema = z.object({
+  photo: z
+    .union([z.instanceof(File), z.string()])
+    .optional()
+    .nullable(),
+  employee_no: z.string().min(1, "Employee Number is required"),
+  first_name: z.string().min(1, "First Name is required"),
+  middle_name: z.string().optional(),
+  last_name: z.string().min(1, "Last Name is required"),
+  maiden_name: z.string().optional(),
+  suffix: z.string().optional(),
+  nickname: z.string().optional(),
+  gender: z.enum(["Male", "Female", "Other", "Prefer not to say"]).optional(),
+  civil_status: z
+    .enum(["Single", "Married", "Widowed", "Legally Separated"])
+    .optional(),
+  date_of_birth: z
+    .string()
+    .date("Must be a valid date (YYYY-MM-DD)")
+    .optional(),
+  nationality: z.string(),
+  blood_type: z
+    .enum(["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-", "Unknown"])
+    .optional(),
+  work_email: z.string().email("Invalid work email address"),
+  work_phone: z
+    .string()
+    .regex(/^(09|\+639)\d{9}$/, "Invalid PH Mobile Number")
+    .optional()
+    .or(z.literal("")),
+  personal_email: z
+    .string()
+    .email("Invalid personal email")
+    .optional()
+    .or(z.literal("")),
+  personal_mobile: z
+    .string()
+    .regex(/^(09|\+639)\d{9}$/, "Invalid PH Mobile Number")
+    .optional()
+    .or(z.literal("")),
+  account_status: z.enum(["Active", "Suspended", "Pending Activation"]),
+  role_id: z.string().min(1, "Security Role is required"),
+  present_address: addressSchema,
+  permanent_address: addressSchema.optional(), // Made optional so users can skip if same as present
+
+  // --- 1-to-Many Relations (Arrays) ---
+  emergency_contacts: z
+    .array(emergencyContactSchema)
+    .min(1, "At least one emergency contact is required"),
+})
+
 export const employeeSchema = z.object({
   // --- Core Identity ---
+  photo: z
+    .union([z.instanceof(File), z.string()])
+    .optional()
+    .nullable(),
   employee_no: z.string().min(1, "Employee Number is required"),
   first_name: z.string().min(1, "First Name is required"),
   middle_name: z.string().optional(),
@@ -186,3 +241,4 @@ export const employeeSchema = z.object({
 })
 
 export type EmployeeFormValues = z.infer<typeof employeeSchema>
+export type CreateEmployeeFormValues = z.infer<typeof createEmployeeSchema>

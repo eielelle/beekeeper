@@ -35,7 +35,7 @@ export default function EditEmployeeLayout({
     <div className="space-y-4">
       {/* Shadcn Tabs Navigation */}
       <Tabs value={activeTab} onValueChange={onTabChange} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 sm:w-[400px]">
+        <TabsList className="grid w-full grid-cols-3 sm:w-[600px]">
           <TabsTrigger value="basic" className="flex items-center gap-2">
             <User className="h-4 w-4" />
             Basic Information
@@ -43,6 +43,10 @@ export default function EditEmployeeLayout({
           <TabsTrigger value="work" className="flex items-center gap-2">
             <Briefcase className="h-4 w-4" />
             Work Information
+          </TabsTrigger>
+          <TabsTrigger value="bank" className="flex items-center gap-2">
+            <Briefcase className="h-4 w-4" />
+            Bank Information
           </TabsTrigger>
         </TabsList>
       </Tabs>

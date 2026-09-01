@@ -1,83 +1,150 @@
 "use client"
 
 import * as React from "react"
+import { useParams } from "next/navigation"
 import { useForm } from "@tanstack/react-form"
-import { Save } from "lucide-react"
+import { Save, Loader2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { Field, FieldLabel } from "@/components/ui/field"
+import { Field, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
 import {
-  EMPLOYMENT_TYPE_OPTIONS,
-  employeeSchema,
-  type EmployeeFormValues,
-} from "./schemas/employee.schema"
+  employeeWorkInfoSchema,
+  type EmployeeWorkFormValues,
+} from "./schemas/employee_work_info.schema"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
-  Combobox,
-  ComboboxContent,
-  ComboboxEmpty,
-  ComboboxInput,
-  ComboboxItem,
-  ComboboxList,
-} from "@/components/ui/combobox"
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
-// Extracted from your schema enums for the Comboboxes
-const EMPLOYEE_STATUS_OPTIONS = [
-  "Hired",
-  "Terminated",
-  "Suspended",
-  "Candidate",
-] as const
-const WORK_ARRANGEMENT_OPTIONS = ["On-site", "Hybrid", "WFH"] as const
+// Import queries
+import {
+  getEmployeeWorkInfo,
+  upsertEmployeeWorkInfo,
+  searchDepartments,
+  searchPositions,
+  searchEmploymentTypes,
+  searchWorkTypes,
+  searchEmploymentStatuses,
+} from "./queries/employee_work_info.query"
+
+// Define base defaults OUTSIDE the component to avoid circular dependencies
+const BASE_DEFAULT_VALUES: Partial<EmployeeWorkFormValues> = {
+  department_id: "",
+  job_position_id: "",
+  reports_to_id: "",
+  employment_type_id: "",
+  work_type_id: "",
+  employment_status_id: "",
+  effective_start_date: "",
+  lifecycles: {
+    original_hire_date: "",
+    current_hire_date: "",
+    probation_end_date: "",
+    regularization_date: "",
+    contract_expiry_date: "",
+  },
+  statutory: {
+    sss_number: "",
+    tin: "",
+    rdo_code: "",
+    philhealth_number: "",
+    pagibig_number: "",
+    national_id: "",
+  },
+}
 
 export function EmployeeWorkInformation({
   initialData,
   onSubmitAction,
 }: {
-  initialData?: Partial<EmployeeFormValues>
-  onSubmitAction: (data: EmployeeFormValues) => Promise<void>
+  initialData?: Partial<EmployeeWorkFormValues>
+  onSubmitAction?: (data: EmployeeWorkFormValues) => Promise<void>
 }) {
-  const [isSubmitting, setIsSubmitting] = React.useState(false)
+  const params = useParams()
+  const employeeId = params?.id as string
+  const isEditMode = !!employeeId
 
-  // Default values for the work information slice of the schema
-  const defaultValues = {
-    employee_status: "Hired",
-    department_id: "",
-    job_position_id: "",
-    reports_to_id: "",
-    employment_type: "Regular",
-    work_arrangement: "On-site",
-    effective_start_date: "",
-    lifecycles: {
-      original_hire_date: "",
-      current_hire_date: "",
-      probation_end_date: "",
-      regularization_date: "",
-      contract_expiry_date: "",
-    },
-    statutory: {
-      sss_number: "",
-      tin: "",
-      rdo_code: "",
-      philhealth_number: "",
-      pagibig_number: "",
-      national_id: "",
-    },
-    ...initialData,
-  } as EmployeeFormValues
+  const [isSubmitting, setIsSubmitting] = React.useState(false)
+  const [isLoading, setIsLoading] = React.useState(true)
+  const [employeeData, setEmployeeData] = React.useState<
+    Partial<EmployeeWorkFormValues>
+  >({})
+
+  // Dropdown States
+  const [departments, setDepartments] = React.useState<
+    { value: string; label: string }[]
+  >([])
+  const [positions, setPositions] = React.useState<
+    { value: string; label: string }[]
+  >([])
+  const [employmentTypes, setEmploymentTypes] = React.useState<
+    { value: string; label: string }[]
+  >([])
+  const [workTypes, setWorkTypes] = React.useState<
+    { value: string; label: string }[]
+  >([])
+  const [employmentStatuses, setEmploymentStatuses] = React.useState<
+    { value: string; label: string }[]
+  >([])
+
+  React.useEffect(() => {
+    async function loadData() {
+      try {
+        setIsLoading(true)
+
+        // Concurrently fetch all lookup arrays
+        const [deps, pos, eTypes, wTypes, eStatuses] = await Promise.all([
+          searchDepartments(""),
+          searchPositions(""),
+          searchEmploymentTypes(""),
+          searchWorkTypes(""),
+          searchEmploymentStatuses(""),
+        ])
+
+        setDepartments(deps)
+        setPositions(pos)
+        setEmploymentTypes(eTypes)
+        setWorkTypes(wTypes)
+        setEmploymentStatuses(eStatuses)
+
+        // Fetch existing employee work info if in edit mode
+        if (isEditMode) {
+          const data = await getEmployeeWorkInfo(employeeId)
+          if (data) setEmployeeData(data)
+        }
+      } catch (error: any) {
+        toast.error("Failed to load data: " + error.message)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    loadData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [employeeId, isEditMode])
 
   const form = useForm({
-    defaultValues,
+    defaultValues: {
+      ...BASE_DEFAULT_VALUES,
+      ...initialData,
+      ...employeeData,
+    } as EmployeeWorkFormValues,
     validators: {
-      onSubmit: employeeSchema,
+      onSubmit: employeeWorkInfoSchema,
     },
     onSubmit: async ({ value }) => {
       try {
         setIsSubmitting(true)
-        await onSubmitAction(value)
-        toast.success("Work information saved successfully")
+        if (employeeId) {
+          await upsertEmployeeWorkInfo(employeeId, value)
+        } else {
+          throw new Error("Missing Employee ID. Cannot save work info.")
+        }
       } catch (error: any) {
         toast.error(error.message || "Failed to save work information")
       } finally {
@@ -85,6 +152,20 @@ export function EmployeeWorkInformation({
       }
     },
   })
+
+  // Prevent form rendering until data is fetched so useForm mounts with correct default values
+  if (isLoading) {
+    return (
+      <Card className="flex h-64 items-center justify-center border-dashed">
+        <div className="flex flex-col items-center space-y-2">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <span className="text-sm font-medium text-muted-foreground">
+            Loading work information...
+          </span>
+        </div>
+      </Card>
+    )
+  }
 
   return (
     <Card>
@@ -96,101 +177,83 @@ export function EmployeeWorkInformation({
           </CardHeader>
           <CardContent>
             <div className="mt-4 grid grid-cols-3 gap-4">
-              <form.Field name="employee_status">
+              <form.Field name="employment_status_id">
                 {(field) => (
                   <Field>
-                    <FieldLabel>Employee Status</FieldLabel>
-                    <Combobox
-                      items={EMPLOYEE_STATUS_OPTIONS}
-                      defaultInputValue={field.state.value}
+                    <FieldLabel>
+                      Employment Status{" "}
+                      <span className="text-destructive">*</span>
+                    </FieldLabel>
+                    <Select
+                      value={(field.state.value as string) || undefined}
+                      onValueChange={(val) => field.handleChange(val as any)}
                     >
-                      <ComboboxInput
-                        placeholder="Select Status"
-                        onChange={(e) =>
-                          field.handleChange(e.target.value as any)
-                        }
-                      />
-                      <ComboboxContent>
-                        <ComboboxEmpty>Nothing found.</ComboboxEmpty>
-                        <ComboboxList>
-                          {EMPLOYEE_STATUS_OPTIONS.map((item) => (
-                            <ComboboxItem
-                              key={item}
-                              value={item}
-                              onSelect={() => field.handleChange(item as any)}
-                            >
-                              {item}
-                            </ComboboxItem>
-                          ))}
-                        </ComboboxList>
-                      </ComboboxContent>
-                    </Combobox>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {employmentStatuses.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>
+                            {item.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FieldError errors={field.state.meta.errors} />
                   </Field>
                 )}
               </form.Field>
 
-              <form.Field name="employment_type">
+              <form.Field name="employment_type_id">
                 {(field) => (
                   <Field>
-                    <FieldLabel>Employment Type</FieldLabel>
-                    <Combobox
-                      items={EMPLOYMENT_TYPE_OPTIONS}
-                      defaultInputValue={field.state.value}
+                    <FieldLabel>
+                      Employment Type{" "}
+                      <span className="text-destructive">*</span>
+                    </FieldLabel>
+                    <Select
+                      value={(field.state.value as string) || undefined}
+                      onValueChange={(val) => field.handleChange(val as any)}
                     >
-                      <ComboboxInput
-                        placeholder="Select Type"
-                        onChange={(e) =>
-                          field.handleChange(e.target.value as any)
-                        }
-                      />
-                      <ComboboxContent>
-                        <ComboboxEmpty>Nothing found.</ComboboxEmpty>
-                        <ComboboxList>
-                          {EMPLOYMENT_TYPE_OPTIONS.map((item) => (
-                            <ComboboxItem
-                              key={item}
-                              value={item}
-                              onSelect={() => field.handleChange(item as any)}
-                            >
-                              {item}
-                            </ComboboxItem>
-                          ))}
-                        </ComboboxList>
-                      </ComboboxContent>
-                    </Combobox>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select Type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {employmentTypes.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>
+                            {item.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FieldError errors={field.state.meta.errors} />
                   </Field>
                 )}
               </form.Field>
 
-              <form.Field name="work_arrangement">
+              <form.Field name="work_type_id">
                 {(field) => (
                   <Field>
-                    <FieldLabel>Work Arrangement</FieldLabel>
-                    <Combobox
-                      items={WORK_ARRANGEMENT_OPTIONS}
-                      defaultInputValue={field.state.value}
+                    <FieldLabel>
+                      Work Arrangement/Type{" "}
+                      <span className="text-destructive">*</span>
+                    </FieldLabel>
+                    <Select
+                      value={(field.state.value as string) || undefined}
+                      onValueChange={(val) => field.handleChange(val as any)}
                     >
-                      <ComboboxInput
-                        placeholder="Select Arrangement"
-                        onChange={(e) =>
-                          field.handleChange(e.target.value as any)
-                        }
-                      />
-                      <ComboboxContent>
-                        <ComboboxEmpty>Nothing found.</ComboboxEmpty>
-                        <ComboboxList>
-                          {WORK_ARRANGEMENT_OPTIONS.map((item) => (
-                            <ComboboxItem
-                              key={item}
-                              value={item}
-                              onSelect={() => field.handleChange(item as any)}
-                            >
-                              {item}
-                            </ComboboxItem>
-                          ))}
-                        </ComboboxList>
-                      </ComboboxContent>
-                    </Combobox>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select Arrangement" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {workTypes.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>
+                            {item.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FieldError errors={field.state.meta.errors} />
                   </Field>
                 )}
               </form.Field>
@@ -206,6 +269,7 @@ export function EmployeeWorkInformation({
                         field.handleChange(e.target.value as any)
                       }
                     />
+                    <FieldError errors={field.state.meta.errors} />
                   </Field>
                 )}
               </form.Field>
@@ -213,14 +277,25 @@ export function EmployeeWorkInformation({
               <form.Field name="department_id">
                 {(field) => (
                   <Field>
-                    <FieldLabel>Department (ID)</FieldLabel>
-                    <Input
-                      placeholder="e.g. uuid-of-department"
-                      value={field.state.value as string}
-                      onChange={(e) =>
-                        field.handleChange(e.target.value as any)
-                      }
-                    />
+                    <FieldLabel>
+                      Department <span className="text-destructive">*</span>
+                    </FieldLabel>
+                    <Select
+                      value={(field.state.value as string) || undefined}
+                      onValueChange={(val) => field.handleChange(val as any)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select Department" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {departments.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>
+                            {item.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FieldError errors={field.state.meta.errors} />
                   </Field>
                 )}
               </form.Field>
@@ -228,14 +303,25 @@ export function EmployeeWorkInformation({
               <form.Field name="job_position_id">
                 {(field) => (
                   <Field>
-                    <FieldLabel>Job Position (ID)</FieldLabel>
-                    <Input
-                      placeholder="e.g. uuid-of-position"
-                      value={field.state.value as string}
-                      onChange={(e) =>
-                        field.handleChange(e.target.value as any)
-                      }
-                    />
+                    <FieldLabel>
+                      Job Position <span className="text-destructive">*</span>
+                    </FieldLabel>
+                    <Select
+                      value={(field.state.value as string) || undefined}
+                      onValueChange={(val) => field.handleChange(val as any)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select Position" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {positions.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>
+                            {item.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FieldError errors={field.state.meta.errors} />
                   </Field>
                 )}
               </form.Field>
@@ -245,12 +331,13 @@ export function EmployeeWorkInformation({
                   <Field>
                     <FieldLabel>Reports To (Manager ID)</FieldLabel>
                     <Input
-                      placeholder="e.g. uuid-of-manager"
+                      placeholder="Enter Manager ID"
                       value={(field.state.value || "") as string}
                       onChange={(e) =>
                         field.handleChange(e.target.value as any)
                       }
                     />
+                    <FieldError errors={field.state.meta.errors} />
                   </Field>
                 )}
               </form.Field>
@@ -276,10 +363,10 @@ export function EmployeeWorkInformation({
                         field.handleChange(e.target.value as any)
                       }
                     />
+                    <FieldError errors={field.state.meta.errors} />
                   </Field>
                 )}
               </form.Field>
-
               <form.Field name="lifecycles.current_hire_date">
                 {(field) => (
                   <Field>
@@ -291,10 +378,10 @@ export function EmployeeWorkInformation({
                         field.handleChange(e.target.value as any)
                       }
                     />
+                    <FieldError errors={field.state.meta.errors} />
                   </Field>
                 )}
               </form.Field>
-
               <form.Field name="lifecycles.probation_end_date">
                 {(field) => (
                   <Field>
@@ -306,10 +393,10 @@ export function EmployeeWorkInformation({
                         field.handleChange(e.target.value as any)
                       }
                     />
+                    <FieldError errors={field.state.meta.errors} />
                   </Field>
                 )}
               </form.Field>
-
               <form.Field name="lifecycles.regularization_date">
                 {(field) => (
                   <Field>
@@ -321,10 +408,10 @@ export function EmployeeWorkInformation({
                         field.handleChange(e.target.value as any)
                       }
                     />
+                    <FieldError errors={field.state.meta.errors} />
                   </Field>
                 )}
               </form.Field>
-
               <form.Field name="lifecycles.contract_expiry_date">
                 {(field) => (
                   <Field>
@@ -336,6 +423,7 @@ export function EmployeeWorkInformation({
                         field.handleChange(e.target.value as any)
                       }
                     />
+                    <FieldError errors={field.state.meta.errors} />
                   </Field>
                 )}
               </form.Field>
@@ -361,10 +449,10 @@ export function EmployeeWorkInformation({
                         field.handleChange(e.target.value as any)
                       }
                     />
+                    <FieldError errors={field.state.meta.errors} />
                   </Field>
                 )}
               </form.Field>
-
               <form.Field name="statutory.philhealth_number">
                 {(field) => (
                   <Field>
@@ -376,10 +464,10 @@ export function EmployeeWorkInformation({
                         field.handleChange(e.target.value as any)
                       }
                     />
+                    <FieldError errors={field.state.meta.errors} />
                   </Field>
                 )}
               </form.Field>
-
               <form.Field name="statutory.pagibig_number">
                 {(field) => (
                   <Field>
@@ -391,10 +479,10 @@ export function EmployeeWorkInformation({
                         field.handleChange(e.target.value as any)
                       }
                     />
+                    <FieldError errors={field.state.meta.errors} />
                   </Field>
                 )}
               </form.Field>
-
               <form.Field name="statutory.tin">
                 {(field) => (
                   <Field>
@@ -406,10 +494,10 @@ export function EmployeeWorkInformation({
                         field.handleChange(e.target.value as any)
                       }
                     />
+                    <FieldError errors={field.state.meta.errors} />
                   </Field>
                 )}
               </form.Field>
-
               <form.Field name="statutory.rdo_code">
                 {(field) => (
                   <Field>
@@ -421,10 +509,10 @@ export function EmployeeWorkInformation({
                         field.handleChange(e.target.value as any)
                       }
                     />
+                    <FieldError errors={field.state.meta.errors} />
                   </Field>
                 )}
               </form.Field>
-
               <form.Field name="statutory.national_id">
                 {(field) => (
                   <Field>
@@ -436,6 +524,7 @@ export function EmployeeWorkInformation({
                         field.handleChange(e.target.value as any)
                       }
                     />
+                    <FieldError errors={field.state.meta.errors} />
                   </Field>
                 )}
               </form.Field>

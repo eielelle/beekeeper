@@ -8,28 +8,11 @@ import {
   searchDepartmentsAction,
   searchPositionsAction,
 } from "@/actions/employee_work_info.action"
-
-export type EmployeeWorkInfoStoreType = {
-  id?: string | number
-  employee_id: number
-  employment_type_id?: number
-  employment_status_id?: number
-  work_type_id?: string
-  department_id?: number
-  position_id?: number
-  sss_no?: string
-  tin_no?: string
-  philhealth_no?: string
-  pagibig_no?: string
-  emergency_contact_name?: string
-  emergency_contact_no?: string
-  emergency_relation?: string
-  allow_overtime?: boolean
-}
+import { EmployeeWorkFormValues } from "@/forms/schemas/employee_work_info.schema"
 
 // --- CRUD Operations ---
 
-export async function getEmployeeWorkInfo(employeeId: string) {
+export async function getEmployeeWorkInfo(employeeId: string | number) {
   try {
     return await getEmployeeWorkInfoAction(employeeId)
   } catch (error: any) {
@@ -38,10 +21,13 @@ export async function getEmployeeWorkInfo(employeeId: string) {
   }
 }
 
-export async function upsertEmployeeWorkInfo(value: EmployeeWorkInfoStoreType) {
+export async function upsertEmployeeWorkInfo(
+  employeeId: string | number,
+  value: EmployeeWorkFormValues
+) {
   const t = toast.loading("Saving work information...")
   try {
-    await upsertEmployeeWorkInfoAction(value)
+    await upsertEmployeeWorkInfoAction(employeeId, value)
     toast.dismiss(t)
     toast.success("Work information successfully saved.")
     return true
