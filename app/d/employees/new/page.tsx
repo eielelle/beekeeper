@@ -21,11 +21,7 @@ export default function Page() {
         </CardHeader>
       </Card>
 
-      <AllInOneEmployeeForm
-        onSubmitAction={function (data: EmployeeFormValues): Promise<void> {
-          throw new Error("Function not implemented.")
-        }}
-      />
+      <AllInOneEmployeeForm />
     </>
   )
 }

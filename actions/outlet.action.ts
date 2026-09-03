@@ -62,7 +62,6 @@ export async function fetchMyAssignedOutletsAction(params: {
 // ==========================================
 export async function fetchOutletsAction(params: FetchOutletsParams) {
   const ability = await getServerAbility()
-  const { employeeId } = await fetchUserPermissions()
 
   // Verify baseline read access
   if (ability.cannot("read", "outlets")) {
@@ -74,68 +73,71 @@ export async function fetchOutletsAction(params: FetchOutletsParams) {
     .from("outlets")
     .select("*, distributor:distributor_id(outlet_name)", { count: "exact" })
 
-  // DATA SCOPING: Check if user has global read access vs assigned-only access
-  const canReadAll = ability.can(
-    "read",
-    subject("outlets", { is_assigned: false })
-  )
+  console.log("BACKEND RECEIVED FILTERS:", params.columnFilters)
 
-  if (!canReadAll) {
-    if (!employeeId) throw new Error("Employee profile not found.")
-
-    // If they can only read assigned, fetch their assigned outlet IDs first
-    // (Assumes a standard 'employee_outlets' junction table - adjust table name if different)
-    const { data: assigned } = await supabase
-      .from("employee_outlets")
-      .select("outlet_id")
-      .eq("employee_id", employeeId)
-
-    const assignedIds = assigned?.map((a) => a.outlet_id) || []
-
-    if (assignedIds.length === 0) {
-      return { data: [], rowCount: 0 } // Return empty if no assignments
-    }
-
-    query = query.in("id", assignedIds)
-  }
-
-  // --- Apply Filters ---
+  // 1. GLOBAL FILTER (Searches across multiple columns using OR)
   if (params.globalFilter) {
     query = query.or(
-      `outlet_name.ilike.%${params.globalFilter}%,outlet_code.ilike.%${params.globalFilter}%`
+      `name.ilike.%${params.globalFilter}%,code.ilike.%${params.globalFilter}%`
     )
   }
 
-  // --- FIX: Semantic Filter Logic for Distributors ---
-  if (params.distributorFilter) {
-    if (params.distributorFilter === "distributors") {
-      query = query.eq("is_distributor", true)
-    } else if (params.distributorFilter === "no_distributor") {
-      query = query.is("distributor_id", null)
-    } else if (params.distributorFilter === "has_distributor") {
-      query = query.not("distributor_id", "is", null)
-    } else {
-      // Fallback just in case a numeric ID is passed in the future
-      query = query.eq("distributor_id", params.distributorFilter)
-    }
+  // 2. NEW: COLUMN-SPECIFIC FILTERS (Searches specific columns using AND)
+  if (params.columnFilters && params.columnFilters.length > 0) {
+    params.columnFilters.forEach((filter) => {
+      const { id, value } = filter
+
+      // 1. Handle basic string payload (from default text inputs)
+      if (typeof value === "string") {
+        query = query.ilike(id, `%${value}%`)
+        return
+      }
+
+      // 2. TypeScript now strictly knows `value` is one of our object payloads
+      switch (value.operator) {
+        case "range":
+          if (
+            value.min !== null &&
+            value.min !== undefined &&
+            value.min !== ""
+          ) {
+            query = query.gte(id, value.min)
+          }
+          if (
+            value.max !== null &&
+            value.max !== undefined &&
+            value.max !== ""
+          ) {
+            query = query.lte(id, value.max)
+          }
+          break
+
+        case "in":
+          query = query.in(id, value.values)
+          break
+
+        case "eq":
+          query = query.eq(id, value.value)
+          break
+
+        case "ilike":
+          query = query.ilike(id, `%${String(value.value)}%`)
+          break
+      }
+    })
   }
 
-  if (params.region) query = query.ilike("region", `%${params.region}%`)
-  if (params.province) query = query.ilike("province", `%${params.province}%`)
-  if (params.city) query = query.ilike("city", `%${params.city}%`)
-  if (params.dateRange?.from)
-    query = query.gte("created_at", params.dateRange.from)
-  if (params.dateRange?.to) query = query.lte("created_at", params.dateRange.to)
-
-  // --- Apply Sorting ---
+  // 3. SORTING
   if (params.sorting && params.sorting.length > 0) {
     const sort = params.sorting[0]
+    // If the sort is on the manager relation, Supabase handles it slightly differently,
+    // but standard columns will sort perfectly here:
     query = query.order(sort.id, { ascending: !sort.desc })
   } else {
     query = query.order("created_at", { ascending: false })
   }
 
-  // --- Apply Pagination ---
+  // 4. PAGINATION
   const from = params.pageIndex * params.pageSize
   const to = from + params.pageSize - 1
   query = query.range(from, to)

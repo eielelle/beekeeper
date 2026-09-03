@@ -11,23 +11,56 @@ import type {
   CreateEmployeeFormValues,
   EmployeeFormValues,
 } from "../schemas/employee.schema" // <-- 1. Import your new schema type
+import { FilterPayload } from "@/types/filter-payloads"
 
 // You can keep this for fetching lists if your table still uses this flat structure,
 // but for mutations (create/update), use the new schema type.
 export type EmployeeStoreType = {
+  // Primary Keys & Identifiers
   id?: string | number
-  employee_no: string
-  first_name: string
-  middle_name?: string
-  last_name: string
-  email?: string
-  phone?: string
-  gender?: string
-  employment_start?: string
-  birthdate?: string
-  is_superuser?: boolean
-  avatar_url?: string
-  created_at?: string
+  employee_no?: string | null
+  user_id?: string | null
+  org_id?: string | number | null
+
+  // Personal Information
+  first_name?: string | null
+  middle_name?: string | null
+  last_name?: string | null
+  maiden_name?: string | null
+  suffix?: string | null
+  nickname?: string | null
+  gender?: string | null
+  date_of_birth?: string | null
+  civil_status?: string | null
+  nationality?: string | null
+  blood_type?: string | null
+
+  // Contact Information
+  work_email?: string | null
+  personal_email?: string | null
+  work_phone?: string | null
+  personal_mobile?: string | null
+
+  // Employment & Organization Details
+  is_superuser?: boolean | null
+  role_id?: string | number | null
+  reports_to_id?: string | number | null
+  account_status?: string | null
+  employee_status?: string | null
+  work_arrangement?: string | null
+
+  // Dates & Milestones
+  employment_start?: string | null
+  effective_start_date?: string | null
+  original_hire_date?: string | null
+  current_hire_date?: string | null
+  probation_end_date?: string | null
+  regularization_date?: string | null
+  contract_expiry_date?: string | null
+
+  // Meta
+  avatar_url?: string | null
+  created_at?: string | null
 }
 
 export type FetchEmployeesParams = {
@@ -35,8 +68,7 @@ export type FetchEmployeesParams = {
   pageSize: number
   globalFilter?: string
   sorting?: { id: string; desc: boolean }[]
-  role?: string
-  gender?: string
+  columnFilters?: { id: string; value: FilterPayload }[]
 }
 
 function getErrorMessage(error: unknown) {

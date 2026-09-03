@@ -207,7 +207,16 @@ export function DataTable<TData extends RowData>({
   return (
     <div className="space-y-4">
       {/* <DataTableSearch searchableColumns={[{ id: "name", title: "Name" }]} /> */}
-      <DataTableGlobalSearch />
+
+      <div className="flex items-center justify-between gap-4">
+        <DataTableGlobalSearch />
+
+        <div className="flex items-center gap-2">
+          <DataTableSortList table={table} />
+          <DataTableViewOptions table={table} />
+        </div>
+      </div>
+
       <div className="overflow-hidden rounded-md border">
         {/* Let the table fill 100% width, dividing columns equally by default */}
         <Table
@@ -351,8 +360,6 @@ export function DataTable<TData extends RowData>({
       </div>
 
       <DataTablePagination table={table} />
-      <DataTableSortList table={table} />
-      <DataTableViewOptions table={table} />
     </div>
   )
 }

@@ -307,435 +307,442 @@ export function OutletForm({
         form.handleSubmit()
       }}
     >
-      {/* OUTLET CODE */}
-      <form.Field name="outlet_code">
-        {(field) => {
-          const isInvalid =
-            field.state.meta.isTouched && !field.state.meta.isValid
+      <div className="grid grid-cols-2 gap-4">
+        {/* OUTLET CODE */}
+        <form.Field name="outlet_code">
+          {(field) => {
+            const isInvalid =
+              field.state.meta.isTouched && !field.state.meta.isValid
 
-          return (
-            <Field data-invalid={isInvalid}>
-              <FieldLabel htmlFor={field.name}>
-                Outlet Code
-                <span className="font-bold text-red-500">*</span>
-              </FieldLabel>
-              <Input
-                id={field.name}
-                name={field.name}
-                value={field.state.value}
-                onBlur={field.handleBlur}
-                onChange={(e) => field.handleChange(e.target.value)}
-                aria-invalid={isInvalid}
-                placeholder="e.g., Office Supplies"
-                autoComplete="off"
-                disabled={mutation.isPending}
-              />
-              {isInvalid && <FieldError errors={field.state.meta.errors} />}
-            </Field>
-          )
-        }}
-      </form.Field>
+            return (
+              <Field data-invalid={isInvalid}>
+                <FieldLabel htmlFor={field.name}>
+                  Outlet Code
+                  <span className="font-bold text-red-500">*</span>
+                </FieldLabel>
+                <Input
+                  id={field.name}
+                  name={field.name}
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  aria-invalid={isInvalid}
+                  placeholder="e.g., Office Supplies"
+                  autoComplete="off"
+                  disabled={mutation.isPending}
+                />
+                {isInvalid && <FieldError errors={field.state.meta.errors} />}
+              </Field>
+            )
+          }}
+        </form.Field>
 
-      {/* OUTLET NAME */}
-      <form.Field name="outlet_name">
-        {(field) => {
-          const isInvalid =
-            field.state.meta.isTouched && !field.state.meta.isValid
+        {/* OUTLET NAME */}
+        <form.Field name="outlet_name">
+          {(field) => {
+            const isInvalid =
+              field.state.meta.isTouched && !field.state.meta.isValid
 
-          return (
-            <Field data-invalid={isInvalid}>
-              <FieldLabel htmlFor={field.name}>
-                Outlet Name
-                <span className="font-bold text-red-500">*</span>
-              </FieldLabel>
-              <Input
-                id={field.name}
-                name={field.name}
-                value={field.state.value}
-                onBlur={field.handleBlur}
-                onChange={(e) => field.handleChange(e.target.value)}
-                aria-invalid={isInvalid}
-                placeholder="e.g., Office Supplies"
-                autoComplete="off"
-                disabled={mutation.isPending}
-              />
-              {isInvalid && <FieldError errors={field.state.meta.errors} />}
-            </Field>
-          )
-        }}
-      </form.Field>
+            return (
+              <Field data-invalid={isInvalid}>
+                <FieldLabel htmlFor={field.name}>
+                  Outlet Name
+                  <span className="font-bold text-red-500">*</span>
+                </FieldLabel>
+                <Input
+                  id={field.name}
+                  name={field.name}
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  aria-invalid={isInvalid}
+                  placeholder="e.g., Office Supplies"
+                  autoComplete="off"
+                  disabled={mutation.isPending}
+                />
+                {isInvalid && <FieldError errors={field.state.meta.errors} />}
+              </Field>
+            )
+          }}
+        </form.Field>
 
-      {/* DEBOUNCED SEARCHABLE SALES GROUP COMBOBOX */}
-      <form.Field name="sales_group_id">
-        {(field) => {
-          const isInvalid =
-            field.state.meta.isTouched && !field.state.meta.isValid
+        {/* DEBOUNCED SEARCHABLE SALES GROUP COMBOBOX */}
+        <form.Field name="sales_group_id">
+          {(field) => {
+            const isInvalid =
+              field.state.meta.isTouched && !field.state.meta.isValid
 
-          const selectedOption = salesGroupOptions.find(
-            (opt) => Number(opt.value) === field.state.value
-          )
+            const selectedOption = salesGroupOptions.find(
+              (opt) => Number(opt.value) === field.state.value
+            )
 
-          return (
-            <Field data-invalid={isInvalid}>
-              <FieldLabel htmlFor={field.name}>Sales Group</FieldLabel>
-              <Popover open={salesGroupOpen} onOpenChange={setSalesGroupOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={salesGroupOpen}
-                    className="w-full justify-between"
-                    disabled={mutation.isPending}
-                  >
-                    {selectedOption
-                      ? selectedOption.label
-                      : field.state.value
-                        ? "Selected Sales Group"
-                        : "Select sales group..."}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent
-                  className="w-[var(--radix-popover-trigger-width)] p-0"
-                  align="start"
-                >
-                  <Command shouldFilter={false} className="w-full">
-                    <CommandInput
-                      placeholder="Search sales group..."
-                      value={salesGroupSearch}
-                      onValueChange={setSalesGroupSearch}
-                    />
-                    <CommandList className="max-h-[200px] overflow-y-auto">
-                      {isSearchingSalesGroups && (
-                        <div className="flex items-center justify-center space-x-2 p-2 text-xs text-muted-foreground">
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                          <span>Searching...</span>
-                        </div>
-                      )}
-                      {!isSearchingSalesGroups &&
-                        salesGroupOptions.length === 0 && (
-                          <CommandEmpty>No sales group found.</CommandEmpty>
-                        )}
-                      <CommandGroup>
-                        {salesGroupOptions.map((option) => (
-                          <CommandItem
-                            key={option.value}
-                            value={option.label}
-                            onSelect={() => {
-                              field.handleChange(
-                                Number(option.value) === field.state.value
-                                  ? undefined
-                                  : Number(option.value)
-                              )
-                              setSalesGroupOpen(false)
-                            }}
-                          >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4",
-                                field.state.value === Number(option.value)
-                                  ? "opacity-100"
-                                  : "opacity-0"
-                              )}
-                            />
-                            {option.label}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-              {isInvalid && <FieldError errors={field.state.meta.errors} />}
-            </Field>
-          )
-        }}
-      </form.Field>
-
-      {/* DEBOUNCED SEARCHABLE DISTRIBUTOR COMBOBOX */}
-      <form.Field name="distributor_id">
-        {(field) => {
-          const isInvalid =
-            field.state.meta.isTouched && !field.state.meta.isValid
-
-          const selectedOption = distributorOptions.find(
-            (opt) => Number(opt.value) === field.state.value
-          )
-
-          return (
-            <Field data-invalid={isInvalid}>
-              <FieldLabel htmlFor={field.name}>Distributor</FieldLabel>
-              <Popover open={distributorOpen} onOpenChange={setDistributorOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={distributorOpen}
-                    className="w-full justify-between"
-                    disabled={mutation.isPending}
-                  >
-                    {selectedOption
-                      ? selectedOption.label
-                      : field.state.value
-                        ? "Selected Distributor"
-                        : "Select distributor..."}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent
-                  className="w-[var(--radix-popover-trigger-width)] p-0"
-                  align="start"
-                >
-                  <Command shouldFilter={false} className="w-full">
-                    <CommandInput
-                      placeholder="Search distributor outlet..."
-                      value={distributorSearch}
-                      onValueChange={setDistributorSearch}
-                    />
-                    <CommandList className="max-h-[200px] overflow-y-auto">
-                      {isSearchingDistributors && (
-                        <div className="flex items-center justify-center space-x-2 p-2 text-xs text-muted-foreground">
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                          <span>Searching...</span>
-                        </div>
-                      )}
-                      {!isSearchingDistributors &&
-                        distributorOptions.length === 0 && (
-                          <CommandEmpty>No distributor found.</CommandEmpty>
-                        )}
-                      <CommandGroup>
-                        {distributorOptions.map((option) => (
-                          <CommandItem
-                            key={option.value}
-                            value={option.label}
-                            onSelect={() => {
-                              field.handleChange(
-                                option.value ? Number(option.value) : undefined
-                              )
-                              setDistributorOpen(false)
-                            }}
-                          >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4",
-                                field.state.value === Number(option.value)
-                                  ? "opacity-100"
-                                  : "opacity-0"
-                              )}
-                            />
-                            {option.label}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-              {isInvalid && <FieldError errors={field.state.meta.errors} />}
-            </Field>
-          )
-        }}
-      </form.Field>
-
-      {/* ADDRESS */}
-      <form.Field name="address">
-        {(field) => {
-          const isInvalid =
-            field.state.meta.isTouched && !field.state.meta.isValid
-
-          return (
-            <Field data-invalid={isInvalid}>
-              <FieldLabel htmlFor={field.name}>Address</FieldLabel>
-              <Textarea
-                id={field.name}
-                name={field.name}
-                value={field.state.value}
-                onBlur={field.handleBlur}
-                onChange={(e) => field.handleChange(e.target.value)}
-                aria-invalid={isInvalid}
-                placeholder="Enter description details here..."
-                autoComplete="off"
-                disabled={mutation.isPending}
-              />
-              {isInvalid && <FieldError errors={field.state.meta.errors} />}
-            </Field>
-          )
-        }}
-      </form.Field>
-
-      {/* REGION SELECT */}
-      <form.Field name="region">
-        {(field) => {
-          const isInvalid =
-            field.state.meta.isTouched && !field.state.meta.isValid
-
-          return (
-            <Field data-invalid={isInvalid}>
-              <FieldLabel htmlFor={field.name}>Region</FieldLabel>
-
-              <Select
-                value={field.state.value}
-                onValueChange={async (regionName) => {
-                  field.handleChange(regionName)
-
-                  // Reset lower form fields
-                  form.setFieldValue("province", "")
-                  form.setFieldValue("city", "")
-                  form.setFieldValue("barangay", "")
-
-                  const regionCode = regionCodeMap.get(regionName)
-                  if (regionCode) {
-                    await fetchProvinces(regionCode)
-                  }
-                }}
-              >
-                <SelectTrigger id={field.name}>
-                  <SelectValue placeholder="Select a region" />
-                </SelectTrigger>
-
-                <SelectContent>
-                  {regionsData.map((region) => (
-                    <SelectItem
-                      key={region.region_name}
-                      value={region.region_name}
+            return (
+              <Field data-invalid={isInvalid}>
+                <FieldLabel htmlFor={field.name}>Sales Group</FieldLabel>
+                <Popover open={salesGroupOpen} onOpenChange={setSalesGroupOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={salesGroupOpen}
+                      className="w-full justify-between"
+                      disabled={mutation.isPending}
                     >
-                      {region.region_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                      {selectedOption
+                        ? selectedOption.label
+                        : field.state.value
+                          ? "Selected Sales Group"
+                          : "Select sales group..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    className="w-[var(--radix-popover-trigger-width)] p-0"
+                    align="start"
+                  >
+                    <Command shouldFilter={false} className="w-full">
+                      <CommandInput
+                        placeholder="Search sales group..."
+                        value={salesGroupSearch}
+                        onValueChange={setSalesGroupSearch}
+                      />
+                      <CommandList className="max-h-[200px] overflow-y-auto">
+                        {isSearchingSalesGroups && (
+                          <div className="flex items-center justify-center space-x-2 p-2 text-xs text-muted-foreground">
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                            <span>Searching...</span>
+                          </div>
+                        )}
+                        {!isSearchingSalesGroups &&
+                          salesGroupOptions.length === 0 && (
+                            <CommandEmpty>No sales group found.</CommandEmpty>
+                          )}
+                        <CommandGroup>
+                          {salesGroupOptions.map((option) => (
+                            <CommandItem
+                              key={option.value}
+                              value={option.label}
+                              onSelect={() => {
+                                field.handleChange(
+                                  Number(option.value) === field.state.value
+                                    ? undefined
+                                    : Number(option.value)
+                                )
+                                setSalesGroupOpen(false)
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  field.state.value === Number(option.value)
+                                    ? "opacity-100"
+                                    : "opacity-0"
+                                )}
+                              />
+                              {option.label}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                {isInvalid && <FieldError errors={field.state.meta.errors} />}
+              </Field>
+            )
+          }}
+        </form.Field>
 
-              {isInvalid && <FieldError errors={field.state.meta.errors} />}
-            </Field>
-          )
-        }}
-      </form.Field>
+        {/* DEBOUNCED SEARCHABLE DISTRIBUTOR COMBOBOX */}
+        <form.Field name="distributor_id">
+          {(field) => {
+            const isInvalid =
+              field.state.meta.isTouched && !field.state.meta.isValid
 
-      {/* PROVINCE SELECT */}
-      <form.Field name="province">
-        {(field) => {
-          const isInvalid =
-            field.state.meta.isTouched && !field.state.meta.isValid
+            const selectedOption = distributorOptions.find(
+              (opt) => Number(opt.value) === field.state.value
+            )
 
-          return (
-            <Field data-invalid={isInvalid}>
-              <FieldLabel htmlFor={field.name}>Province</FieldLabel>
-
-              <Select
-                value={field.state.value}
-                disabled={!provincesData.length}
-                onValueChange={async (provinceName) => {
-                  field.handleChange(provinceName)
-
-                  form.setFieldValue("city", "")
-                  form.setFieldValue("barangay", "")
-
-                  const provinceCode = provinceCodeMap.get(provinceName)
-                  if (provinceCode) {
-                    await fetchCities(provinceCode)
-                  }
-                }}
-              >
-                <SelectTrigger id={field.name}>
-                  <SelectValue placeholder="Select a province" />
-                </SelectTrigger>
-
-                <SelectContent>
-                  {provincesData.map((province) => (
-                    <SelectItem
-                      key={province.province_name}
-                      value={province.province_name}
+            return (
+              <Field data-invalid={isInvalid}>
+                <FieldLabel htmlFor={field.name}>Distributor</FieldLabel>
+                <Popover
+                  open={distributorOpen}
+                  onOpenChange={setDistributorOpen}
+                >
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={distributorOpen}
+                      className="w-full justify-between"
+                      disabled={mutation.isPending}
                     >
-                      {province.province_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                      {selectedOption
+                        ? selectedOption.label
+                        : field.state.value
+                          ? "Selected Distributor"
+                          : "Select distributor..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    className="w-[var(--radix-popover-trigger-width)] p-0"
+                    align="start"
+                  >
+                    <Command shouldFilter={false} className="w-full">
+                      <CommandInput
+                        placeholder="Search distributor outlet..."
+                        value={distributorSearch}
+                        onValueChange={setDistributorSearch}
+                      />
+                      <CommandList className="max-h-[200px] overflow-y-auto">
+                        {isSearchingDistributors && (
+                          <div className="flex items-center justify-center space-x-2 p-2 text-xs text-muted-foreground">
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                            <span>Searching...</span>
+                          </div>
+                        )}
+                        {!isSearchingDistributors &&
+                          distributorOptions.length === 0 && (
+                            <CommandEmpty>No distributor found.</CommandEmpty>
+                          )}
+                        <CommandGroup>
+                          {distributorOptions.map((option) => (
+                            <CommandItem
+                              key={option.value}
+                              value={option.label}
+                              onSelect={() => {
+                                field.handleChange(
+                                  option.value
+                                    ? Number(option.value)
+                                    : undefined
+                                )
+                                setDistributorOpen(false)
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  field.state.value === Number(option.value)
+                                    ? "opacity-100"
+                                    : "opacity-0"
+                                )}
+                              />
+                              {option.label}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                {isInvalid && <FieldError errors={field.state.meta.errors} />}
+              </Field>
+            )
+          }}
+        </form.Field>
 
-              {isInvalid && <FieldError errors={field.state.meta.errors} />}
-            </Field>
-          )
-        }}
-      </form.Field>
+        {/* ADDRESS */}
+        <form.Field name="address">
+          {(field) => {
+            const isInvalid =
+              field.state.meta.isTouched && !field.state.meta.isValid
 
-      {/* CITY SELECT */}
-      <form.Field name="city">
-        {(field) => {
-          const isInvalid =
-            field.state.meta.isTouched && !field.state.meta.isValid
+            return (
+              <Field data-invalid={isInvalid}>
+                <FieldLabel htmlFor={field.name}>Address</FieldLabel>
+                <Textarea
+                  id={field.name}
+                  name={field.name}
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  aria-invalid={isInvalid}
+                  placeholder="Enter description details here..."
+                  autoComplete="off"
+                  disabled={mutation.isPending}
+                />
+                {isInvalid && <FieldError errors={field.state.meta.errors} />}
+              </Field>
+            )
+          }}
+        </form.Field>
 
-          return (
-            <Field data-invalid={isInvalid}>
-              <FieldLabel htmlFor={field.name}>City</FieldLabel>
+        {/* REGION SELECT */}
+        <form.Field name="region">
+          {(field) => {
+            const isInvalid =
+              field.state.meta.isTouched && !field.state.meta.isValid
 
-              <Select
-                value={field.state.value}
-                disabled={!citiesData.length}
-                onValueChange={async (cityName) => {
-                  field.handleChange(cityName)
+            return (
+              <Field data-invalid={isInvalid}>
+                <FieldLabel htmlFor={field.name}>Region</FieldLabel>
 
-                  form.setFieldValue("barangay", "")
+                <Select
+                  value={field.state.value}
+                  onValueChange={async (regionName) => {
+                    field.handleChange(regionName)
 
-                  const cityCode = cityCodeMap.get(cityName)
-                  if (cityCode) {
-                    await fetchBarangays(cityCode)
-                  }
-                }}
-              >
-                <SelectTrigger id={field.name}>
-                  <SelectValue placeholder="Select a city" />
-                </SelectTrigger>
+                    // Reset lower form fields
+                    form.setFieldValue("province", "")
+                    form.setFieldValue("city", "")
+                    form.setFieldValue("barangay", "")
 
-                <SelectContent>
-                  {citiesData.map((city) => (
-                    <SelectItem key={city.city_name} value={city.city_name}>
-                      {city.city_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                    const regionCode = regionCodeMap.get(regionName)
+                    if (regionCode) {
+                      await fetchProvinces(regionCode)
+                    }
+                  }}
+                >
+                  <SelectTrigger id={field.name}>
+                    <SelectValue placeholder="Select a region" />
+                  </SelectTrigger>
 
-              {isInvalid && <FieldError errors={field.state.meta.errors} />}
-            </Field>
-          )
-        }}
-      </form.Field>
+                  <SelectContent>
+                    {regionsData.map((region) => (
+                      <SelectItem
+                        key={region.region_name}
+                        value={region.region_name}
+                      >
+                        {region.region_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
 
-      {/* BARANGAY SELECT */}
-      <form.Field name="barangay">
-        {(field) => {
-          const isInvalid =
-            field.state.meta.isTouched && !field.state.meta.isValid
+                {isInvalid && <FieldError errors={field.state.meta.errors} />}
+              </Field>
+            )
+          }}
+        </form.Field>
 
-          return (
-            <Field data-invalid={isInvalid}>
-              <FieldLabel htmlFor={field.name}>Barangay</FieldLabel>
+        {/* PROVINCE SELECT */}
+        <form.Field name="province">
+          {(field) => {
+            const isInvalid =
+              field.state.meta.isTouched && !field.state.meta.isValid
 
-              <Select
-                value={field.state.value}
-                disabled={!barangaysData.length}
-                onValueChange={(brgyName) => {
-                  field.handleChange(brgyName)
-                }}
-              >
-                <SelectTrigger id={field.name}>
-                  <SelectValue placeholder="Select a barangay" />
-                </SelectTrigger>
+            return (
+              <Field data-invalid={isInvalid}>
+                <FieldLabel htmlFor={field.name}>Province</FieldLabel>
 
-                <SelectContent>
-                  {barangaysData.map((brgy) => (
-                    <SelectItem key={brgy.brgy_name} value={brgy.brgy_name}>
-                      {brgy.brgy_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                <Select
+                  value={field.state.value}
+                  disabled={!provincesData.length}
+                  onValueChange={async (provinceName) => {
+                    field.handleChange(provinceName)
 
-              {isInvalid && <FieldError errors={field.state.meta.errors} />}
-            </Field>
-          )
-        }}
-      </form.Field>
+                    form.setFieldValue("city", "")
+                    form.setFieldValue("barangay", "")
+
+                    const provinceCode = provinceCodeMap.get(provinceName)
+                    if (provinceCode) {
+                      await fetchCities(provinceCode)
+                    }
+                  }}
+                >
+                  <SelectTrigger id={field.name}>
+                    <SelectValue placeholder="Select a province" />
+                  </SelectTrigger>
+
+                  <SelectContent>
+                    {provincesData.map((province) => (
+                      <SelectItem
+                        key={province.province_name}
+                        value={province.province_name}
+                      >
+                        {province.province_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {isInvalid && <FieldError errors={field.state.meta.errors} />}
+              </Field>
+            )
+          }}
+        </form.Field>
+
+        {/* CITY SELECT */}
+        <form.Field name="city">
+          {(field) => {
+            const isInvalid =
+              field.state.meta.isTouched && !field.state.meta.isValid
+
+            return (
+              <Field data-invalid={isInvalid}>
+                <FieldLabel htmlFor={field.name}>City</FieldLabel>
+
+                <Select
+                  value={field.state.value}
+                  disabled={!citiesData.length}
+                  onValueChange={async (cityName) => {
+                    field.handleChange(cityName)
+
+                    form.setFieldValue("barangay", "")
+
+                    const cityCode = cityCodeMap.get(cityName)
+                    if (cityCode) {
+                      await fetchBarangays(cityCode)
+                    }
+                  }}
+                >
+                  <SelectTrigger id={field.name}>
+                    <SelectValue placeholder="Select a city" />
+                  </SelectTrigger>
+
+                  <SelectContent>
+                    {citiesData.map((city) => (
+                      <SelectItem key={city.city_name} value={city.city_name}>
+                        {city.city_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {isInvalid && <FieldError errors={field.state.meta.errors} />}
+              </Field>
+            )
+          }}
+        </form.Field>
+
+        {/* BARANGAY SELECT */}
+        <form.Field name="barangay">
+          {(field) => {
+            const isInvalid =
+              field.state.meta.isTouched && !field.state.meta.isValid
+
+            return (
+              <Field data-invalid={isInvalid}>
+                <FieldLabel htmlFor={field.name}>Barangay</FieldLabel>
+
+                <Select
+                  value={field.state.value}
+                  disabled={!barangaysData.length}
+                  onValueChange={(brgyName) => {
+                    field.handleChange(brgyName)
+                  }}
+                >
+                  <SelectTrigger id={field.name}>
+                    <SelectValue placeholder="Select a barangay" />
+                  </SelectTrigger>
+
+                  <SelectContent>
+                    {barangaysData.map((brgy) => (
+                      <SelectItem key={brgy.brgy_name} value={brgy.brgy_name}>
+                        {brgy.brgy_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {isInvalid && <FieldError errors={field.state.meta.errors} />}
+              </Field>
+            )
+          }}
+        </form.Field>
+      </div>
 
       {/* MAP LOCATION PICKER & LAT/LONG INPUTS */}
       <div className="space-y-3">

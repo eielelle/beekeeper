@@ -39,36 +39,69 @@ async function uploadProfilePicture(
 // ==========================================
 export async function fetchEmployeesAction(params: FetchEmployeesParams) {
   const ability = await getServerAbility()
-
   if (ability.cannot("read", "employees")) {
     throw new Error("Forbidden: You do not have permission to view employees.")
   }
 
   const supabase = await createClient()
+
   let query = supabase.from("employees").select("*", { count: "exact" })
 
-  // --- 1. Global Search ---
+  console.log("BACKEND RECEIVED FILTERS:", params.columnFilters)
+
+  // 1. GLOBAL FILTER (Searches across multiple columns using OR)
   if (params.globalFilter) {
     query = query.or(
       `employee_no.ilike.%${params.globalFilter}%,first_name.ilike.%${params.globalFilter}%,last_name.ilike.%${params.globalFilter}%,email.ilike.%${params.globalFilter}%`
     )
   }
 
-  // --- 2. Dynamic Filters ---
-  if (params.gender && params.gender !== "all") {
-    query = query.eq("gender", params.gender)
+  // 2. COLUMN-SPECIFIC FILTERS (Searches specific columns using AND)
+  if (params.columnFilters && params.columnFilters.length > 0) {
+    params.columnFilters.forEach((filter) => {
+      const { id, value } = filter
+
+      // 1. Handle basic string payload (from default text inputs)
+      if (typeof value === "string") {
+        query = query.ilike(id, `%${value}%`)
+        return
+      }
+
+      // 2. TypeScript now strictly knows `value` is one of our object payloads
+      switch (value.operator) {
+        case "range":
+          if (
+            value.min !== null &&
+            value.min !== undefined &&
+            value.min !== ""
+          ) {
+            query = query.gte(id, value.min)
+          }
+          if (
+            value.max !== null &&
+            value.max !== undefined &&
+            value.max !== ""
+          ) {
+            query = query.lte(id, value.max)
+          }
+          break
+
+        case "in":
+          query = query.in(id, value.values)
+          break
+
+        case "eq":
+          query = query.eq(id, value.value)
+          break
+
+        case "ilike":
+          query = query.ilike(id, `%${String(value.value)}%`)
+          break
+      }
+    })
   }
 
-  if (params.role && params.role !== "all") {
-    if (params.role === "superuser") {
-      query = query.eq("is_superuser", true)
-    } else if (params.role === "employee") {
-      // Handles both explicit 'false' or empty 'null' values in the DB safely
-      query = query.or("is_superuser.eq.false,is_superuser.is.null")
-    }
-  }
-
-  // --- 3. Sorting ---
+  // 3. SORTING
   if (params.sorting && params.sorting.length > 0) {
     const sort = params.sorting[0]
     query = query.order(sort.id, { ascending: !sort.desc })
@@ -76,7 +109,7 @@ export async function fetchEmployeesAction(params: FetchEmployeesParams) {
     query = query.order("created_at", { ascending: false })
   }
 
-  // --- 4. Pagination ---
+  // 4. PAGINATION
   const from = params.pageIndex * params.pageSize
   const to = from + params.pageSize - 1
   query = query.range(from, to)

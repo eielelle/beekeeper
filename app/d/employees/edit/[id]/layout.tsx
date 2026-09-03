@@ -21,14 +21,20 @@ export default function EditEmployeeLayout({
   const baseUrl = `/d/employees/edit/${id}`
   const basicUrl = `${baseUrl}/basic-information`
   const workUrl = `${baseUrl}/work-information`
+  const bankUrl = `${baseUrl}/bank-information`
 
   // Determine active tab based on the current URL
-  const activeTab = pathname.includes("work-information") ? "work" : "basic"
+  const activeTab = pathname.includes("work-information")
+    ? "work"
+    : pathname.includes("bank-information")
+      ? "bank"
+      : "basic"
 
   // Handle tab clicks by changing the route
   const onTabChange = (value: string) => {
     if (value === "basic") router.push(basicUrl)
     if (value === "work") router.push(workUrl)
+    if (value === "bank") router.push(bankUrl)
   }
 
   return (

@@ -9,6 +9,7 @@ import {
   fetchSalesGroupOptionsAction,
   fetchDistributorOptionsAction,
 } from "@/actions/outlet.action"
+import { FilterPayload } from "@/types/filter-payloads"
 
 export type OutletStoreType = {
   id?: string
@@ -36,6 +37,7 @@ export type FetchOutletsParams = {
   pageSize: number
   globalFilter?: string
   sorting?: { id: string; desc: boolean }[]
+  columnFilters?: { id: string; value: FilterPayload }[]
   distributorFilter?: string
   dateRange?: { from?: string; to?: string }
   region?: string
