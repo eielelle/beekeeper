@@ -98,7 +98,7 @@ export default function DataTablePagination<TData extends RowData>({
   return (
     <div className="flex flex-col items-center justify-between gap-4 px-2 sm:flex-row">
       {/* LEFT: Showing Results Text */}
-      <div className="text-sm text-muted-foreground">
+      <div className="text-xs text-muted-foreground">
         Showing <span className="font-medium text-foreground">{startRow}</span>{" "}
         to <span className="font-medium text-foreground">{endRow}</span> of{" "}
         <span className="font-medium text-foreground">{rowCount}</span> results
@@ -107,7 +107,7 @@ export default function DataTablePagination<TData extends RowData>({
       <div className="flex flex-col items-center gap-4 sm:flex-row sm:gap-6 lg:gap-8">
         {/* MIDDLE: Rows per page selector */}
         <div className="flex items-center space-x-2">
-          <p className="text-sm font-medium">Rows per page</p>
+          <p className="text-xs font-medium">Rows per page</p>
           <Select value={String(pageSize)} onValueChange={setSize}>
             <SelectTrigger className="h-8 w-[70px]">
               <SelectValue placeholder={pageSize} />

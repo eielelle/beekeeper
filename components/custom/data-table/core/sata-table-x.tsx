@@ -78,33 +78,22 @@ const ContextMenuRowInner = <TData extends RowData>({
           data-state={row.getIsSelected() && "selected"}
           className={className}
         >
-          {row.getVisibleCells().map((cell) => {
-            const isColumnPinned = cell.column.getIsPinned()
-            return (
-              <TableCell
-                key={cell.id}
-                style={{
-                  width: cell.column.getSize(),
-                  ...getStickyStyles(
-                    cell.column as Column<typeof features, TData, unknown>
-                  ),
-                }}
-                className={cn(
-                  // Apply z-10 for pinned body cells so they scroll UNDER the header
-                  isColumnPinned ? "z-10 bg-background" : "",
-                  // Only apply the necessary border side based on pin direction (start/end)
-                  isColumnPinned === "start"
-                    ? "border-r shadow-[1px_0_0_0_theme(colors.border)]"
-                    : "",
-                  isColumnPinned === "end"
-                    ? "border-l shadow-[-1px_0_0_0_theme(colors.border)]"
-                    : ""
-                )}
-              >
-                <table.FlexRender cell={cell} />
-              </TableCell>
-            )
-          })}
+          {row.getVisibleCells().map((cell) => (
+            <TableCell
+              key={cell.id}
+              style={{
+                width: cell.column.getSize(),
+                ...getStickyStyles(
+                  cell.column as Column<typeof features, TData, unknown>
+                ),
+              }}
+              className={cn(
+                cell.column.getIsPinned() ? "border-x bg-background" : ""
+              )}
+            >
+              <table.FlexRender cell={cell} />
+            </TableCell>
+          ))}
         </TableRow>
       </ContextMenuTrigger>
 
@@ -233,10 +222,10 @@ export function DataTable<TData extends RowData>({
 
       return {
         position: "sticky",
-        // Using start and end for the latest TanStack versions
-        left:
-          isPinned === "start" ? `${column.getStart("start")}px` : undefined,
-        right: isPinned === "end" ? `${column.getAfter("end")}px` : undefined,
+        backgroundColor: "var(--background)",
+        zIndex: 20,
+        left: isPinned === "start" ? `${column.getStart()}px` : undefined,
+        right: isPinned === "end" ? `${column.getAfter()}px` : undefined,
       }
     },
     []
@@ -255,32 +244,6 @@ export function DataTable<TData extends RowData>({
         </div>
       </div>
 
-      <div className="mt-2 flex">
-        {table.getVisibleLeafColumns().map((column) => {
-          const meta = column.columnDef.meta as CustomColumnMeta
-          const filterVariant = meta?.filterVariant
-          const filterOptions = meta?.filterOptions ?? []
-
-          if (!column.getCanFilter()) {
-            return null
-          }
-
-          return (
-            <div key={column.id}>
-              {filterVariant === "number-range" ? (
-                <NumberRangeFilter column={column} />
-              ) : filterVariant === "date-range" ? (
-                <DateRangeFilter column={column} />
-              ) : filterVariant === "date" ? (
-                <DateFilter column={column} />
-              ) : filterVariant === "checkbox" ? (
-                <CheckboxFilter column={column} options={filterOptions} />
-              ) : null}
-            </div>
-          )
-        })}
-      </div>
-
       <div className="overflow-hidden rounded-md border">
         {/* Let the table fill 100% width, dividing columns equally by default */}
         <Table
@@ -291,14 +254,16 @@ export function DataTable<TData extends RowData>({
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => {
-                  const isColumnPinned = header.column.getIsPinned()
+                  const meta = header.column.columnDef.meta as CustomColumnMeta
+                  const filterVariant = meta?.filterVariant
+                  const filterOptions = meta?.filterOptions ?? []
 
                   return (
                     <TableHead
                       key={header.id}
 
                       // --- Drag and Drop Events ---
-                      draggable={!isColumnPinned}
+                      draggable={!header.column.getIsPinned()}
                       onDragStart={(e) => handleDragStart(e, header.column.id)}
                       onDragOver={(e) => handleDragOver(e, header.column.id)}
                       onDrop={(e) => handleDrop(e, header.column.id)}
@@ -321,15 +286,7 @@ export function DataTable<TData extends RowData>({
                       }}
                       className={cn(
                         "group relative transition-colors duration-200",
-                        // Headers get z-20 so they sit above pinned rows (z-10)
-                        isColumnPinned ? "z-20 bg-background" : "",
-                        // Directional borders fix the chunky double lines
-                        isColumnPinned === "start"
-                          ? "border-r shadow-[1px_0_0_0_theme(colors.border)]"
-                          : "",
-                        isColumnPinned === "end"
-                          ? "border-l shadow-[-1px_0_0_0_theme(colors.border)]"
-                          : "",
+                        header.column.getIsPinned() ? "border-x shadow-sm" : "",
                         draggedColumn === header.column.id
                           ? "bg-accent opacity-40"
                           : "",
@@ -343,6 +300,23 @@ export function DataTable<TData extends RowData>({
                           <div className="flex-1 font-semibold">
                             <table.FlexRender header={header} />
                           </div>
+
+                          {header.column.getCanFilter() ? (
+                            <div className="mt-2 w-full">
+                              {filterVariant === "number-range" ? (
+                                <NumberRangeFilter column={header.column} />
+                              ) : filterVariant === "date-range" ? (
+                                <DateRangeFilter column={header.column} />
+                              ) : filterVariant === "date" ? (
+                                <DateFilter column={header.column} />
+                              ) : filterVariant === "checkbox" ? (
+                                <CheckboxFilter
+                                  column={header.column}
+                                  options={filterOptions}
+                                />
+                              ) : null}
+                            </div>
+                          ) : null}
                         </div>
                       )}
 
@@ -360,7 +334,7 @@ export function DataTable<TData extends RowData>({
                           }}
 
                           className={cn(
-                            "absolute top-0 right-0 z-30 h-full w-1 cursor-col-resize touch-none bg-border select-none",
+                            "absolute top-0 right-0 h-full w-1 cursor-col-resize touch-none bg-border select-none",
                             header.column.getIsResizing()
                               ? "bg-primary opacity-100"
                               : "opacity-0 group-hover:opacity-100"
@@ -382,7 +356,7 @@ export function DataTable<TData extends RowData>({
                 row={row}
                 table={table}
                 getStickyStyles={getStickyStyles}
-                className="sticky top-0 z-20 bg-muted/95 shadow-sm backdrop-blur"
+                className="sticky top-0 z-10 bg-muted/50"
               />
             ))}
 
@@ -417,7 +391,7 @@ export function DataTable<TData extends RowData>({
                 row={row}
                 table={table}
                 getStickyStyles={getStickyStyles}
-                className="sticky bottom-0 z-20 border-t bg-muted/95 shadow-sm backdrop-blur"
+                className="sticky bottom-0 z-10 bg-muted/50"
               />
             ))}
           </TableBody>
