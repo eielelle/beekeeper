@@ -2,6 +2,9 @@ import { OutletStoreType } from "@/forms/queries/outlet.query"
 import { createAppColumnHelper } from "@/hooks/use-data-table"
 import { ColumnSort } from "../core/data-table-column-header"
 import { CustomColumnMeta } from "@/types/filter-payloads" // <-- Adjust path to where you saved this interface
+import { Button } from "@/components/ui/button"
+import { Edit, Trash } from "lucide-react"
+import Link from "next/link"
 
 const columnHelper = createAppColumnHelper<OutletStoreType>()
 
@@ -55,5 +58,23 @@ export const columns = columnHelper.columns([
     meta: {
       filterVariant: "text",
     } as CustomColumnMeta,
+  }),
+
+  columnHelper.display({
+    id: "actions",
+    cell: ({ row }) => {
+      return (
+        <div className="flex gap-2">
+          <Link href={`/d/outlets/edit/${row.original.id}`}>
+            <Button size={"xs"} variant={"ghost"}>
+              <Edit />
+            </Button>
+          </Link>
+          <Button size={"xs"} variant={"ghost"}>
+            <Trash />
+          </Button>
+        </div>
+      )
+    },
   }),
 ])

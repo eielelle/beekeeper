@@ -2,6 +2,8 @@ import { EmployeeStoreType } from "@/forms/queries/employee.query"
 import { createAppColumnHelper } from "@/hooks/use-data-table"
 import { ColumnSort } from "../core/data-table-column-header"
 import { CustomColumnMeta } from "@/types/filter-payloads" // <-- Adjust path to where you saved this interface
+import { Button } from "@/components/ui/button"
+import { Edit, Trash } from "lucide-react"
 
 const columnHelper = createAppColumnHelper<EmployeeStoreType>()
 
@@ -55,12 +57,21 @@ export const columns = columnHelper.columns([
     } as CustomColumnMeta,
   }),
 
-  columnHelper.accessor("account_status", {
-    header: (props) => (
-      <ColumnSort column={props.column} label="Employee Status" />
-    ),
-    meta: {
-      filterVariant: "text",
-    } as CustomColumnMeta,
+  columnHelper.display({
+    id: "actions",
+    cell: ({ row }) => {
+      const employee = row.original
+
+      return (
+        <div className="flex gap-2">
+          <Button size={"xs"} variant={"ghost"}>
+            <Edit />
+          </Button>
+          <Button size={"xs"} variant={"ghost"}>
+            <Trash />
+          </Button>
+        </div>
+      )
+    },
   }),
 ])

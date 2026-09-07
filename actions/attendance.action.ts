@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase-server"
 import { getServerAbility } from "@/lib/casl/server"
 import type { FetchAttendanceLogsParams } from "@/forms/queries/attendance.query"
+import { FetchParams } from "@/types/fetch-params"
 
 // Helper to map the Auth user to your Employees table
 async function getCurrentEmployeeId(supabase: any, userId: string) {
@@ -141,41 +142,62 @@ export async function fetchAttendanceStatsAction(dateRange?: {
   }
 }
 
-// ==========================================
-// 2. PERSONAL ACTIONS (For /my-attendances)
-// ==========================================
+export async function fetchMyAttendanceLogsAction(params: FetchParams) {
+  const ability = await getServerAbility()
+  if (ability.cannot("read", "attendances")) {
+    throw new Error("Forbidden: You do not have permission to view employees.")
+  }
 
-export async function fetchMyAttendanceLogsAction(
-  params: Omit<FetchAttendanceLogsParams, "employeeId">
-) {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) throw new Error("Unauthorized")
 
-  const currentEmployeeId = await getCurrentEmployeeId(supabase, user.id)
+  let query = supabase.from("attendances").select("*", { count: "exact" })
 
-  let query = supabase.from("attendances").select(
-    `
-      id, time_in, time_out, time_in_lat, time_in_long, time_out_lat, time_out_long, 
-      time_in_attachment, time_out_attachment, created_at, 
-      employee:employees!employee_id(id, first_name, last_name, employee_no, avatar_url)
-    `,
-    { count: "exact" }
-  )
+  // 2. COLUMN-SPECIFIC FILTERS (Searches specific columns using AND)
+  if (params.columnFilters && params.columnFilters.length > 0) {
+    params.columnFilters.forEach((filter) => {
+      const { id, value } = filter
 
-  // SECURE LOCK: You can only ever see your own logs
-  query = query.eq("employee_id", currentEmployeeId)
+      // 1. Handle basic string payload (from default text inputs)
+      if (typeof value === "string") {
+        query = query.ilike(id, `%${value}%`)
+        return
+      }
 
-  if (params.statusFilter === "active") query = query.is("time_out", null)
-  else if (params.statusFilter === "completed")
-    query = query.not("time_out", "is", null)
+      // 2. TypeScript now strictly knows `value` is one of our object payloads
+      switch (value.operator) {
+        case "range":
+          if (
+            value.min !== null &&
+            value.min !== undefined &&
+            value.min !== ""
+          ) {
+            query = query.gte(id, value.min)
+          }
+          if (
+            value.max !== null &&
+            value.max !== undefined &&
+            value.max !== ""
+          ) {
+            query = query.lte(id, value.max)
+          }
+          break
 
-  if (params.dateRange?.from)
-    query = query.gte("created_at", params.dateRange.from)
-  if (params.dateRange?.to) query = query.lte("created_at", params.dateRange.to)
+        case "in":
+          query = query.in(id, value.values)
+          break
 
+        case "eq":
+          query = query.eq(id, value.value)
+          break
+
+        case "ilike":
+          query = query.ilike(id, `%${String(value.value)}%`)
+          break
+      }
+    })
+  }
+
+  // 3. SORTING
   if (params.sorting && params.sorting.length > 0) {
     const sort = params.sorting[0]
     query = query.order(sort.id, { ascending: !sort.desc })
@@ -183,15 +205,67 @@ export async function fetchMyAttendanceLogsAction(
     query = query.order("created_at", { ascending: false })
   }
 
+  // 4. PAGINATION
   const from = params.pageIndex * params.pageSize
-  const { data, error, count } = await query.range(
-    from,
-    from + params.pageSize - 1
-  )
+  const to = from + params.pageSize - 1
+  query = query.range(from, to)
 
+  const { data, error, count } = await query
   if (error) throw new Error(error.message)
-  return { data: data || [], rowCount: count || 0 }
+
+  return { data, rowCount: count || 0 }
 }
+
+// ==========================================
+// 2. PERSONAL ACTIONS (For /my-attendances)
+// ==========================================
+// export async function fetchMyAttendanceLogsAction(
+//   params: Omit<FetchAttendanceLogsParams, "employeeId">
+// ) {
+//   const supabase = await createClient()
+//   const {
+//     data: { user },
+//   } = await supabase.auth.getUser()
+//   if (!user) throw new Error("Unauthorized")
+
+//   const currentEmployeeId = await getCurrentEmployeeId(supabase, user.id)
+
+//   let query = supabase.from("attendances").select(
+//     `
+//       id, time_in, time_out, time_in_lat, time_in_long, time_out_lat, time_out_long,
+//       time_in_attachment, time_out_attachment, created_at,
+//       employee:employees!employee_id(id, first_name, last_name, employee_no, avatar_url)
+//     `,
+//     { count: "exact" }
+//   )
+
+//   // SECURE LOCK: You can only ever see your own logs
+//   query = query.eq("employee_id", currentEmployeeId)
+
+//   if (params.statusFilter === "active") query = query.is("time_out", null)
+//   else if (params.statusFilter === "completed")
+//     query = query.not("time_out", "is", null)
+
+//   if (params.dateRange?.from)
+//     query = query.gte("created_at", params.dateRange.from)
+//   if (params.dateRange?.to) query = query.lte("created_at", params.dateRange.to)
+
+//   if (params.sorting && params.sorting.length > 0) {
+//     const sort = params.sorting[0]
+//     query = query.order(sort.id, { ascending: !sort.desc })
+//   } else {
+//     query = query.order("created_at", { ascending: false })
+//   }
+
+//   const from = params.pageIndex * params.pageSize
+//   const { data, error, count } = await query.range(
+//     from,
+//     from + params.pageSize - 1
+//   )
+
+//   if (error) throw new Error(error.message)
+//   return { data: data || [], rowCount: count || 0 }
+// }
 
 export async function fetchMyAttendanceStatsAction(dateRange?: {
   from?: string

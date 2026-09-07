@@ -7,6 +7,7 @@ import {
   updateAttendanceAction,
   deleteAttendanceAction,
 } from "@/actions/attendance.action" // Adjust path if needed
+import { FetchParams } from "@/types/fetch-params"
 import { toast } from "sonner"
 
 // --- TYPES ---
@@ -30,50 +31,39 @@ export type AttendanceLogType = {
   } | null
 }
 
-export type FetchAttendanceLogsParams = {
-  pageIndex: number
-  pageSize: number
-  sorting?: { id: string; desc: boolean }[]
-  statusFilter?: string
-  employeeId?: string
-  dateRange?: { from?: string; to?: string }
-}
-
 // ==========================================
 // ADMIN FETCH WRAPPERS
 // ==========================================
-export async function fetchAttendanceLogs(params: FetchAttendanceLogsParams) {
-  try {
-    const response = await fetchAttendanceLogsAction(params)
-    return {
-      data: response.data as unknown as AttendanceLogType[],
-      rowCount: response.rowCount,
-    }
-  } catch (error: any) {
-    toast.error(`ERR: ${error.message}`)
-    throw error
-  }
-}
+// export async function fetchAttendanceLogs(params: FetchAttendanceLogsParams) {
+//   try {
+//     const response = await fetchAttendanceLogsAction(params)
+//     return {
+//       data: response.data as unknown as AttendanceLogType[],
+//       rowCount: response.rowCount,
+//     }
+//   } catch (error: any) {
+//     toast.error(`ERR: ${error.message}`)
+//     throw error
+//   }
+// }
 
-export async function fetchAttendanceStats({
-  dateRange,
-}: {
-  dateRange?: { from?: string; to?: string }
-}) {
-  try {
-    return await fetchAttendanceStatsAction(dateRange)
-  } catch (error: any) {
-    toast.error(`ERR: ${error.message}`)
-    throw error
-  }
-}
+// export async function fetchAttendanceStats({
+//   dateRange,
+// }: {
+//   dateRange?: { from?: string; to?: string }
+// }) {
+//   try {
+//     return await fetchAttendanceStatsAction(dateRange)
+//   } catch (error: any) {
+//     toast.error(`ERR: ${error.message}`)
+//     throw error
+//   }
+// }
 
 // ==========================================
 // PERSONAL (EMPLOYEE) FETCH WRAPPERS
 // ==========================================
-export async function fetchMyAttendanceLogs(
-  params: Omit<FetchAttendanceLogsParams, "employeeId">
-) {
+export async function fetchMyAttendanceLogs(params: FetchParams) {
   try {
     const response = await fetchMyAttendanceLogsAction(params)
     return {

@@ -78,7 +78,7 @@ export async function fetchOutletsAction(params: FetchOutletsParams) {
   // 1. GLOBAL FILTER (Searches across multiple columns using OR)
   if (params.globalFilter) {
     query = query.or(
-      `name.ilike.%${params.globalFilter}%,code.ilike.%${params.globalFilter}%`
+      `outlet_name.ilike.%${params.globalFilter}%,outlet_code.ilike.%${params.globalFilter}%`
     )
   }
 

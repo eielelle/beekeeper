@@ -53,6 +53,7 @@ interface DataTableProps<TData extends RowData> {
   paginationAtom?: Atom<PaginationState>
   pageCount: number
   rowCount: number
+  onRowClick?: (row: Row<DataTableFeatures, TData>) => void
 }
 
 // --- Extracted outside to prevent recreating the component on every render ---
@@ -61,6 +62,7 @@ const ContextMenuRowInner = <TData extends RowData>({
   className,
   table,
   getStickyStyles,
+  onRowClick,
 }: {
   row: Row<typeof features, TData>
   className?: string
@@ -68,6 +70,7 @@ const ContextMenuRowInner = <TData extends RowData>({
   getStickyStyles: (
     column: Column<typeof features, TData, unknown>
   ) => React.CSSProperties
+  onRowClick?: (row: any) => void
 }) => {
   const isPinned = row.getIsPinned()
 
@@ -76,7 +79,8 @@ const ContextMenuRowInner = <TData extends RowData>({
       <ContextMenuTrigger asChild>
         <TableRow
           data-state={row.getIsSelected() && "selected"}
-          className={className}
+          className={cn(className, onRowClick && "cursor-pointer")}
+          onClick={() => onRowClick?.(row)}
         >
           {row.getVisibleCells().map((cell) => {
             const isColumnPinned = cell.column.getIsPinned()
@@ -143,6 +147,7 @@ export function DataTable<TData extends RowData>({
   data,
   pageCount = -1,
   rowCount,
+  onRowClick,
 }: DataTableProps<TData>) {
   const {
     pagination,
@@ -383,6 +388,7 @@ export function DataTable<TData extends RowData>({
                 table={table}
                 getStickyStyles={getStickyStyles}
                 className="sticky top-0 z-20 bg-muted/95 shadow-sm backdrop-blur"
+                onRowClick={onRowClick}
               />
             ))}
 
@@ -396,6 +402,7 @@ export function DataTable<TData extends RowData>({
                       row={row}
                       table={table}
                       getStickyStyles={getStickyStyles}
+                      onRowClick={onRowClick}
                     />
                   ))
               : table.getTopRows().length === 0 &&
@@ -418,6 +425,7 @@ export function DataTable<TData extends RowData>({
                 table={table}
                 getStickyStyles={getStickyStyles}
                 className="sticky bottom-0 z-20 border-t bg-muted/95 shadow-sm backdrop-blur"
+                onRowClick={onRowClick}
               />
             ))}
           </TableBody>
