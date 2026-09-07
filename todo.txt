@@ -75,7 +75,7 @@ Expenses
 
 Outlets
 - Dashboard (read)
-- Outlets (New, Update, Delete, View)
+- Outlets (New [done], Update [done], Delete, View)
 - Assigned Outlets (Delete, view)
 - Outlet Assignment (Assign, update)
 
@@ -172,3 +172,96 @@ Production
   if (error) throw new Error(error.message)
 
   return { data, rowCount: count || 0 }
+
+
+
+
+
+-------------------------------------ACTION----------------
+
+
+// ==========================================
+// 1. FETCH ALL EMPLOYEES (PAGINATED)
+// ==========================================
+export async function fetchEmployeesAction(params: FetchEmployeesParams) {
+  const ability = await getServerAbility()
+  if (ability.cannot("read", "employees")) {
+    throw new Error("Forbidden: You do not have permission to view employees.")
+  }
+
+  const supabase = await createClient()
+
+  let query = supabase.from("employees").select("*", { count: "exact" })
+
+  console.log("BACKEND RECEIVED FILTERS:", params.columnFilters)
+
+  // 1. GLOBAL FILTER (Searches across multiple columns using OR)
+  if (params.globalFilter) {
+    query = query.or(
+      `employee_no.ilike.%${params.globalFilter}%,first_name.ilike.%${params.globalFilter}%,last_name.ilike.%${params.globalFilter}%,email.ilike.%${params.globalFilter}%`
+    )
+  }
+
+  // 2. COLUMN-SPECIFIC FILTERS (Searches specific columns using AND)
+  if (params.columnFilters && params.columnFilters.length > 0) {
+    params.columnFilters.forEach((filter) => {
+      const { id, value } = filter
+
+      // 1. Handle basic string payload (from default text inputs)
+      if (typeof value === "string") {
+        query = query.ilike(id, `%${value}%`)
+        return
+      }
+
+      // 2. TypeScript now strictly knows `value` is one of our object payloads
+      switch (value.operator) {
+        case "range":
+          if (
+            value.min !== null &&
+            value.min !== undefined &&
+            value.min !== ""
+          ) {
+            query = query.gte(id, value.min)
+          }
+          if (
+            value.max !== null &&
+            value.max !== undefined &&
+            value.max !== ""
+          ) {
+            query = query.lte(id, value.max)
+          }
+          break
+
+        case "in":
+          query = query.in(id, value.values)
+          break
+
+        case "eq":
+          query = query.eq(id, value.value)
+          break
+
+        case "ilike":
+          query = query.ilike(id, `%${String(value.value)}%`)
+          break
+      }
+    })
+  }
+
+  // 3. SORTING
+  if (params.sorting && params.sorting.length > 0) {
+    const sort = params.sorting[0]
+    query = query.order(sort.id, { ascending: !sort.desc })
+  } else {
+    query = query.order("created_at", { ascending: false })
+  }
+
+  // 4. PAGINATION
+  const from = params.pageIndex * params.pageSize
+  const to = from + params.pageSize - 1
+  query = query.range(from, to)
+
+  const { data, error, count } = await query
+  if (error) throw new Error(error.message)
+
+  return { data, rowCount: count || 0 }
+}
