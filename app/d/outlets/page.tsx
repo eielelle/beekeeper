@@ -17,8 +17,10 @@ import {
 } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 
 export default function Page() {
+  const router = useRouter()
   // Extract globalFilter from your hook
   const { page, size, sorting, globalFilter, columnFilters } =
     useUrlTableState()
@@ -66,6 +68,9 @@ export default function Page() {
             data={outletsData}
             pageCount={pageCount}
             rowCount={rowCount}
+            onRowClick={(row) =>
+              router.push(`/d/outlets/details/${row.original.id}`)
+            }
           />
         </CardContent>
       </Card>

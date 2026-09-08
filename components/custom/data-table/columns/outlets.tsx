@@ -5,12 +5,19 @@ import { CustomColumnMeta } from "@/types/filter-payloads" // <-- Adjust path to
 import { Button } from "@/components/ui/button"
 import { Edit, Trash } from "lucide-react"
 import Link from "next/link"
+import { formatSupabaseDate } from "@/lib/helpers/date"
+import { DeleteAction } from "../../dialogs/delete-dialog"
 
 const columnHelper = createAppColumnHelper<OutletStoreType>()
 
 export const columns = columnHelper.columns([
   columnHelper.accessor("created_at", {
     header: (props) => <ColumnSort column={props.column} label="Created At" />,
+    cell: ({ getValue }) =>
+      formatSupabaseDate(getValue(), {
+        preset: "medium",
+        includeTime: true,
+      }),
     meta: {
       filterVariant: "date",
     } as CustomColumnMeta,
@@ -35,14 +42,22 @@ export const columns = columnHelper.columns([
       <ColumnSort column={props.column} label="Is Distributor" />
     ),
     meta: {
-      filterVariant: "text",
+      filterVariant: "checkbox",
+      filterOptions: [
+        { label: "Distributor", value: "true" },
+        { label: "Not Distributor", value: "false" },
+      ],
     } as CustomColumnMeta,
   }),
 
   columnHelper.accessor("is_active", {
     header: (props) => <ColumnSort column={props.column} label="Active" />,
     meta: {
-      filterVariant: "text",
+      filterVariant: "checkbox",
+      filterOptions: [
+        { label: "Active", value: "true" },
+        { label: "Inactive", value: "false" },
+      ],
     } as CustomColumnMeta,
   }),
 
@@ -70,9 +85,14 @@ export const columns = columnHelper.columns([
               <Edit />
             </Button>
           </Link>
-          <Button size={"xs"} variant={"ghost"}>
-            <Trash />
-          </Button>
+          <DeleteAction
+            id={row.original.id!}
+            deleteFn={async (id) => {
+              // Implement the actual delete function for outlets
+            }}
+            queryKeyToInvalidate={["outlets"]}
+            entityName="outlet"
+          />
         </div>
       )
     },

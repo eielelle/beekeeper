@@ -888,11 +888,7 @@ export function OutletForm({
 
       {/* SUBMIT BUTTON */}
       <Button type="submit" disabled={mutation.isPending}>
-        {mutation.isPending
-          ? "Saving..."
-          : isEditMode
-            ? "Update Outlet"
-            : "Create Outlet"}
+        {mutation.isPending ? "Saving..." : isEditMode ? "Save" : "Save"}
       </Button>
     </form>
   )

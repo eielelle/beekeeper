@@ -12,14 +12,10 @@ import { OutletForm } from "@/forms/outlet.form"
 export default function Page() {
   return (
     <>
-      <Card>
+      <Card className="border-t-4 border-t-primary">
         <CardHeader>
           <CardTitle>Edit Outlet</CardTitle>
           <CardDescription>Update an existing outlet</CardDescription>
-
-          <CardAction>
-            <Button>Save</Button>
-          </CardAction>
         </CardHeader>
       </Card>
 

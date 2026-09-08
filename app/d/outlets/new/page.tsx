@@ -14,14 +14,10 @@ import { Link } from "lucide-react"
 export default function Page() {
   return (
     <>
-      <Card>
+      <Card className="border-t-4 border-t-primary">
         <CardHeader>
           <CardTitle>New Outlet</CardTitle>
           <CardDescription>Add a new outlet</CardDescription>
-
-          <CardAction>
-            <Button>Save</Button>
-          </CardAction>
         </CardHeader>
       </Card>
 

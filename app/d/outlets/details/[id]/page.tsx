@@ -29,7 +29,7 @@ export default async function Page({ params }: PageProps) {
 
   return (
     <section className="space-y-4">
-      <Card className="border-t-2 border-t-primary">
+      <Card className="border-t-4 border-t-primary">
         <CardHeader>
           <CardTitle>{outlet.outlet_name}</CardTitle>
           <CardDescription>Database Record Details</CardDescription>
