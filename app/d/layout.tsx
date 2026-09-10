@@ -74,7 +74,7 @@ export default async function DashboardLayout({
           </DropdownMenu>
         </header>
 
-        <main className="flex flex-1 flex-col gap-4 p-4">
+        <main className="flex flex-1 flex-col gap-4 bg-muted p-4">
           <AppBreadcrumb />
           {children}
         </main>

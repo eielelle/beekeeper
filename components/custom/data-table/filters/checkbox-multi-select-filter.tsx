@@ -2,17 +2,26 @@
 
 import * as React from "react"
 import { Column, RowData } from "@tanstack/react-table"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Filter } from "lucide-react" // Optional, for a nice filter icon
+
 import { DataTableFeatures } from "@/hooks/use-data-table"
 import { FilterPayload } from "@/types/filter-payloads"
 
 export function CheckboxFilter<TData extends RowData, TValue = unknown>({
   column,
+  title,
   options,
 }: {
   column: Column<DataTableFeatures, TData, TValue>
+  title: string
   options: { label: string; value: string }[]
 }) {
   const filterPayload = column.getFilterValue() as
@@ -38,35 +47,51 @@ export function CheckboxFilter<TData extends RowData, TValue = unknown>({
   }
 
   return (
-    <div
-      className="mt-2 flex flex-col space-y-2"
-      onClick={(e) => e.stopPropagation()}
-    >
-      {options.map((option) => (
-        <div key={option.value} className="flex items-center space-x-2">
-          <Checkbox
-            id={`${column.id}-${option.value}`}
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="xs">
+          <Filter className="mr-2 h-4 w-4" />
+          {title}
+          {/* Optional: Show a badge with the count of active filters */}
+          {selectedValues.size > 0 && (
+            <>
+              <DropdownMenuSeparator className="hidden h-4 md:block" />
+              <span className="ml-2 rounded-sm bg-secondary px-1 text-xs font-normal">
+                {selectedValues.size} selected
+              </span>
+            </>
+          )}
+        </Button>
+      </DropdownMenuTrigger>
+
+      <DropdownMenuContent align="start" className="w-[200px]">
+        {options.map((option) => (
+          <DropdownMenuCheckboxItem
+            key={option.value}
             checked={selectedValues.has(option.value)}
             onCheckedChange={() => toggleOption(option.value)}
-          />
-          <Label
-            htmlFor={`${column.id}-${option.value}`}
-            className="cursor-pointer text-xs font-medium"
+            // Prevents the dropdown from closing when selecting multiple items
+            onSelect={(e) => e.preventDefault()}
           >
             {option.label}
-          </Label>
-        </div>
-      ))}
-      {selectedValues.size > 0 && (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => column.setFilterValue(undefined)}
-          className="h-6 text-xs"
-        >
-          Clear
-        </Button>
-      )}
-    </div>
+          </DropdownMenuCheckboxItem>
+        ))}
+
+        {/* Clear Button at the bottom of the dropdown */}
+        {selectedValues.size > 0 && (
+          <>
+            <DropdownMenuSeparator />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => column.setFilterValue(undefined)}
+              className="w-full justify-center text-xs font-normal"
+            >
+              Clear filters
+            </Button>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }

@@ -47,7 +47,7 @@ export default function Page() {
 
   return (
     <div className="space-y-4">
-      <Card>
+      <Card className="border-t-4 border-t-primary">
         <CardHeader>
           <CardTitle>Employees</CardTitle>
           <CardDescription>View and manage employees</CardDescription>
@@ -68,10 +68,6 @@ export default function Page() {
         data={innerData}
         pageCount={pageCount}
         rowCount={rowCount}
-        onRowClick={(row) => {
-          const employee = row.original
-          router.push(`/d/employees/view/${employee.id}`)
-        }}
       />
     </div>
   )

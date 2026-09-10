@@ -6,6 +6,7 @@ import {
   updateEmployeeAction,
   getCurrentEmployeeIdAction,
   searchEmployeeOptionsAction,
+  removeEmployeeAction,
 } from "@/actions/employee.action"
 import type {
   CreateEmployeeFormValues,
@@ -140,30 +141,6 @@ export async function updateEmployee(
   }
 }
 
-export async function deleteEmployee(id: string | number) {
-  const t = toast.loading("Deleting Employee. Please wait.")
-  try {
-    const res = await fetch(`/api/v1/users?id=${id}`, {
-      method: "DELETE",
-    })
-
-    if (!res.ok) {
-      const errData = await res.json()
-      throw new Error(
-        errData.error || "Failed to delete employee and auth account."
-      )
-    }
-
-    toast.dismiss(t)
-    toast.success("Employee successfully deleted.")
-    return await res.json()
-  } catch (error) {
-    toast.dismiss(t)
-    toast.error(`ERR: ${getErrorMessage(error)}`)
-    throw error
-  }
-}
-
 export async function searchEmployeeOptions(searchTerm: string) {
   try {
     return await searchEmployeeOptionsAction(searchTerm)
@@ -171,5 +148,19 @@ export async function searchEmployeeOptions(searchTerm: string) {
     console.error(error)
     toast.error(`ERR: ${getErrorMessage(error)}`)
     return []
+  }
+}
+
+export async function removeEmployee(id: string) {
+  const t = toast.loading("Removing Employee. Please wait.")
+
+  try {
+    await removeEmployeeAction(id)
+    toast.dismiss(t)
+    toast.success("Employee successfully removed.")
+  } catch (error) {
+    toast.dismiss(t)
+    toast.error(`ERR: ${getErrorMessage(error)}`)
+    throw error
   }
 }

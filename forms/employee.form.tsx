@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import { useForm } from "@tanstack/react-form"
 import { Plus, Trash2, Upload, Loader2 } from "lucide-react"
 
@@ -34,6 +34,17 @@ import {
   getEmployee,
   updateEmployee,
 } from "./queries/employee.query"
+
+import {
+  regions,
+  provinces,
+  cities,
+  barangays,
+  Barangay,
+  City,
+  Province,
+  Region,
+} from "select-philippines-address"
 
 // 1. Define base defaults OUTSIDE the component to avoid declaration order and circular dependency issues
 const BASE_DEFAULT_VALUES: Partial<CreateEmployeeFormValues> = {
@@ -93,6 +104,7 @@ export function AllInOneEmployeeForm({
   initialData?: Partial<CreateEmployeeFormValues>
   onSubmitAction?: (data: CreateEmployeeFormValues) => Promise<void>
 }) {
+  const router = useRouter()
   const params = useParams()
   const employeeId = params?.id as string
   const isEditMode = !!employeeId
@@ -112,26 +124,73 @@ export function AllInOneEmployeeForm({
   // Reference for the hidden file input
   const fileInputRef = React.useRef<HTMLInputElement>(null)
 
+  // --- ADDRESS CASCADE STATES ---
+  const [regionsData, setRegionsData] = React.useState<Region[]>([])
+  const regionCodeMap = React.useMemo(
+    () => new Map(regionsData.map((r) => [r.region_name, r.region_code])),
+    [regionsData]
+  )
+
+  // Present Address States
+  const [presentProvinces, setPresentProvinces] = React.useState<Province[]>([])
+  const [presentCities, setPresentCities] = React.useState<City[]>([])
+  const [presentBarangays, setPresentBarangays] = React.useState<Barangay[]>([])
+
+  const presentProvinceCodeMap = React.useMemo(
+    () =>
+      new Map(presentProvinces.map((p) => [p.province_name, p.province_code])),
+    [presentProvinces]
+  )
+  const presentCityCodeMap = React.useMemo(
+    () => new Map(presentCities.map((c) => [c.city_name, c.city_code])),
+    [presentCities]
+  )
+
+  // Permanent Address States
+  const [permanentProvinces, setPermanentProvinces] = React.useState<
+    Province[]
+  >([])
+  const [permanentCities, setPermanentCities] = React.useState<City[]>([])
+  const [permanentBarangays, setPermanentBarangays] = React.useState<
+    Barangay[]
+  >([])
+
+  const permanentProvinceCodeMap = React.useMemo(
+    () =>
+      new Map(
+        permanentProvinces.map((p) => [p.province_name, p.province_code])
+      ),
+    [permanentProvinces]
+  )
+  const permanentCityCodeMap = React.useMemo(
+    () => new Map(permanentCities.map((c) => [c.city_name, c.city_code])),
+    [permanentCities]
+  )
+
+  // Fetch Regions on mount
+  React.useEffect(() => {
+    ;(async () => {
+      const data = await regions()
+      setRegionsData(data)
+    })()
+  }, [])
+
   // Fetch Roles & Employee Data
   React.useEffect(() => {
     async function loadData() {
       try {
-        // Fetch Roles
         setIsLoadingRoles(true)
         const fetchedRoles = await fetchRoles()
         setRoles(fetchedRoles || [])
         setIsLoadingRoles(false)
 
-        // Fetch Employee if in Edit Mode
         if (isEditMode) {
           setIsLoadingEmployee(true)
           const data = await getEmployee(employeeId)
 
           if (data) {
-            // Map the fetched DB data to the form schema using BASE_DEFAULT_VALUES for fallbacks
             setEmployeeData({
               ...data,
-              // Convert role_id to string for the Select component
               role_id: data.role_id ? String(data.role_id) : "",
               present_address:
                 data.employee_addresses?.find(
@@ -161,8 +220,56 @@ export function AllInOneEmployeeForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [employeeId, isEditMode])
 
+  // Hydrate Address Fields for Edit Mode
+  React.useEffect(() => {
+    if (!employeeData || regionsData.length === 0) return
+
+    async function hydrateAddressCascade(
+      address: any,
+      setProv: React.Dispatch<React.SetStateAction<Province[]>>,
+      setCit: React.Dispatch<React.SetStateAction<City[]>>,
+      setBrgy: React.Dispatch<React.SetStateAction<Barangay[]>>
+    ) {
+      if (!address?.region) return
+      const regionCode = regionCodeMap.get(address.region)
+      if (!regionCode) return
+
+      const provs = await provinces(regionCode)
+      setProv(provs)
+
+      const provinceCode = provs.find(
+        (p) => p.province_name === address.province
+      )?.province_code
+      if (!provinceCode) return
+
+      const cits = await cities(provinceCode)
+      setCit(cits)
+
+      const cityCode = cits.find((c) => c.city_name === address.city)?.city_code
+      if (!cityCode) return
+
+      const brgys = await barangays(cityCode)
+      setBrgy(brgys)
+    }
+
+    hydrateAddressCascade(
+      employeeData.present_address,
+      setPresentProvinces,
+      setPresentCities,
+      setPresentBarangays
+    )
+
+    if (employeeData.permanent_address) {
+      hydrateAddressCascade(
+        employeeData.permanent_address,
+        setPermanentProvinces,
+        setPermanentCities,
+        setPermanentBarangays
+      )
+    }
+  }, [employeeData, regionsData, regionCodeMap])
+
   const form = useForm({
-    // Merge the base defaults, any passed-in initial data, and finally the fetched DB data
     defaultValues: {
       ...BASE_DEFAULT_VALUES,
       ...initialData,
@@ -189,8 +296,12 @@ export function AllInOneEmployeeForm({
             await updateEmployee(employeeId, submissionData)
             toast.success("Employee updated successfully")
           } else {
-            await createEmployee(submissionData)
+            const newEmployee = await createEmployee(submissionData)
             toast.success("Employee created successfully")
+
+            if (newEmployee?.id) {
+              router.push(`/d/employees/edit/${newEmployee.id}`)
+            }
           }
         }
       } catch (error: any) {
@@ -201,7 +312,6 @@ export function AllInOneEmployeeForm({
     },
   })
 
-  // Prevent form rendering until data is fetched so useForm mounts with correct default values
   if (isLoadingEmployee) {
     return (
       <Card className="flex h-64 items-center justify-center border-dashed">
@@ -215,7 +325,6 @@ export function AllInOneEmployeeForm({
     )
   }
 
-  // Helper to get initials for the Avatar Fallback
   const firstName = form.getFieldValue("first_name") as string
   const lastName = form.getFieldValue("last_name") as string
   const initials =
@@ -515,7 +624,9 @@ export function AllInOneEmployeeForm({
               <form.Field name="date_of_birth">
                 {(field) => (
                   <Field>
-                    <FieldLabel>Date Of Birth</FieldLabel>
+                    <FieldLabel>
+                      Date Of Birth <span className="text-destructive">*</span>
+                    </FieldLabel>
                     <Input
                       type="date"
                       value={field.state.value as string}
@@ -643,37 +754,43 @@ export function AllInOneEmployeeForm({
                   )}
                 </form.Field>
 
-                <form.Field name="present_address.barangay">
+                <form.Field name="present_address.region">
                   {(field) => (
                     <Field>
                       <FieldLabel>
-                        Barangay <span className="text-destructive">*</span>
+                        Region <span className="text-destructive">*</span>
                       </FieldLabel>
-                      <Input
-                        placeholder="Barangay"
-                        value={field.state.value as string}
-                        onChange={(e) =>
-                          field.handleChange(e.target.value as any)
-                        }
-                      />
-                      <FieldError errors={field.state.meta.errors} />
-                    </Field>
-                  )}
-                </form.Field>
+                      <Select
+                        value={(field.state.value as string) || undefined}
+                        onValueChange={async (val) => {
+                          field.handleChange(val as any)
+                          form.setFieldValue("present_address.province", "")
+                          form.setFieldValue("present_address.city", "")
+                          form.setFieldValue("present_address.barangay", "")
 
-                <form.Field name="present_address.city">
-                  {(field) => (
-                    <Field>
-                      <FieldLabel>
-                        City <span className="text-destructive">*</span>
-                      </FieldLabel>
-                      <Input
-                        placeholder="City"
-                        value={field.state.value as string}
-                        onChange={(e) =>
-                          field.handleChange(e.target.value as any)
-                        }
-                      />
+                          const regionCode = regionCodeMap.get(val)
+                          if (regionCode) {
+                            const p = await provinces(regionCode)
+                            setPresentProvinces(p)
+                            setPresentCities([])
+                            setPresentBarangays([])
+                          }
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select Region" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {regionsData.map((region) => (
+                            <SelectItem
+                              key={region.region_name}
+                              value={region.region_name}
+                            >
+                              {region.region_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FieldError errors={field.state.meta.errors} />
                     </Field>
                   )}
@@ -685,31 +802,105 @@ export function AllInOneEmployeeForm({
                       <FieldLabel>
                         Province <span className="text-destructive">*</span>
                       </FieldLabel>
-                      <Input
-                        placeholder="Province"
-                        value={field.state.value as string}
-                        onChange={(e) =>
-                          field.handleChange(e.target.value as any)
-                        }
-                      />
+                      <Select
+                        disabled={!presentProvinces.length}
+                        value={(field.state.value as string) || undefined}
+                        onValueChange={async (val) => {
+                          field.handleChange(val as any)
+                          form.setFieldValue("present_address.city", "")
+                          form.setFieldValue("present_address.barangay", "")
+
+                          const provCode = presentProvinceCodeMap.get(val)
+                          if (provCode) {
+                            const c = await cities(provCode)
+                            setPresentCities(c)
+                            setPresentBarangays([])
+                          }
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select Province" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {presentProvinces.map((province) => (
+                            <SelectItem
+                              key={province.province_name}
+                              value={province.province_name}
+                            >
+                              {province.province_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FieldError errors={field.state.meta.errors} />
                     </Field>
                   )}
                 </form.Field>
 
-                <form.Field name="present_address.region">
+                <form.Field name="present_address.city">
                   {(field) => (
                     <Field>
                       <FieldLabel>
-                        Region <span className="text-destructive">*</span>
+                        City <span className="text-destructive">*</span>
                       </FieldLabel>
-                      <Input
-                        placeholder="Region"
-                        value={field.state.value as string}
-                        onChange={(e) =>
-                          field.handleChange(e.target.value as any)
-                        }
-                      />
+                      <Select
+                        disabled={!presentCities.length}
+                        value={(field.state.value as string) || undefined}
+                        onValueChange={async (val) => {
+                          field.handleChange(val as any)
+                          form.setFieldValue("present_address.barangay", "")
+
+                          const cityCode = presentCityCodeMap.get(val)
+                          if (cityCode) {
+                            const b = await barangays(cityCode)
+                            setPresentBarangays(b)
+                          }
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select City" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {presentCities.map((city) => (
+                            <SelectItem
+                              key={city.city_name}
+                              value={city.city_name}
+                            >
+                              {city.city_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FieldError errors={field.state.meta.errors} />
+                    </Field>
+                  )}
+                </form.Field>
+
+                <form.Field name="present_address.barangay">
+                  {(field) => (
+                    <Field>
+                      <FieldLabel>
+                        Barangay <span className="text-destructive">*</span>
+                      </FieldLabel>
+                      <Select
+                        disabled={!presentBarangays.length}
+                        value={(field.state.value as string) || undefined}
+                        onValueChange={(val) => field.handleChange(val as any)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select Barangay" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {presentBarangays.map((brgy) => (
+                            <SelectItem
+                              key={brgy.brgy_name}
+                              value={brgy.brgy_name}
+                            >
+                              {brgy.brgy_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FieldError errors={field.state.meta.errors} />
                     </Field>
                   )}
@@ -823,37 +1014,43 @@ export function AllInOneEmployeeForm({
                     )}
                   </form.Field>
 
-                  <form.Field name="permanent_address.barangay" mode="value">
+                  <form.Field name="permanent_address.region" mode="value">
                     {(field) => (
                       <Field>
                         <FieldLabel>
-                          Barangay <span className="text-destructive">*</span>
+                          Region <span className="text-destructive">*</span>
                         </FieldLabel>
-                        <Input
-                          placeholder="Barangay"
-                          value={(field.state.value || "") as string}
-                          onChange={(e) =>
-                            field.handleChange(e.target.value as any)
-                          }
-                        />
-                        <FieldError errors={field.state.meta.errors} />
-                      </Field>
-                    )}
-                  </form.Field>
+                        <Select
+                          value={(field.state.value as string) || undefined}
+                          onValueChange={async (val) => {
+                            field.handleChange(val as any)
+                            form.setFieldValue("permanent_address.province", "")
+                            form.setFieldValue("permanent_address.city", "")
+                            form.setFieldValue("permanent_address.barangay", "")
 
-                  <form.Field name="permanent_address.city" mode="value">
-                    {(field) => (
-                      <Field>
-                        <FieldLabel>
-                          City <span className="text-destructive">*</span>
-                        </FieldLabel>
-                        <Input
-                          placeholder="City"
-                          value={(field.state.value || "") as string}
-                          onChange={(e) =>
-                            field.handleChange(e.target.value as any)
-                          }
-                        />
+                            const regionCode = regionCodeMap.get(val)
+                            if (regionCode) {
+                              const p = await provinces(regionCode)
+                              setPermanentProvinces(p)
+                              setPermanentCities([])
+                              setPermanentBarangays([])
+                            }
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select Region" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {regionsData.map((region) => (
+                              <SelectItem
+                                key={region.region_name}
+                                value={region.region_name}
+                              >
+                                {region.region_name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         <FieldError errors={field.state.meta.errors} />
                       </Field>
                     )}
@@ -865,31 +1062,107 @@ export function AllInOneEmployeeForm({
                         <FieldLabel>
                           Province <span className="text-destructive">*</span>
                         </FieldLabel>
-                        <Input
-                          placeholder="Province"
-                          value={(field.state.value || "") as string}
-                          onChange={(e) =>
-                            field.handleChange(e.target.value as any)
-                          }
-                        />
+                        <Select
+                          disabled={!permanentProvinces.length}
+                          value={(field.state.value as string) || undefined}
+                          onValueChange={async (val) => {
+                            field.handleChange(val as any)
+                            form.setFieldValue("permanent_address.city", "")
+                            form.setFieldValue("permanent_address.barangay", "")
+
+                            const provCode = permanentProvinceCodeMap.get(val)
+                            if (provCode) {
+                              const c = await cities(provCode)
+                              setPermanentCities(c)
+                              setPermanentBarangays([])
+                            }
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select Province" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {permanentProvinces.map((province) => (
+                              <SelectItem
+                                key={province.province_name}
+                                value={province.province_name}
+                              >
+                                {province.province_name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         <FieldError errors={field.state.meta.errors} />
                       </Field>
                     )}
                   </form.Field>
 
-                  <form.Field name="permanent_address.region" mode="value">
+                  <form.Field name="permanent_address.city" mode="value">
                     {(field) => (
                       <Field>
                         <FieldLabel>
-                          Region <span className="text-destructive">*</span>
+                          City <span className="text-destructive">*</span>
                         </FieldLabel>
-                        <Input
-                          placeholder="Region"
-                          value={(field.state.value || "") as string}
-                          onChange={(e) =>
-                            field.handleChange(e.target.value as any)
+                        <Select
+                          disabled={!permanentCities.length}
+                          value={(field.state.value as string) || undefined}
+                          onValueChange={async (val) => {
+                            field.handleChange(val as any)
+                            form.setFieldValue("permanent_address.barangay", "")
+
+                            const cityCode = permanentCityCodeMap.get(val)
+                            if (cityCode) {
+                              const b = await barangays(cityCode)
+                              setPermanentBarangays(b)
+                            }
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select City" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {permanentCities.map((city) => (
+                              <SelectItem
+                                key={city.city_name}
+                                value={city.city_name}
+                              >
+                                {city.city_name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FieldError errors={field.state.meta.errors} />
+                      </Field>
+                    )}
+                  </form.Field>
+
+                  <form.Field name="permanent_address.barangay" mode="value">
+                    {(field) => (
+                      <Field>
+                        <FieldLabel>
+                          Barangay <span className="text-destructive">*</span>
+                        </FieldLabel>
+                        <Select
+                          disabled={!permanentBarangays.length}
+                          value={(field.state.value as string) || undefined}
+                          onValueChange={(val) =>
+                            field.handleChange(val as any)
                           }
-                        />
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select Barangay" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {permanentBarangays.map((brgy) => (
+                              <SelectItem
+                                key={brgy.brgy_name}
+                                value={brgy.brgy_name}
+                              >
+                                {brgy.brgy_name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         <FieldError errors={field.state.meta.errors} />
                       </Field>
                     )}

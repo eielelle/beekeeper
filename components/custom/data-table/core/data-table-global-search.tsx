@@ -38,7 +38,7 @@ export function DataTableGlobalSearch({
   }, [query, globalFilter, setGlobalFilter])
 
   return (
-    <div className="relative flex items-center">
+    <div className="relative flex items-center bg-background">
       <Search className="absolute left-2.5 h-4 w-4 text-muted-foreground" />
       <Input
         placeholder={placeholder}

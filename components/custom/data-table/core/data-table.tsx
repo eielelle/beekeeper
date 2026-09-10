@@ -94,6 +94,9 @@ const ContextMenuRowInner = <TData extends RowData>({
                   ),
                 }}
                 className={cn(
+                  // ADD THIS to prevent text overlapping into the next column:
+                  "truncate overflow-hidden text-ellipsis",
+
                   // Apply z-10 for pinned body cells so they scroll UNDER the header
                   isColumnPinned ? "z-10 bg-background" : "",
                   // Only apply the necessary border side based on pin direction (start/end)
@@ -277,9 +280,16 @@ export function DataTable<TData extends RowData>({
               ) : filterVariant === "date-range" ? (
                 <DateRangeFilter column={column} />
               ) : filterVariant === "date" ? (
-                <DateFilter column={column} />
+                <DateFilter
+                  column={column}
+                  title={column.columnDef.meta?.filterName as string}
+                />
               ) : filterVariant === "checkbox" ? (
-                <CheckboxFilter column={column} options={filterOptions} />
+                <CheckboxFilter
+                  column={column}
+                  title={column.columnDef.meta?.filterName as string}
+                  options={filterOptions}
+                />
               ) : null}
             </div>
           )
@@ -289,7 +299,7 @@ export function DataTable<TData extends RowData>({
       <div className="overflow-hidden rounded-md border">
         {/* Let the table fill 100% width, dividing columns equally by default */}
         <Table
-          className="w-full"
+          className="w-full bg-background"
           style={{ minWidth: table.getTotalSize(), tableLayout: "fixed" }}
         >
           <TableHeader>
@@ -387,7 +397,7 @@ export function DataTable<TData extends RowData>({
                 row={row}
                 table={table}
                 getStickyStyles={getStickyStyles}
-                className="sticky top-0 z-20 bg-muted/95 shadow-sm backdrop-blur"
+                className="sticky top-0 z-20 bg-primary shadow-sm backdrop-blur"
                 onRowClick={onRowClick}
               />
             ))}
@@ -424,7 +434,7 @@ export function DataTable<TData extends RowData>({
                 row={row}
                 table={table}
                 getStickyStyles={getStickyStyles}
-                className="sticky bottom-0 z-20 border-t bg-muted/95 shadow-sm backdrop-blur"
+                className="sticky bottom-0 z-20 border-t bg-primary shadow-sm backdrop-blur"
                 onRowClick={onRowClick}
               />
             ))}

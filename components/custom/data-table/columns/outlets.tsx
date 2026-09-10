@@ -3,7 +3,7 @@ import { createAppColumnHelper } from "@/hooks/use-data-table"
 import { ColumnSort } from "../core/data-table-column-header"
 import { CustomColumnMeta } from "@/types/filter-payloads" // <-- Adjust path to where you saved this interface
 import { Button } from "@/components/ui/button"
-import { Edit, Trash } from "lucide-react"
+import { Edit, Eye, Trash } from "lucide-react"
 import Link from "next/link"
 import { formatSupabaseDate } from "@/lib/helpers/date"
 import { DeleteAction } from "../../dialogs/delete-dialog"
@@ -11,18 +11,6 @@ import { DeleteAction } from "../../dialogs/delete-dialog"
 const columnHelper = createAppColumnHelper<OutletStoreType>()
 
 export const columns = columnHelper.columns([
-  columnHelper.accessor("created_at", {
-    header: (props) => <ColumnSort column={props.column} label="Created At" />,
-    cell: ({ getValue }) =>
-      formatSupabaseDate(getValue(), {
-        preset: "medium",
-        includeTime: true,
-      }),
-    meta: {
-      filterVariant: "date",
-    } as CustomColumnMeta,
-  }),
-
   columnHelper.accessor("outlet_code", {
     header: (props) => <ColumnSort column={props.column} label="Outlet Code" />,
     meta: {
@@ -43,6 +31,7 @@ export const columns = columnHelper.columns([
     ),
     meta: {
       filterVariant: "checkbox",
+      filterName: "Distributor Status",
       filterOptions: [
         { label: "Distributor", value: "true" },
         { label: "Not Distributor", value: "false" },
@@ -53,6 +42,7 @@ export const columns = columnHelper.columns([
   columnHelper.accessor("is_active", {
     header: (props) => <ColumnSort column={props.column} label="Active" />,
     meta: {
+      filterName: "Is Active",
       filterVariant: "checkbox",
       filterOptions: [
         { label: "Active", value: "true" },
@@ -75,11 +65,37 @@ export const columns = columnHelper.columns([
     } as CustomColumnMeta,
   }),
 
+  columnHelper.accessor("region", {
+    header: (props) => <ColumnSort column={props.column} label="Region" />,
+    meta: {
+      filterVariant: "text",
+    } as CustomColumnMeta,
+  }),
+
+  columnHelper.accessor("created_at", {
+    header: (props) => <ColumnSort column={props.column} label="Created At" />,
+    cell: ({ getValue }) =>
+      formatSupabaseDate(getValue(), {
+        preset: "medium",
+        includeTime: true,
+      }),
+    meta: {
+      filterName: "Created At",
+      filterVariant: "date",
+    } as CustomColumnMeta,
+  }),
+
   columnHelper.display({
     id: "actions",
+    header: () => <div className="flex h-full items-center">Actions</div>,
     cell: ({ row }) => {
       return (
-        <div className="flex gap-2">
+        <div className="flex gap-1">
+          <Link href={`/d/outlets/view/${row.original.id}`}>
+            <Button size={"xs"} variant={"ghost"}>
+              <Eye />
+            </Button>
+          </Link>
           <Link href={`/d/outlets/edit/${row.original.id}`}>
             <Button size={"xs"} variant={"ghost"}>
               <Edit />

@@ -12,4 +12,5 @@ export type FilterPayload =
 export interface CustomColumnMeta {
   filterVariant?: "number-range" | "date-range" | "date" | "checkbox" | "text"
   filterOptions?: { label: string; value: string }[]
+  filterName?: string // Optional: Name to display for the filter
 }

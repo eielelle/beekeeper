@@ -6,6 +6,7 @@ import {
   BarChart,
   BookOpen,
   Bot,
+  Briefcase,
   Calendar,
   Calendar1,
   CalendarCheck,
@@ -16,6 +17,7 @@ import {
   Database,
   Factory,
   Files,
+  Folder,
   Frame,
   GalleryVerticalEnd,
   Headset,
@@ -98,6 +100,10 @@ const data = {
           url: "/d/employees",
         },
         {
+          title: "Disciplinary Actions",
+          url: "/d/employees",
+        },
+        {
           title: "Configuration",
           url: "/d/employees",
         },
@@ -109,6 +115,10 @@ const data = {
       icon: Clock1,
       isActive: false,
       items: [
+        {
+          title: "Dashboard",
+          url: "/d/attendances/my-attendances",
+        },
         {
           title: "My Attendance",
           url: "/d/attendances/my-attendances",
@@ -126,16 +136,72 @@ const data = {
       isActive: false,
       items: [
         {
-          title: "My Leaves",
+          title: "Dashboard",
           url: "/d/leaves/my-leaves",
         },
         {
-          title: "Leaves",
+          title: "My Leave Requests",
+          url: "/d/leaves/my-leaves",
+        },
+        {
+          title: "Leave Requests",
           url: "/d/leaves/leaves-log",
         },
         {
-          title: "Leave Approvals",
+          title: "Leave Balances",
           url: "/d/leaves/leaves-log",
+        },
+        {
+          title: "Configuration",
+          url: "/d/leaves/leaves-log",
+        },
+      ],
+    },
+    {
+      title: "Recruitment",
+      url: "#",
+      icon: Briefcase,
+      isActive: false,
+      items: [
+        {
+          title: "Dashboard",
+          url: "#",
+        },
+        {
+          title: "Recruitment Pipeline",
+          url: "#",
+        },
+        {
+          title: "Candidates",
+          url: "#",
+        },
+        {
+          title: "Interviews",
+          url: "#",
+        },
+        {
+          title: "Job Openings",
+          url: "#",
+        },
+        {
+          title: "Configuration",
+          url: "#",
+        },
+      ],
+    },
+    {
+      title: "Assets",
+      url: "#",
+      icon: Folder,
+      isActive: false,
+      items: [
+        {
+          title: "Dashboard",
+          url: "#",
+        },
+        {
+          title: "View Assets",
+          url: "#",
         },
       ],
     },

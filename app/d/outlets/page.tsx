@@ -46,7 +46,7 @@ export default function Page() {
 
   return (
     <div className="space-y-4">
-      <Card>
+      <Card className="border-t-4 border-t-primary">
         <CardHeader>
           <CardTitle>Outlets</CardTitle>
           <CardDescription>Review and manage your outlets</CardDescription>
@@ -68,9 +68,6 @@ export default function Page() {
             data={outletsData}
             pageCount={pageCount}
             rowCount={rowCount}
-            onRowClick={(row) =>
-              router.push(`/d/outlets/details/${row.original.id}`)
-            }
           />
         </CardContent>
       </Card>

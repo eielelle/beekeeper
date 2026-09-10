@@ -7,12 +7,11 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { AllInOneEmployeeForm } from "@/forms/employee.form"
-import { EmployeeFormValues } from "@/forms/schemas/employee.schema"
 
 export default function Page() {
   return (
     <>
-      <Card>
+      <Card className="border-t-4 border-t-primary">
         <CardHeader>
           <CardTitle>Add New Employee</CardTitle>
           <CardDescription>

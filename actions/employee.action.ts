@@ -9,6 +9,7 @@ import {
   CreateEmployeeFormValues,
   createEmployeeSchema,
 } from "@/forms/schemas/employee.schema"
+import { supabaseAdmin } from "@/lib/supabase/admin"
 
 // Helper to handle profile picture uploads to Supabase Storage
 // Note: Ensure you have a storage bucket named 'avatars' (or change the name below)
@@ -23,14 +24,16 @@ async function uploadProfilePicture(
   const fileName = `${employeeNo || "emp"}-${Date.now()}.${fileExt}`
 
   const { error } = await supabase.storage
-    .from("avatars") // <--- Change this to match your Supabase bucket name if different
+    .from(process.env.BUCKET_NAME) // <--- Change this to match your Supabase bucket name if different
     .upload(fileName, file)
 
   if (error) {
     throw new Error(`Failed to upload photo: ${error.message}`)
   }
 
-  const { data } = supabase.storage.from("avatars").getPublicUrl(fileName)
+  const { data } = supabase.storage
+    .from(process.env.BUCKET_NAME)
+    .getPublicUrl(fileName)
   return data.publicUrl
 }
 
@@ -45,9 +48,9 @@ export async function fetchEmployeesAction(params: FetchEmployeesParams) {
 
   const supabase = await createClient()
 
-  let query = supabase.from("employees").select("*", { count: "exact" })
-
-  console.log("BACKEND RECEIVED FILTERS:", params.columnFilters)
+  let query = supabase
+    .from("view_active_employees")
+    .select("*", { count: "exact" })
 
   // 1. GLOBAL FILTER (Searches across multiple columns using OR)
   if (params.globalFilter) {
@@ -199,10 +202,22 @@ export async function createEmployeeAction(values: CreateEmployeeFormValues) {
       ...employeeValues
     } = values
 
+    const { error } = await supabaseAdmin.auth.admin.createUser({
+      email: employeeValues.work_email,
+      password: `${employeeValues.first_name.toLowerCase()}${employeeValues.last_name.toLowerCase()}123!`,
+      email_confirm: true,
+    })
+
+    if (error) {
+      throw new Error(`Failed to create user: ${error.message}`)
+    }
+
     // 2. Insert core employee record FIRST to get the new ID
+    const employeeData = { ...employeeValues }
+    delete employeeData.photo
     const { data: newEmployee, error: employeeError } = await supabase
       .from("employees")
-      .insert([{ ...employeeValues, avatar_url }])
+      .insert([{ ...employeeData, avatar_url }])
       .select()
       .single()
 
@@ -463,4 +478,24 @@ export async function searchEmployeeOptionsAction(searchTerm: string) {
     value: String(item.id),
     label: `${item.first_name} ${item.last_name} (${item.employee_no})`,
   }))
+}
+
+// Remove Employee Action (Optional, if needed)
+export async function removeEmployeeAction(id: string) {
+  const ability = await getServerAbility()
+  // Security: Check if they can delete this specific employee
+  if (ability.cannot("delete", subject("employees", { employee_id: id }))) {
+    throw new Error(
+      "Forbidden: You do not have permission to delete this employee."
+    )
+  }
+
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from("employees")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", id)
+  if (error) throw new Error(error.message)
+
+  return data
 }

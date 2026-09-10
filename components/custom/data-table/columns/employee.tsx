@@ -1,9 +1,14 @@
-import { EmployeeStoreType } from "@/forms/queries/employee.query"
+import {
+  EmployeeStoreType,
+  removeEmployee,
+} from "@/forms/queries/employee.query"
 import { createAppColumnHelper } from "@/hooks/use-data-table"
 import { ColumnSort } from "../core/data-table-column-header"
 import { CustomColumnMeta } from "@/types/filter-payloads" // <-- Adjust path to where you saved this interface
 import { Button } from "@/components/ui/button"
-import { Edit, Trash } from "lucide-react"
+import { Edit, Eye, Trash } from "lucide-react"
+import Link from "next/link"
+import { DeleteAction } from "../../dialogs/delete-dialog"
 
 const columnHelper = createAppColumnHelper<EmployeeStoreType>()
 
@@ -59,17 +64,30 @@ export const columns = columnHelper.columns([
 
   columnHelper.display({
     id: "actions",
+    header: () => <div className="flex h-full items-center">Actions</div>,
     cell: ({ row }) => {
       const employee = row.original
 
       return (
-        <div className="flex gap-2">
-          <Button size={"xs"} variant={"ghost"}>
-            <Edit />
-          </Button>
-          <Button size={"xs"} variant={"ghost"}>
-            <Trash />
-          </Button>
+        <div className="flex gap-1">
+          <Link href={`/d/employees/edit/${employee.id}`}>
+            <Button size={"xs"} variant={"ghost"}>
+              <Eye />
+            </Button>
+          </Link>
+          <Link href={`/d/employees/edit/${employee.id}`}>
+            <Button size={"xs"} variant={"ghost"}>
+              <Edit />
+            </Button>
+          </Link>
+          <DeleteAction
+            id={row.original.id!}
+            deleteFn={async (id) => {
+              await removeEmployee(id.toString())
+            }}
+            queryKeyToInvalidate={["employees"]}
+            entityName="employee"
+          />
         </div>
       )
     },
