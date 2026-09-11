@@ -5,6 +5,7 @@ Announcements
 Employees
 - Dashboard
 - Employee Directory
+ - View
 - Organization Chart
 - Policies
 - Disciplinary
@@ -12,8 +13,6 @@ Employees
 
 Attendances
 - Dashboard
-- My Attendances
-- Attendances
 
 Leaves
 - Dashboard
@@ -74,10 +73,13 @@ Expenses
 - BDF
 
 Outlets
-- Dashboard (read)
-- Outlets (New [done], Update [done], Delete, View)
-- Assigned Outlets (Delete, view)
-- Outlet Assignment (Assign, update)
+- Dashboard
+- Outlets
+ - Delete
+ - View
+
+- Assigned Outlet
+- Outlet Assignment
 
 Bookings
 - Dashboard
@@ -93,6 +95,12 @@ Production
 - Daily Reports
 - Production Entries
 
+
+ - List
+ - Update 
+ - New
+ - Delete
+ - View
 
 
 
