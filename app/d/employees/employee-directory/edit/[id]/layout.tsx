@@ -18,7 +18,7 @@ export default function EditEmployeeLayout({
   const id = params?.id as string
 
   // Define absolute URLs (make sure to include the leading "/")
-  const baseUrl = `/d/employees/edit/${id}`
+  const baseUrl = `/d/employees/employee-directory/edit/${id}`
   const basicUrl = `${baseUrl}/basic-information`
   const workUrl = `${baseUrl}/work-information`
   const bankUrl = `${baseUrl}/bank-information`

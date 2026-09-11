@@ -70,12 +70,12 @@ export const columns = columnHelper.columns([
 
       return (
         <div className="flex gap-1">
-          <Link href={`/d/employees/edit/${employee.id}`}>
+          <Link href={`/d/employees/employee-directory/details/${employee.id}`}>
             <Button size={"xs"} variant={"ghost"}>
               <Eye />
             </Button>
           </Link>
-          <Link href={`/d/employees/edit/${employee.id}`}>
+          <Link href={`/d/employees/employee-directory/edit/${employee.id}`}>
             <Button size={"xs"} variant={"ghost"}>
               <Edit />
             </Button>

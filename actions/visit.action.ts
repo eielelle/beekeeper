@@ -3,12 +3,108 @@
 import { createClient } from "@/lib/supabase/server"
 import { getServerAbility, fetchUserPermissions } from "@/lib/casl/server"
 import { subject } from "@casl/ability"
-import { FetchVisitsParams, VisitStoreType } from "@/forms/queries/visit.query"
+import { VisitStoreType } from "@/forms/queries/visit.query"
+import { FetchParams } from "@/types/fetch-params"
 
 // ==========================================
 // 1. FETCH ALL VISITS
 // ==========================================
-export async function fetchVisitsAction(params: FetchVisitsParams) {
+export async function fetchVisitsAction(params: FetchParams) {
+  const ability = await getServerAbility()
+
+  console.log("IM FIRING")
+
+  if (ability.cannot("read", "visits")) {
+    throw new Error("Forbidden: You do not have permission to view visits.")
+  }
+
+  const supabase = await createClient()
+  let query = supabase.from("visits").select(
+    `
+      *,
+      outlets ( id, outlet_code, outlet_name ),
+      visit_types ( id, type_name )
+    `,
+    { count: "exact" }
+  )
+
+  // 1. GLOBAL FILTER (Searches across multiple columns using OR)
+  if (params.globalFilter) {
+    query = query.or(
+      `name.ilike.%${params.globalFilter}%,code.ilike.%${params.globalFilter}%`
+    )
+  }
+
+  // 2. NEW: COLUMN-SPECIFIC FILTERS (Searches specific columns using AND)
+  if (params.columnFilters && params.columnFilters.length > 0) {
+    params.columnFilters.forEach((filter) => {
+      const { id, value } = filter
+
+      // 1. Handle basic string payload (from default text inputs)
+      if (typeof value === "string") {
+        query = query.ilike(id, `%${value}%`)
+        return
+      }
+
+      // 2. TypeScript now strictly knows `value` is one of our object payloads
+      switch (value.operator) {
+        case "range":
+          if (
+            value.min !== null &&
+            value.min !== undefined &&
+            value.min !== ""
+          ) {
+            query = query.gte(id, value.min)
+          }
+          if (
+            value.max !== null &&
+            value.max !== undefined &&
+            value.max !== ""
+          ) {
+            query = query.lte(id, value.max)
+          }
+          break
+
+        case "in":
+          query = query.in(id, value.values)
+          break
+
+        case "eq":
+          query = query.eq(id, value.value)
+          break
+
+        case "ilike":
+          query = query.ilike(id, `%${String(value.value)}%`)
+          break
+      }
+    })
+  }
+
+  // 3. SORTING
+  if (params.sorting && params.sorting.length > 0) {
+    const sort = params.sorting[0]
+    // If the sort is on the manager relation, Supabase handles it slightly differently,
+    // but standard columns will sort perfectly here:
+    query = query.order(sort.id, { ascending: !sort.desc })
+  } else {
+    query = query.order("created_at", { ascending: false })
+  }
+
+  // 4. PAGINATION
+  const from = params.pageIndex * params.pageSize
+  const to = from + params.pageSize - 1
+  query = query.range(from, to)
+
+  const { data, error, count } = await query
+  if (error) throw new Error(error.message)
+
+  return { data, rowCount: count || 0 }
+}
+
+// ==========================================
+// 1. FETCH ALL VISITS
+// ==========================================
+export async function fetchMyVisitsAction(params: FetchParams) {
   const ability = await getServerAbility()
   const { employeeId } = await fetchUserPermissions()
 
@@ -49,18 +145,69 @@ export async function fetchVisitsAction(params: FetchVisitsParams) {
 
     query = query.in("outlet_id", assignedIds)
   }
-
+  // 1. GLOBAL FILTER (Searches across multiple columns using OR)
   if (params.globalFilter) {
-    query = query.or(`notes.ilike.%${params.globalFilter}%`)
+    query = query.or(
+      `name.ilike.%${params.globalFilter}%,code.ilike.%${params.globalFilter}%`
+    )
   }
 
+  // 2. NEW: COLUMN-SPECIFIC FILTERS (Searches specific columns using AND)
+  if (params.columnFilters && params.columnFilters.length > 0) {
+    params.columnFilters.forEach((filter) => {
+      const { id, value } = filter
+
+      // 1. Handle basic string payload (from default text inputs)
+      if (typeof value === "string") {
+        query = query.ilike(id, `%${value}%`)
+        return
+      }
+
+      // 2. TypeScript now strictly knows `value` is one of our object payloads
+      switch (value.operator) {
+        case "range":
+          if (
+            value.min !== null &&
+            value.min !== undefined &&
+            value.min !== ""
+          ) {
+            query = query.gte(id, value.min)
+          }
+          if (
+            value.max !== null &&
+            value.max !== undefined &&
+            value.max !== ""
+          ) {
+            query = query.lte(id, value.max)
+          }
+          break
+
+        case "in":
+          query = query.in(id, value.values)
+          break
+
+        case "eq":
+          query = query.eq(id, value.value)
+          break
+
+        case "ilike":
+          query = query.ilike(id, `%${String(value.value)}%`)
+          break
+      }
+    })
+  }
+
+  // 3. SORTING
   if (params.sorting && params.sorting.length > 0) {
     const sort = params.sorting[0]
+    // If the sort is on the manager relation, Supabase handles it slightly differently,
+    // but standard columns will sort perfectly here:
     query = query.order(sort.id, { ascending: !sort.desc })
   } else {
-    query = query.order("start_date", { ascending: false })
+    query = query.order("created_at", { ascending: false })
   }
 
+  // 4. PAGINATION
   const from = params.pageIndex * params.pageSize
   const to = from + params.pageSize - 1
   query = query.range(from, to)

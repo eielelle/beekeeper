@@ -1,6 +1,6 @@
 import { createAppColumnHelper } from "@/hooks/use-data-table"
 import { ColumnSort } from "../core/data-table-column-header"
-import { CustomColumnMeta } from "@/types/filter-payloads"
+import { CustomColumnMeta } from "@/types/filter-payloads" // <-- Adjust path to where you saved this interface
 import { AttendanceLogType } from "@/forms/queries/attendance.query"
 import { formatSupabaseDate } from "@/lib/helpers/date"
 import { CoordinateHoverMap } from "../../maps/coordinates-hover-map"
@@ -11,28 +11,6 @@ import { Eye } from "lucide-react"
 const columnHelper = createAppColumnHelper<AttendanceLogType>()
 
 export const columns = columnHelper.columns([
-  columnHelper.display({
-    id: "employee_no", // display columns require a unique id
-    header: () => <div className="flex h-full items-center">Employee No</div>,
-    cell: (props) => {
-      return props.row.original.employee?.employee_no || "N/A"
-    },
-  }),
-
-  columnHelper.display({
-    id: "employee", // display columns require a unique id
-    header: () => <div className="flex h-full items-center">Employee</div>,
-    cell: (props) => {
-      return (
-        props.row.original.employee?.first_name +
-          " " +
-          props.row.original.employee?.middle_name?.charAt(0) +
-          ". " +
-          props.row.original.employee?.last_name || "N/A"
-      )
-    },
-  }),
-
   columnHelper.accessor("time_in", {
     header: (props) => <ColumnSort column={props.column} label="Time In" />,
     meta: {

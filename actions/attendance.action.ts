@@ -2,7 +2,6 @@
 
 import { createClient } from "@/lib/supabase-server"
 import { getServerAbility } from "@/lib/casl/server"
-import type { FetchAttendanceLogsParams } from "@/forms/queries/attendance.query"
 import { FetchParams } from "@/types/fetch-params"
 
 // Helper to map the Auth user to your Employees table
@@ -19,9 +18,7 @@ async function getCurrentEmployeeId(supabase: any, userId: string) {
 // 1. ADMIN ACTIONS (For /attendance-logs)
 // ==========================================
 
-export async function fetchAttendanceLogsAction(
-  params: FetchAttendanceLogsParams
-) {
+export async function fetchAttendanceLogsAction(params: FetchParams) {
   const ability = await getServerAbility()
 
   // HARD BLOCK: If they aren't HR/Admin, completely reject the request.
@@ -45,52 +42,84 @@ export async function fetchAttendanceLogsAction(
       time_in_attachment,
       time_out_attachment,
       created_at,
-      employee:employees!employee_id(id, first_name, last_name, employee_no, avatar_url)
+      employee:employees!employee_id(id, first_name, middle_name, last_name, suffix, employee_no, avatar_url)
     `,
     { count: "exact" }
   )
 
-  // Admin can filter by any employee
-  if (params.employeeId && params.employeeId !== "all") {
-    query = query.eq("employee_id", params.employeeId)
+  // 1. GLOBAL FILTER (Searches across multiple columns using OR)
+  if (params.globalFilter) {
+    query = query.or(
+      `name.ilike.%${params.globalFilter}%,code.ilike.%${params.globalFilter}%`
+    )
   }
 
-  if (params.statusFilter === "active") query = query.is("time_out", null)
-  else if (params.statusFilter === "completed")
-    query = query.not("time_out", "is", null)
+  // 2. NEW: COLUMN-SPECIFIC FILTERS (Searches specific columns using AND)
+  if (params.columnFilters && params.columnFilters.length > 0) {
+    params.columnFilters.forEach((filter) => {
+      const { id, value } = filter
 
-  if (params.dateRange?.from)
-    query = query.gte("created_at", params.dateRange.from)
-  if (params.dateRange?.to) query = query.lte("created_at", params.dateRange.to)
+      // 1. Handle basic string payload (from default text inputs)
+      if (typeof value === "string") {
+        query = query.ilike(id, `%${value}%`)
+        return
+      }
 
-  // Sorting (With Supabase Foreign Table Fix for employees)
+      // 2. TypeScript now strictly knows `value` is one of our object payloads
+      switch (value.operator) {
+        case "range":
+          if (
+            value.min !== null &&
+            value.min !== undefined &&
+            value.min !== ""
+          ) {
+            query = query.gte(id, value.min)
+          }
+          if (
+            value.max !== null &&
+            value.max !== undefined &&
+            value.max !== ""
+          ) {
+            query = query.lte(id, value.max)
+          }
+          break
+
+        case "in":
+          query = query.in(id, value.values)
+          break
+
+        case "eq":
+          query = query.eq(id, value.value)
+          break
+
+        case "ilike":
+          query = query.ilike(id, `%${String(value.value)}%`)
+          break
+      }
+    })
+  }
+
+  // 3. SORTING
   if (params.sorting && params.sorting.length > 0) {
     const sort = params.sorting[0]
-    if (sort.id === "employee_name") {
-      query = query.order("first_name", {
-        ascending: !sort.desc,
-        foreignTable: "employees",
-      })
-    } else if (sort.id === "employee_no") {
-      query = query.order("employee_no", {
-        ascending: !sort.desc,
-        foreignTable: "employees",
-      })
-    } else {
-      query = query.order(sort.id, { ascending: !sort.desc })
-    }
+    // If the sort is on the manager relation, Supabase handles it slightly differently,
+    // but standard columns will sort perfectly here:
+    query = query.order(sort.id, { ascending: !sort.desc })
   } else {
     query = query.order("created_at", { ascending: false })
   }
 
+  // 4. PAGINATION
   const from = params.pageIndex * params.pageSize
-  const { data, error, count } = await query.range(
-    from,
-    from + params.pageSize - 1
-  )
+  const to = from + params.pageSize - 1
+  query = query.range(from, to)
 
+  const { data, error, count } = await query
   if (error) throw new Error(error.message)
-  return { data: data || [], rowCount: count || 0 }
+
+  console.log(data)
+
+  return { data, rowCount: count || 0 }
 }
 
 export async function fetchAttendanceStatsAction(dateRange?: {

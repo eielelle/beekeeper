@@ -1,6 +1,6 @@
 "use client"
 
-import { columns } from "@/components/custom/data-table/columns/attendance"
+import { columns } from "@/components/custom/data-table/columns/my-attendance"
 import { DataTable } from "@/components/custom/data-table/core/data-table"
 import { Button } from "@/components/ui/button"
 import {
@@ -23,11 +23,16 @@ export default function Page() {
   const { page, size, sorting, globalFilter, columnFilters } =
     useUrlTableState()
 
-  const router = useRouter()
-
   const employees = useQuery({
     // Add globalFilter to the queryKey so it refetches on change
-    queryKey: ["employees", page, size, sorting, globalFilter, columnFilters],
+    queryKey: [
+      "my-attendances",
+      page,
+      size,
+      sorting,
+      globalFilter,
+      columnFilters,
+    ],
     queryFn: () =>
       fetchMyAttendanceLogs({
         pageIndex: page - 1,
@@ -46,7 +51,7 @@ export default function Page() {
 
   return (
     <div className="space-y-4">
-      <Card>
+      <Card className="border-t-4 border-t-primary">
         <CardHeader>
           <CardTitle>My Attendances</CardTitle>
           <CardDescription>View your attendance logs</CardDescription>
@@ -60,10 +65,6 @@ export default function Page() {
         data={innerData}
         pageCount={pageCount}
         rowCount={rowCount}
-        onRowClick={(row) => {
-          const employee = row.original
-          router.push(`/d/employees/view/${employee.id}`)
-        }}
       />
     </div>
   )

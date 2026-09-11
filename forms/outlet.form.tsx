@@ -4,7 +4,7 @@ import * as React from "react"
 import dynamic from "next/dynamic"
 import { useForm } from "@tanstack/react-form"
 import * as z from "zod"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import { useMutation, useQuery } from "@tanstack/react-query"
 import { useState, useEffect, useMemo } from "react"
 import { Check, ChevronsUpDown, Loader2 } from "lucide-react"
@@ -77,6 +77,8 @@ export function OutletForm({
   editId?: string
   onClose?: () => void
 }) {
+  const router = useRouter()
+
   // Address Cascade States
   const [regionsData, setRegions] = useState<Region[]>([])
   const [provincesData, setProvinces] = useState<Province[]>([])
@@ -259,6 +261,7 @@ export function OutletForm({
       if (onClose) {
         onClose()
       }
+      router.push("/d/outlets/view-outlets")
     },
   })
 

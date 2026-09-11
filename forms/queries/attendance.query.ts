@@ -25,7 +25,9 @@ export type AttendanceLogType = {
   employee: {
     id: number
     first_name: string | null
+    middle_name: string | null
     last_name: string | null
+    suffix: string | null
     employee_no: string | null
     avatar_url: string | null
   } | null
@@ -34,18 +36,18 @@ export type AttendanceLogType = {
 // ==========================================
 // ADMIN FETCH WRAPPERS
 // ==========================================
-// export async function fetchAttendanceLogs(params: FetchAttendanceLogsParams) {
-//   try {
-//     const response = await fetchAttendanceLogsAction(params)
-//     return {
-//       data: response.data as unknown as AttendanceLogType[],
-//       rowCount: response.rowCount,
-//     }
-//   } catch (error: any) {
-//     toast.error(`ERR: ${error.message}`)
-//     throw error
-//   }
-// }
+export async function fetchAttendanceLogs(params: FetchParams) {
+  try {
+    const response = await fetchAttendanceLogsAction(params)
+    return {
+      data: response.data as unknown as AttendanceLogType[],
+      rowCount: response.rowCount,
+    }
+  } catch (error: any) {
+    toast.error(`ERR: ${error.message}`)
+    throw error
+  }
+}
 
 // export async function fetchAttendanceStats({
 //   dateRange,

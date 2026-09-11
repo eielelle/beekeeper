@@ -8,6 +8,7 @@ import {
   searchOutletsAction,
   searchVisitTypesAction,
 } from "@/actions/visit.action"
+import { FetchParams } from "@/types/fetch-params"
 
 export type VisitStoreType = {
   id?: string
@@ -42,7 +43,7 @@ export type FetchVisitsParams = {
   sorting?: { id: string; desc: boolean }[]
 }
 
-export async function fetchVisits(params: FetchVisitsParams) {
+export async function fetchVisits(params: FetchParams) {
   const t = toast.loading("Fetching Visits. Please wait.")
   try {
     const response = await fetchVisitsAction(params)

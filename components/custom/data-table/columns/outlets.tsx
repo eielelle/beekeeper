@@ -91,12 +91,12 @@ export const columns = columnHelper.columns([
     cell: ({ row }) => {
       return (
         <div className="flex gap-1">
-          <Link href={`/d/outlets/view/${row.original.id}`}>
+          <Link href={`/d/outlets/view-outlets/details/${row.original.id}`}>
             <Button size={"xs"} variant={"ghost"}>
               <Eye />
             </Button>
           </Link>
-          <Link href={`/d/outlets/edit/${row.original.id}`}>
+          <Link href={`/d/outlets/view-outlets/edit/${row.original.id}`}>
             <Button size={"xs"} variant={"ghost"}>
               <Edit />
             </Button>

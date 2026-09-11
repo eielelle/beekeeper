@@ -302,8 +302,8 @@ const data = {
           url: "/d/outlets/my-outlets",
         },
         {
-          title: "Outlets",
-          url: "/d/outlets",
+          title: "View Outlets",
+          url: "/d/outlets/view-outlets",
         },
         {
           title: "Outlet Assignment",
