@@ -50,6 +50,7 @@ export type AppSubject =
   | "sales_groups"
   | "production_areas"
   | "production_lines"
+  | "production_pipelines"
   | "productions"
   | "employment_statuses"
   | "employment_types"

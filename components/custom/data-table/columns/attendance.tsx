@@ -7,6 +7,7 @@ import { CoordinateHoverMap } from "../../maps/coordinates-hover-map"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Eye } from "lucide-react"
+import { AttendanceDetailsModal } from "../../dialogs/attendance-dialog"
 
 const columnHelper = createAppColumnHelper<AttendanceLogType>()
 
@@ -64,13 +65,13 @@ export const columns = columnHelper.columns([
   }),
 
   columnHelper.display({
-    id: "time_in_location", // display columns require a unique id
+    id: "time_in_location",
     header: () => (
       <div className="flex h-full items-center">Time In Location</div>
     ),
     cell: (props) => {
-      const lat = props.row.original.time_out_lat
-      const lng = props.row.original.time_out_long
+      const lat = props.row.original.time_in_lat
+      const lng = props.row.original.time_in_long
 
       if (!lat || !lng) return "N/A"
 
@@ -79,7 +80,7 @@ export const columns = columnHelper.columns([
   }),
 
   columnHelper.display({
-    id: "time_out_location", // display columns require a unique id
+    id: "time_out_location",
     header: () => (
       <div className="flex h-full items-center">Time Out Location</div>
     ),
@@ -127,15 +128,9 @@ export const columns = columnHelper.columns([
     id: "actions",
     header: () => <div className="flex h-full items-center">Actions</div>,
     cell: ({ row }) => {
-      const employee = row.original
-
       return (
         <div className="flex gap-1">
-          <Link href={`/d/employees/employee-directory/details/${employee.id}`}>
-            <Button size={"xs"} variant={"ghost"}>
-              <Eye />
-            </Button>
-          </Link>
+          <AttendanceDetailsModal attendance={row.original} />
         </div>
       )
     },
