@@ -5,21 +5,24 @@ import {
   createLeaveAction,
   updateLeaveAction,
   deleteLeaveAction,
-  fetchLeaveStatsAction,
-  searchEmployeeOptionsAction,
 } from "@/actions/leave.action"
+import { FilterPayload } from "@/types/filter-payloads"
+import { LeaveFormValues } from "@/forms/schemas/leave.schema"
 
-export type LeaveStoreType = {
+export type LeaveType = {
   id?: string | number
-  employee_id: number
-  leave_date: string
   reason: string
+  employee_id?: number | null
   created_at?: string
-  status?: "pending" | "approved" | "rejected"
-  current_step?: number | null // <-- Added for Approval Workflow tracking
-  // Joined relation for the UI
-  employee?: { first_name: string; last_name: string } | null
-  approved_by?: string | null
+  status?: string
+  leave_date_from: string
+  leave_date_to: string
+  // Relational data for Data Table
+  employee?: {
+    first_name: string
+    last_name: string
+    employee_no?: string
+  } | null
 }
 
 export type FetchLeavesParams = {
@@ -27,88 +30,83 @@ export type FetchLeavesParams = {
   pageSize: number
   globalFilter?: string
   sorting?: { id: string; desc: boolean }[]
-  dateRange?: { from?: string; to?: string }
+  columnFilters?: { id: string; value: FilterPayload }[]
 }
 
 export async function fetchLeaves(params: FetchLeavesParams) {
+  const t = toast.loading("Fetching leaves. Please wait.")
   try {
-    return await fetchLeavesAction(params)
-  } catch (error: any) {
-    toast.error(`ERR: ${error.message}`)
+    const response = await fetchLeavesAction(params)
+    toast.dismiss(t)
+    return response
+  } catch (error: unknown) {
+    toast.dismiss(t)
+    const message =
+      error instanceof Error ? error.message : "An unknown error occurred"
+    toast.error(`ERR: ${message}`)
     throw error
   }
 }
 
 export async function getLeave(id: string) {
-  const t = toast.loading("Fetching Leave record. Please wait.")
+  const t = toast.loading("Fetching leave details. Please wait.")
   try {
     const data = await getLeaveAction(id)
     toast.dismiss(t)
     return data
-  } catch (error: any) {
+  } catch (error: unknown) {
     toast.dismiss(t)
-    toast.error(`ERR: ${error.message}`)
+    const message =
+      error instanceof Error ? error.message : "An unknown error occurred"
+    toast.error(`ERR: ${message}`)
     throw error
   }
 }
 
-export async function createLeave(value: LeaveStoreType) {
-  const t = toast.loading("Creating Leave record. Please wait.")
+export async function createLeave(value: LeaveFormValues) {
+  const t = toast.loading("Submitting leave request. Please wait.")
   try {
     const data = await createLeaveAction(value)
     toast.dismiss(t)
-    toast.success("Leave successfully recorded.")
+    toast.success("Leave request successfully submitted.")
     return data
-  } catch (error: any) {
+  } catch (error: unknown) {
     toast.dismiss(t)
-    toast.error(`ERR: ${error.message}`)
+    const message =
+      error instanceof Error ? error.message : "An unknown error occurred"
+    toast.error(`ERR: ${message}`)
     throw error
   }
 }
 
-export async function updateLeave(value: LeaveStoreType) {
-  const t = toast.loading("Updating Leave record. Please wait.")
+export async function updateLeave(value: LeaveFormValues & { id: string }) {
+  const t = toast.loading("Updating leave request. Please wait.")
   try {
     const data = await updateLeaveAction(value)
     toast.dismiss(t)
-    toast.success("Leave successfully updated.")
+    toast.success("Leave request successfully updated.")
     return data
-  } catch (error: any) {
+  } catch (error: unknown) {
     toast.dismiss(t)
-    toast.error(`ERR: ${error.message}`)
+    const message =
+      error instanceof Error ? error.message : "An unknown error occurred"
+    toast.error(`ERR: ${message}`)
     throw error
   }
 }
 
 export async function deleteLeave(id: string) {
-  const t = toast.loading("Deleting Leave record. Please wait.")
+  const t = toast.loading("Deleting leave request. Please wait.")
   try {
     const data = await deleteLeaveAction(id)
     toast.dismiss(t)
-    toast.success("Leave successfully deleted.")
+    toast.success("Leave request successfully deleted.")
     return data
-  } catch (error: any) {
+  } catch (error: unknown) {
     toast.dismiss(t)
-    toast.error(`ERR: ${error.message}`)
+    const message =
+      error instanceof Error ? error.message : "An unknown error occurred"
+    toast.error(`ERR: ${message}`)
     throw error
-  }
-}
-
-export async function fetchLeaveStats() {
-  try {
-    return await fetchLeaveStatsAction()
-  } catch (error: any) {
-    console.error(error)
-    return { total: 0, upcoming: 0 }
-  }
-}
-
-export async function searchEmployeeOptions(searchTerm: string) {
-  try {
-    return await searchEmployeeOptionsAction(searchTerm)
-  } catch (error: any) {
-    console.error(error)
-    toast.error(`ERR: ${error.message}`)
-    return [] // Return an empty array so the UI dropdown doesn't crash on failure
   }
 }

@@ -140,6 +140,10 @@ const data = {
           url: "/d/leaves/my-leaves",
         },
         {
+          title: "Request Leave",
+          url: "/d/leaves/my-leaves",
+        },
+        {
           title: "My Leave Requests",
           url: "/d/leaves/my-leaves",
         },

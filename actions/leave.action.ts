@@ -1,50 +1,101 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
-import { getServerAbility, fetchUserPermissions } from "@/lib/casl/server"
-import { subject } from "@casl/ability"
-import { triggerApprovalWorkflow } from "./approval.action"
-import { FetchLeavesParams, LeaveStoreType } from "@/forms/queries/leave.query"
+import { getServerAbility } from "@/lib/casl/server"
+import { FetchParams } from "@/types/fetch-params"
+import { LeaveFormValues } from "@/forms/schemas/leave.schema"
 
-// ==========================================
-// 1. FETCH ALL LEAVES (PAGINATED)
-// ==========================================
-export async function fetchLeavesAction(params: FetchLeavesParams) {
+// Helper to resolve current logged-in employee ID
+async function getCurrentEmployeeId(supabase: any) {
+  const { data: authData, error: authError } = await supabase.auth.getUser()
+  if (authError || !authData.user) throw new Error("Unauthorized user.")
+
+  const { data: empData, error: empError } = await supabase
+    .from("employees")
+    .select("id")
+    .eq("user_id", authData.user.id)
+    .single()
+
+  if (empError || !empData)
+    throw new Error("Could not locate employee profile.")
+  return empData.id
+}
+
+export async function fetchLeavesAction(params: FetchParams) {
   const ability = await getServerAbility()
-  const { employeeId } = await fetchUserPermissions()
-
   if (ability.cannot("read", "leaves")) {
     throw new Error("Forbidden: You do not have permission to view leaves.")
   }
 
   const supabase = await createClient()
-  let query = supabase
-    .from("leaves")
-    .select("*, employee:employee_id(first_name, last_name)", {
-      count: "exact",
-    })
 
-  // DATA SCOPING: Check if user has global read access (by testing a dummy ID).
-  // If not, strictly filter the query to only return their own records.
-  const canReadAll = ability.can("read", subject("leaves", { employee_id: -1 }))
-  if (!canReadAll) {
-    if (!employeeId) throw new Error("Employee profile not found.")
-    query = query.eq("employee_id", employeeId)
+  let query = supabase.from("leaves").select(
+    `
+    *,
+    employee:employees(first_name, last_name, employee_no)
+  `,
+    { count: "exact" }
+  )
+
+  // 1. GLOBAL FILTER
+  if (params.globalFilter) {
+    query = query.or(
+      `reason.ilike.%${params.globalFilter}%,status.ilike.%${params.globalFilter}%`
+    )
   }
 
-  if (params.globalFilter)
-    query = query.ilike("reason", `%${params.globalFilter}%`)
-  if (params.dateRange?.from)
-    query = query.gte("leave_date", params.dateRange.from)
-  if (params.dateRange?.to) query = query.lte("leave_date", params.dateRange.to)
+  // 2. COLUMN-SPECIFIC FILTERS
+  if (params.columnFilters && params.columnFilters.length > 0) {
+    params.columnFilters.forEach((filter) => {
+      const { id, value } = filter
 
+      if (typeof value === "string") {
+        query = query.ilike(id, `%${value}%`)
+        return
+      }
+
+      switch (value.operator) {
+        case "range":
+          if (
+            value.min !== null &&
+            value.min !== undefined &&
+            value.min !== ""
+          ) {
+            query = query.gte(id, value.min)
+          }
+          if (
+            value.max !== null &&
+            value.max !== undefined &&
+            value.max !== ""
+          ) {
+            query = query.lte(id, value.max)
+          }
+          break
+
+        case "in":
+          query = query.in(id, value.values)
+          break
+
+        case "eq":
+          query = query.eq(id, value.value)
+          break
+
+        case "ilike":
+          query = query.ilike(id, `%${String(value.value)}%`)
+          break
+      }
+    })
+  }
+
+  // 3. SORTING
   if (params.sorting && params.sorting.length > 0) {
     const sort = params.sorting[0]
     query = query.order(sort.id, { ascending: !sort.desc })
   } else {
-    query = query.order("leave_date", { ascending: false })
+    query = query.order("created_at", { ascending: false })
   }
 
+  // 4. PAGINATION
   const from = params.pageIndex * params.pageSize
   const to = from + params.pageSize - 1
   query = query.range(from, to)
@@ -52,154 +103,65 @@ export async function fetchLeavesAction(params: FetchLeavesParams) {
   const { data, error, count } = await query
   if (error) throw new Error(error.message)
 
-  if (!data || data.length === 0) {
-    return { data: [], rowCount: count || 0 }
-  }
-
-  // --- APPROVAL WORKFLOW STITCHING ---
-  const leaveIds = data.map((leave) => String(leave.id))
-
-  const { data: approvals } = await supabase
-    .from("approval_requests")
-    .select(
-      `
-      record_id,
-      current_step,
-      status,
-      approval_logs (
-        step_level,
-        status,
-        created_at,
-        approver:employees (
-          first_name,
-          last_name
-        )
-      )
-    `
-    )
-    .eq("module", "leaves")
-    .in("record_id", leaveIds)
-
-  const enrichedLeaves = data.map((leave) => {
-    const request = approvals?.find((a) => a.record_id === String(leave.id))
-
-    // Sort logs sequentially by step_level
-    const sortedLogs = request?.approval_logs
-      ? [...request.approval_logs].sort((a, b) => a.step_level - b.step_level)
-      : []
-
-    return {
-      ...leave,
-      current_step:
-        request && request.status === "pending" ? request.current_step : null,
-      approval_logs: sortedLogs, // Return the full timeline array
-    }
-  })
-
-  return { data: enrichedLeaves, rowCount: count || 0 }
+  return { data, rowCount: count || 0 }
 }
 
-// ==========================================
-// 2. GET SINGLE LEAVE
-// ==========================================
 export async function getLeaveAction(id: string) {
-  const supabase = await createClient()
   const ability = await getServerAbility()
+  if (ability.cannot("read", "leaves")) {
+    throw new Error("Forbidden: You cannot view this leave request.")
+  }
 
+  const supabase = await createClient()
   const { data, error } = await supabase
     .from("leaves")
     .select("*")
     .eq("id", id)
     .single()
+
   if (error) throw new Error(error.message)
-
-  // Validate they can read this specific record
-  if (
-    ability.cannot("read", subject("leaves", { employee_id: data.employee_id }))
-  ) {
-    throw new Error("Forbidden: You cannot view this leave request.")
-  }
-
   return data
 }
 
-// ==========================================
-// 3. CREATE LEAVE & TRIGGER APPROVAL
-// ==========================================
-export async function createLeaveAction(value: LeaveStoreType) {
+export async function createLeaveAction(value: LeaveFormValues) {
   const ability = await getServerAbility()
-  const { employeeId } = await fetchUserPermissions()
-  const supabase = await createClient()
-
   if (ability.cannot("create", "leaves")) {
-    throw new Error(
-      "Forbidden: You do not have permission to file leave requests."
-    )
+    throw new Error("Forbidden: You do not have permission to apply for leave.")
   }
 
-  // Force employee_id to the logged-in user if they are filing for themselves
-  const targetEmployeeId = value.employee_id || employeeId
-  if (!targetEmployeeId) throw new Error("Employee ID is required.")
+  const supabase = await createClient()
+  const employeeId = await getCurrentEmployeeId(supabase)
 
-  const { data: leave, error } = await supabase
+  const payload = {
+    ...value,
+    employee_id: employeeId,
+    status: "pending",
+  }
+
+  const { data, error } = await supabase
     .from("leaves")
-    .insert([
-      {
-        employee_id: targetEmployeeId,
-        leave_date: value.leave_date,
-        reason: value.reason,
-        status: "pending", // ALWAYS defaults to pending
-      },
-    ])
-    .select("id, employee_id")
+    .insert([payload])
+    .select()
     .single()
 
   if (error) throw new Error(error.message)
-
-  // TRIGGER THE APPROVAL ENGINE
-  const { data: empData } = await supabase
-    .from("employees")
-    .select("org_id")
-    .eq("id", targetEmployeeId)
-    .single()
-  await triggerApprovalWorkflow(
-    "leaves",
-    leave.id.toString(),
-    targetEmployeeId,
-    empData?.org_id || undefined
-  )
-
-  return leave
+  return data
 }
 
-// ==========================================
-// 4. UPDATE LEAVE
-// ==========================================
-export async function updateLeaveAction(value: LeaveStoreType) {
+export async function updateLeaveAction(
+  value: LeaveFormValues & { id: string }
+) {
   const ability = await getServerAbility()
-  const supabase = await createClient()
-
-  if (!value.id) throw new Error("Leave ID is required for updates.")
-
-  // Fetch existing record to check ownership
-  const { data: existing } = await supabase
-    .from("leaves")
-    .select("*")
-    .eq("id", value.id)
-    .single()
-  if (!existing) throw new Error("Leave record not found.")
-
-  if (
-    ability.cannot(
-      "update",
-      subject("leaves", { employee_id: existing.employee_id })
+  if (ability.cannot("update", "leaves")) {
+    throw new Error(
+      "Forbidden: You do not have permission to update leave requests."
     )
-  ) {
-    throw new Error("Forbidden: You cannot update this leave request.")
   }
 
-  const { id, employee, created_at, employee_id, status, ...updates } = value
+  const { id, ...updates } = value
+  if (!id) throw new Error("Leave ID is required for updates.")
 
+  const supabase = await createClient()
   const { data, error } = await supabase
     .from("leaves")
     .update(updates)
@@ -211,227 +173,22 @@ export async function updateLeaveAction(value: LeaveStoreType) {
   return data
 }
 
-// ==========================================
-// 5. DELETE LEAVE
-// ==========================================
 export async function deleteLeaveAction(id: string) {
   const ability = await getServerAbility()
-  const supabase = await createClient()
-
-  const { data: existing } = await supabase
-    .from("leaves")
-    .select("employee_id")
-    .eq("id", id)
-    .single()
-  if (!existing) throw new Error("Leave record not found.")
-
-  if (
-    ability.cannot(
-      "delete",
-      subject("leaves", { employee_id: existing.employee_id })
+  if (ability.cannot("delete", "leaves")) {
+    throw new Error(
+      "Forbidden: You do not have permission to delete leave requests."
     )
-  ) {
-    throw new Error("Forbidden: You cannot delete this leave request.")
   }
 
+  const supabase = await createClient()
   const { data, error } = await supabase
     .from("leaves")
     .delete()
     .eq("id", id)
     .select()
     .single()
+
   if (error) throw new Error(error.message)
   return data
-}
-
-// ==========================================
-// 6. FETCH LEAVE STATS
-// ==========================================
-export async function fetchLeaveStatsAction() {
-  const ability = await getServerAbility()
-
-  if (ability.cannot("read", "leaves")) {
-    throw new Error(
-      "Forbidden: You do not have permission to view leave stats."
-    )
-  }
-
-  const { employeeId } = await fetchUserPermissions()
-  const supabase = await createClient()
-  const today = new Date().toISOString().split("T")[0]
-
-  let queryTotal = supabase
-    .from("leaves")
-    .select("*", { count: "exact", head: true })
-  let queryUpcoming = supabase
-    .from("leaves")
-    .select("*", { count: "exact", head: true })
-    .gte("leave_date", today)
-
-  const canReadAll = ability.can("read", subject("leaves", { employee_id: -1 }))
-  if (!canReadAll && employeeId) {
-    queryTotal = queryTotal.eq("employee_id", employeeId)
-    queryUpcoming = queryUpcoming.eq("employee_id", employeeId)
-  }
-
-  const [totalRes, upcomingRes] = await Promise.all([queryTotal, queryUpcoming])
-
-  return {
-    total: totalRes.count ?? 0,
-    upcoming: upcomingRes.count ?? 0,
-  }
-}
-
-// ==========================================
-// 7. SEARCH EMPLOYEE OPTIONS (FOR DROPDOWNS)
-// ==========================================
-export async function searchEmployeeOptionsAction(searchTerm: string) {
-  const ability = await getServerAbility()
-
-  if (ability.cannot("read", "employees")) {
-    throw new Error("Forbidden: You do not have permission to view employees.")
-  }
-
-  const supabase = await createClient()
-  let query = supabase.from("employees").select("id, first_name, last_name")
-
-  if (searchTerm) {
-    query = query.or(
-      `first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%`
-    )
-  }
-
-  const { data, error } = await query.limit(20)
-
-  if (error) throw new Error(error.message)
-
-  return (data || []).map((item) => ({
-    value: String(item.id),
-    label: `${item.first_name} ${item.last_name}`,
-  }))
-}
-
-// ==========================================
-// 8. FETCH MY LEAVES (STRICTLY SCOPED)
-// ==========================================
-export async function fetchMyLeavesAction(params: FetchLeavesParams) {
-  const ability = await getServerAbility()
-  const { employeeId } = await fetchUserPermissions()
-
-  if (!employeeId) throw new Error("Employee profile not found.")
-
-  if (ability.cannot("read", subject("leaves", { employee_id: employeeId }))) {
-    throw new Error(
-      "Forbidden: You do not have permission to view your leaves."
-    )
-  }
-
-  const supabase = await createClient()
-  let query = supabase
-    .from("leaves")
-    .select("*", { count: "exact" })
-    .eq("employee_id", employeeId)
-
-  if (params.globalFilter)
-    query = query.ilike("reason", `%${params.globalFilter}%`)
-  if (params.dateRange?.from)
-    query = query.gte("leave_date", params.dateRange.from)
-  if (params.dateRange?.to) query = query.lte("leave_date", params.dateRange.to)
-
-  if (params.sorting && params.sorting.length > 0) {
-    const sort = params.sorting[0]
-    query = query.order(sort.id, { ascending: !sort.desc })
-  } else {
-    query = query.order("leave_date", { ascending: false })
-  }
-
-  const from = params.pageIndex * params.pageSize
-  const to = from + params.pageSize - 1
-  query = query.range(from, to)
-
-  const { data, error, count } = await query
-  if (error) throw new Error(error.message)
-
-  if (!data || data.length === 0) {
-    return { data: [], rowCount: count || 0 }
-  }
-
-  // --- APPROVAL WORKFLOW STITCHING ---
-  const leaveIds = data.map((leave) => String(leave.id))
-
-  const { data: approvals } = await supabase
-    .from("approval_requests")
-    .select(
-      `
-      record_id,
-      current_step,
-      status,
-      approval_logs (
-        step_level,
-        status,
-        created_at,
-        approver:employees (
-          first_name,
-          last_name
-        )
-      )
-    `
-    )
-    .eq("module", "leaves")
-    .in("record_id", leaveIds)
-
-  const enrichedLeaves = data.map((leave) => {
-    const request = approvals?.find((a) => a.record_id === String(leave.id))
-
-    // Sort logs sequentially by step_level
-    const sortedLogs = request?.approval_logs
-      ? [...request.approval_logs].sort((a, b) => a.step_level - b.step_level)
-      : []
-
-    return {
-      ...leave,
-      current_step:
-        request && request.status === "pending" ? request.current_step : null,
-      approval_logs: sortedLogs, // Return the full timeline array
-    }
-  })
-
-  return { data: enrichedLeaves, rowCount: count || 0 }
-}
-
-// ==========================================
-// 9. FETCH MY LEAVE STATS
-// ==========================================
-export async function fetchMyLeaveStatsAction() {
-  const ability = await getServerAbility()
-  const { employeeId } = await fetchUserPermissions()
-
-  if (
-    !employeeId ||
-    ability.cannot("read", subject("leaves", { employee_id: employeeId }))
-  ) {
-    throw new Error(
-      "Forbidden: You do not have permission to view your leave stats."
-    )
-  }
-
-  const supabase = await createClient()
-  const today = new Date().toISOString().split("T")[0]
-
-  const [totalRes, upcomingRes] = await Promise.all([
-    supabase
-      .from("leaves")
-      .select("*", { count: "exact", head: true })
-      .eq("employee_id", employeeId),
-    supabase
-      .from("leaves")
-      .select("*", { count: "exact", head: true })
-      .eq("employee_id", employeeId)
-      .gte("leave_date", today),
-  ])
-
-  return {
-    total: totalRes.count ?? 0,
-    upcoming: upcomingRes.count ?? 0,
-  }
 }
