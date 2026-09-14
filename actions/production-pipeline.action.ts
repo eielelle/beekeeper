@@ -5,38 +5,6 @@ import { getServerAbility } from "@/lib/casl/server"
 import { ProductionPipelineFormValues } from "@/forms/schemas/production-pipeline.schema"
 import { FetchParams } from "@/types/fetch-params"
 
-// ----------------------------------------------------------------------
-// Helper: Get Current User's Department
-// ----------------------------------------------------------------------
-async function getCurrentUserDepartmentId(supabase: any) {
-  const { data: authData, error: authError } = await supabase.auth.getUser()
-  if (authError || !authData.user) throw new Error("Unauthorized user.")
-
-  const { data: empData, error: empError } = await supabase
-    .from("employees")
-    .select("id, employee_work_information!inner(department_id)")
-    .eq("user_id", authData.user.id)
-    .single()
-
-  if (empError || !empData)
-    throw new Error("Could not locate employee profile.")
-
-  const workInfo = Array.isArray(empData.employee_work_information)
-    ? empData.employee_work_information[0]
-    : empData.employee_work_information
-
-  if (!workInfo?.department_id) {
-    throw new Error(
-      "You are not assigned to a department. Cannot manage production pipelines."
-    )
-  }
-
-  return workInfo.department_id
-}
-
-// ----------------------------------------------------------------------
-// Fetch Pipelines (Data Table)
-// ----------------------------------------------------------------------
 export async function fetchProductionPipelinesAction(params: FetchParams) {
   const ability = await getServerAbility()
   if (ability.cannot("read", "production_pipelines")) {
@@ -44,18 +12,15 @@ export async function fetchProductionPipelinesAction(params: FetchParams) {
   }
 
   const supabase = await createClient()
-  const departmentId = await getCurrentUserDepartmentId(supabase)
 
-  let query = supabase
-    .from("production_pipelines")
-    .select(
-      `
+  let query = supabase.from("production_pipelines").select(
+    `
     *,
-    department:departments(name, code)
+    department:departments(name, code),
+    steps:production_pipeline_steps(count)
     `,
-      { count: "exact" }
-    )
-    .eq("department_id", departmentId)
+    { count: "exact" }
+  )
 
   if (params.globalFilter) {
     query = query.or(
@@ -108,9 +73,6 @@ export async function fetchProductionPipelinesAction(params: FetchParams) {
   return { data, rowCount: count || 0 }
 }
 
-// ----------------------------------------------------------------------
-// Get Single Pipeline (For Edit Form)
-// ----------------------------------------------------------------------
 export async function getProductionPipelineAction(id: string) {
   const ability = await getServerAbility()
   if (ability.cannot("read", "production_pipelines")) {
@@ -118,27 +80,17 @@ export async function getProductionPipelineAction(id: string) {
   }
 
   const supabase = await createClient()
-  const departmentId = await getCurrentUserDepartmentId(supabase)
 
   const { data, error } = await supabase
     .from("production_pipelines")
-    .select(
-      `
-      *,
-      steps:production_pipeline_steps(*)
-    `
-    )
+    .select(`*, steps:production_pipeline_steps(*)`)
     .eq("id", id)
-    .eq("department_id", departmentId)
     .single()
 
   if (error) throw new Error(error.message)
   return data
 }
 
-// ----------------------------------------------------------------------
-// Create Pipeline & Steps
-// ----------------------------------------------------------------------
 export async function createProductionPipelineAction(
   value: ProductionPipelineFormValues
 ) {
@@ -150,20 +102,24 @@ export async function createProductionPipelineAction(
   }
 
   const supabase = await createClient()
-  const departmentId = await getCurrentUserDepartmentId(supabase)
 
-  const { steps, ...pipelineData } = value
+  const { steps, department_id, ...pipelineData } = value
 
-  // 1. Insert Header
   const { data: pipeline, error: pipeError } = await supabase
     .from("production_pipelines")
-    .insert([{ ...pipelineData, department_id: departmentId }])
+    // Use the first step as the pipeline name since the name input is hidden
+    .insert([
+      {
+        ...pipelineData,
+        name: steps[0]?.step_name || "New Pipeline",
+        department_id: Number(department_id),
+      },
+    ])
     .select()
     .single()
 
   if (pipeError) throw new Error(pipeError.message)
 
-  // 2. Insert Steps sequentially to build depends_on_step_id chain
   let previousStepId = null
   for (let i = 0; i < steps.length; i++) {
     const { data: step, error: stepError } = await supabase
@@ -194,7 +150,6 @@ export async function updateProductionPipelineAction(
     id: string
     created_at?: string
     org_id?: number
-    department_id?: number | string
   }
 ) {
   const ability = await getServerAbility()
@@ -205,7 +160,6 @@ export async function updateProductionPipelineAction(
   }
 
   const supabase = await createClient()
-  const currentDeptId = await getCurrentUserDepartmentId(supabase)
 
   const { id, steps, created_at, org_id, department_id, ...updates } = value
   if (!id) throw new Error("Pipeline ID is required for updates.")
@@ -213,9 +167,12 @@ export async function updateProductionPipelineAction(
   // 1. Update Pipeline Header
   const { data: pipeline, error: pipeError } = await supabase
     .from("production_pipelines")
-    .update(updates)
+    .update({
+      ...updates,
+      name: steps[0]?.step_name || "New Pipeline",
+      department_id: Number(department_id),
+    })
     .eq("id", id)
-    .eq("department_id", currentDeptId)
     .select()
     .single()
 
@@ -227,12 +184,13 @@ export async function updateProductionPipelineAction(
     .update({ depends_on_step_id: null })
     .eq("pipeline_id", id)
 
-  // 3. Delete removed steps
+  // 3. Fetch existing steps
   const { data: existingSteps } = await supabase
     .from("production_pipeline_steps")
     .select("id")
     .eq("pipeline_id", id)
 
+  // 4. Delete removed steps
   const payloadIds = steps.filter((s) => s.id).map((s) => s.id)
   const stepsToDelete =
     existingSteps
@@ -250,13 +208,23 @@ export async function updateProductionPipelineAction(
       )
   }
 
-  // 4. Upsert steps sequentially to rebuild the depends_on_step_id chain
+  // 5. Temporarily offset remaining steps to prevent "unique_step_order" constraint violation
+  const remainingSteps =
+    existingSteps?.filter((es) => !stepsToDelete.includes(es.id)) || []
+  for (let i = 0; i < remainingSteps.length; i++) {
+    await supabase
+      .from("production_pipeline_steps")
+      .update({ step_order: 10000 + i }) // Move them safely out of the 1-N range temporarily
+      .eq("id", remainingSteps[i].id)
+  }
+
+  // 6. Upsert steps sequentially to rebuild the depends_on_step_id chain and apply new order
   let previousStepId = null
   for (let i = 0; i < steps.length; i++) {
     const stepPayload = {
       pipeline_id: id,
       step_name: steps[i].step_name,
-      step_order: i + 1,
+      step_order: i + 1, // Safe to assign now
       depends_on_step_id: previousStepId,
     }
 
@@ -285,9 +253,6 @@ export async function updateProductionPipelineAction(
   return pipeline
 }
 
-// ----------------------------------------------------------------------
-// Delete Pipeline
-// ----------------------------------------------------------------------
 export async function deleteProductionPipelineAction(id: string) {
   const ability = await getServerAbility()
   if (ability.cannot("delete", "production_pipelines")) {
@@ -297,20 +262,16 @@ export async function deleteProductionPipelineAction(id: string) {
   }
 
   const supabase = await createClient()
-  const departmentId = await getCurrentUserDepartmentId(supabase)
 
-  // 1. Delete steps first to prevent foreign key violations (if no ON DELETE CASCADE)
   await supabase
     .from("production_pipeline_steps")
     .delete()
     .eq("pipeline_id", id)
 
-  // 2. Delete the pipeline header
   const { data, error } = await supabase
     .from("production_pipelines")
     .delete()
     .eq("id", id)
-    .eq("department_id", departmentId)
     .select()
     .single()
 

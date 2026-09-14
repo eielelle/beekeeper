@@ -2,6 +2,7 @@
 
 import {
   Card,
+  CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
@@ -19,7 +20,12 @@ export default function Page() {
           </CardDescription>
         </CardHeader>
       </Card>
-      <ProductionPipelineForm />
+
+      <Card>
+        <CardContent>
+          <ProductionPipelineForm />
+        </CardContent>
+      </Card>
     </div>
   )
 }

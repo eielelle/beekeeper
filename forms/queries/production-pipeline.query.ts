@@ -17,12 +17,7 @@ export type ProductionPipelineType = {
   org_id?: number
   created_at?: string
   // Add the steps array here:
-  steps?: {
-    id: number
-    step_name: string
-    step_order: number
-    depends_on_step_id?: number | null
-  }[]
+  steps?: { id?: number; step_name?: string; count?: number }[]
   // Relational data for the Data Table view
   department?: { name: string; code: string } | null
 }

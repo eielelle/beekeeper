@@ -1,6 +1,7 @@
 // app/pipelines/edit/[id]/page.tsx
 import {
   Card,
+  CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
@@ -29,8 +30,11 @@ export default async function EditPipelinePage({
         </CardHeader>
       </Card>
 
-      {/* Pass the server-resolved editId to your client form */}
-      <ProductionPipelineForm editId={id} />
+      <Card>
+        <CardContent>
+          <ProductionPipelineForm editId={id} />
+        </CardContent>
+      </Card>
     </div>
   )
 }

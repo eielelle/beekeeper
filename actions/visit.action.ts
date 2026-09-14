@@ -12,8 +12,6 @@ import { FetchParams } from "@/types/fetch-params"
 export async function fetchVisitsAction(params: FetchParams) {
   const ability = await getServerAbility()
 
-  console.log("IM FIRING")
-
   if (ability.cannot("read", "visits")) {
     throw new Error("Forbidden: You do not have permission to view visits.")
   }

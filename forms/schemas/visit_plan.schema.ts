@@ -1,15 +1,23 @@
 import * as z from "zod"
 
 export const visitPlanItemSchema = z.object({
-  visit_id: z.string().min(1, "A valid visit must be selected"),
+  uid: z.string(),
+  outlet_id: z.string().min(1, { message: "Outlet is required." }),
+  visit_type_id: z.string().min(1, { message: "Visit Type is required." }),
+  start_date: z.string().min(1, { message: "Start date is required." }),
+  end_date: z.string().min(1, { message: "End date is required." }),
+  notes: z.string().optional().nullable(),
 })
 
 export const visitPlanSchema = z.object({
-  title: z.string().min(1, "Plan title is required").max(150),
-  start_date: z.string().min(1, "Start date is required"),
-  end_date: z.string().min(1, "End date is required"),
-  start_time: z.string().or(z.literal("")).nullable(),
-  end_time: z.string().or(z.literal("")).nullable(),
-  remarks: z.string().or(z.literal("")).nullable(),
-  items: z.array(visitPlanItemSchema), // Can be empty if they want to create a draft plan first
+  title: z.string().min(1, { message: "Plan title is required." }),
+  start_date: z.string().min(1, { message: "Start date is required." }),
+  end_date: z.string().min(1, { message: "End date is required." }),
+  remarks: z.string().optional().nullable(),
+  visits: z
+    .array(visitPlanItemSchema)
+    .min(1, { message: "At least one visit is required." }),
 })
+
+export type VisitPlanFormValues = z.infer<typeof visitPlanSchema>
+export type VisitPlanItemValue = z.infer<typeof visitPlanItemSchema>

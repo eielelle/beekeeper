@@ -1,184 +1,298 @@
 "use client"
 
 import * as React from "react"
-import { useForm, useStore } from "@tanstack/react-form"
-import * as z from "zod"
-import { useParams } from "next/navigation"
-import { useMutation, useQuery } from "@tanstack/react-query"
-import { useState, useEffect } from "react"
-import { CalendarDays, Clock, Loader2 } from "lucide-react"
-import { toast } from "sonner"
+import { useForm } from "@tanstack/react-form"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { Plus, Trash2, Check, ChevronsUpDown } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 import { Button } from "@/components/ui/button"
 import { Field, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
+import { Card, CardContent } from "@/components/ui/card"
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command"
 
 import {
-  createVisitPlan,
-  getVisitPlan,
-  updateVisitPlan,
-  fetchVisitsByDateRange,
-} from "./queries/visit_plan.query"
-import { visitPlanSchema } from "./schemas/visit_plan.schema"
+  visitPlanSchema,
+  VisitPlanFormValues,
+} from "./schemas/visit_plan.schema"
+import { createVisitPlan } from "./queries/visit_plan.query"
+import {
+  searchOutletsAction,
+  searchVisitTypesAction,
+} from "@/actions/visit.action"
 
-const getFirstItem = (data: any) => (Array.isArray(data) ? data[0] : data)
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = React.useState<T>(value)
+  React.useEffect(() => {
+    const handler = setTimeout(() => setDebouncedValue(value), delay)
+    return () => clearTimeout(handler)
+  }, [value, delay])
+  return debouncedValue
+}
 
-export function VisitPlanForm({
-  editId,
-  onClose,
+// ----------------------------------------------------------------------
+// Sub-component for individual visit array items
+// ----------------------------------------------------------------------
+function VisitItemRow({
+  field,
+  index,
+  onRemove,
+  isOnlyItem,
 }: {
-  editId?: string
-  onClose?: () => void
+  field: any
+  index: number
+  onRemove: () => void
+  isOnlyItem: boolean
 }) {
-  const params = useParams()
-  let id = params?.id as string | undefined
-  if (editId) id = editId
-  const isEditMode = !!id
+  const [outletOpen, setOutletOpen] = React.useState(false)
+  const [outletSearch, setOutletSearch] = React.useState("")
+  const debouncedOutletSearch = useDebounce(outletSearch, 300)
+  const [selectedOutletName, setSelectedOutletName] = React.useState("")
 
-  // We store the full visit details object here to render the rich table
-  const [visitDetails, setVisitDetails] = useState<Record<string, any>>({})
+  const [typeOpen, setTypeOpen] = React.useState(false)
+  const [typeSearch, setTypeSearch] = React.useState("")
+  const debouncedTypeSearch = useDebounce(typeSearch, 300)
+  const [selectedTypeName, setSelectedTypeName] = React.useState("")
 
-  const { data: planData, isLoading: isLoadingPlan } = useQuery({
-    queryKey: ["visit_plans", id],
-    queryFn: () => getVisitPlan(id!),
-    enabled: isEditMode,
+  const { data: outlets } = useQuery({
+    queryKey: ["outlets-search", debouncedOutletSearch],
+    queryFn: () => searchOutletsAction(debouncedOutletSearch),
   })
 
-  // Pre-load details for existing tied visits
-  useEffect(() => {
-    if (isEditMode && planData?.visit_plan_items) {
-      const details: Record<string, any> = {}
-      planData.visit_plan_items.forEach((item: any) => {
-        if (item.visits) {
-          details[item.visit_id] = item.visits
-        }
-      })
-      setVisitDetails((prev) => ({ ...prev, ...details }))
-    }
-  }, [isEditMode, planData])
+  const { data: visitTypes } = useQuery({
+    queryKey: ["visit-types-search", debouncedTypeSearch],
+    queryFn: () => searchVisitTypesAction(debouncedTypeSearch),
+  })
+
+  return (
+    <Card className="relative mb-4">
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="absolute top-2 right-2 h-8 w-8 text-muted-foreground hover:text-destructive"
+        onClick={onRemove}
+        disabled={isOnlyItem}
+      >
+        <Trash2 className="h-4 w-4" />
+      </Button>
+      <CardContent className="space-y-4 pt-6">
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <FieldLabel>Outlet</FieldLabel>
+            <Popover open={outletOpen} onOpenChange={setOutletOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  className="w-full justify-between"
+                >
+                  {field.value.outlet_id && selectedOutletName
+                    ? selectedOutletName
+                    : "Search outlet..."}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[300px] p-0">
+                <Command>
+                  <CommandInput
+                    placeholder="Search outlets..."
+                    value={outletSearch}
+                    onValueChange={setOutletSearch}
+                  />
+                  <CommandList>
+                    <CommandEmpty>No outlets found.</CommandEmpty>
+                    <CommandGroup>
+                      {outlets?.map((outlet) => (
+                        <CommandItem
+                          key={outlet.id}
+                          value={String(outlet.id)}
+                          onSelect={(val) => {
+                            field.handleChange({
+                              ...field.value,
+                              outlet_id: val,
+                            })
+                            setSelectedOutletName(outlet.outlet_name)
+                            setOutletOpen(false)
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              field.value.outlet_id === String(outlet.id)
+                                ? "opacity-100"
+                                : "opacity-0"
+                            )}
+                          />
+                          {outlet.outlet_name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          <div className="space-y-2">
+            <FieldLabel>Visit Type</FieldLabel>
+            <Popover open={typeOpen} onOpenChange={setTypeOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  className="w-full justify-between"
+                >
+                  {field.value.visit_type_id && selectedTypeName
+                    ? selectedTypeName
+                    : "Search type..."}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[300px] p-0">
+                <Command>
+                  <CommandInput
+                    placeholder="Search visit types..."
+                    value={typeSearch}
+                    onValueChange={setTypeSearch}
+                  />
+                  <CommandList>
+                    <CommandEmpty>No visit types found.</CommandEmpty>
+                    <CommandGroup>
+                      {visitTypes?.map((type) => (
+                        <CommandItem
+                          key={type.id}
+                          value={String(type.id)}
+                          onSelect={(val) => {
+                            field.handleChange({
+                              ...field.value,
+                              visit_type_id: val,
+                            })
+                            setSelectedTypeName(type.type_name)
+                            setTypeOpen(false)
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              field.value.visit_type_id === String(type.id)
+                                ? "opacity-100"
+                                : "opacity-0"
+                            )}
+                          />
+                          {type.type_name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <FieldLabel>Start Date</FieldLabel>
+            <Input
+              type="date"
+              value={field.value.start_date}
+              onChange={(e) =>
+                field.handleChange({
+                  ...field.value,
+                  start_date: e.target.value,
+                })
+              }
+            />
+          </div>
+          <div className="space-y-2">
+            <FieldLabel>End Date</FieldLabel>
+            <Input
+              type="date"
+              value={field.value.end_date}
+              onChange={(e) =>
+                field.handleChange({ ...field.value, end_date: e.target.value })
+              }
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <FieldLabel>Notes</FieldLabel>
+          <Textarea
+            value={field.value.notes ?? ""}
+            onChange={(e) =>
+              field.handleChange({ ...field.value, notes: e.target.value })
+            }
+            placeholder="Visit objectives or details..."
+            rows={2}
+            className="resize-none"
+          />
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+// ----------------------------------------------------------------------
+// Main Form Component
+// ----------------------------------------------------------------------
+export function VisitPlanForm() {
+  const queryClient = useQueryClient()
 
   const mutation = useMutation({
-    mutationFn: (values: z.infer<typeof visitPlanSchema>) => {
-      if (isEditMode) {
-        return updateVisitPlan(id!, values)
-      }
-      return createVisitPlan(values)
-    },
-    onSuccess: () => {
-      form.reset()
-      if (onClose) onClose()
-    },
+    mutationFn: (values: VisitPlanFormValues) => createVisitPlan(values),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["visit-plans"] }),
   })
-
-  const dv: z.input<typeof visitPlanSchema> = {
-    title: planData?.title ?? "",
-    start_date: planData?.start_date ?? "",
-    end_date: planData?.end_date ?? "",
-    start_time: planData?.start_time ?? "",
-    end_time: planData?.end_time ?? "",
-    remarks: planData?.remarks ?? "",
-    items: planData?.visit_plan_items
-      ? planData.visit_plan_items.map((i: any) => ({ visit_id: i.visit_id }))
-      : [],
-  }
 
   const form = useForm({
-    defaultValues: dv,
-    validators: { onSubmit: visitPlanSchema },
-    onSubmit: async ({ value }) => {
-      // Fix: Convert empty strings to null for PostgreSQL TIME columns
-      if (value.start_time === "") value.start_time = null
-      if (value.end_time === "") value.end_time = null
-
-      mutation.mutate(value)
+    defaultValues: {
+      title: "",
+      start_date: "",
+      end_date: "",
+      remarks: "",
+      visits: [
+        {
+          uid: "initial",
+          outlet_id: "",
+          visit_type_id: "",
+          start_date: "",
+          end_date: "",
+          notes: "",
+        },
+      ],
     },
+    validators: { onChange: visitPlanSchema as any },
+    onSubmit: async ({ value }) => await mutation.mutateAsync(value),
   })
-
-  // --- Reactive Auto-Fill Logic ---
-  const startDate = useStore(form.store, (state) => state.values.start_date)
-  const endDate = useStore(form.store, (state) => state.values.end_date)
-
-  const [syncedDates, setSyncedDates] = useState("")
-
-  const { data: autoVisits = [], isFetching: isFetchingAutoVisits } = useQuery({
-    queryKey: ["auto-visits", startDate, endDate],
-    queryFn: () => fetchVisitsByDateRange(startDate, endDate),
-    enabled:
-      !!startDate && !!endDate && new Date(startDate) <= new Date(endDate),
-  })
-
-  useEffect(() => {
-    const currentRange = `${startDate}_${endDate}`
-
-    if (
-      startDate &&
-      endDate &&
-      !isFetchingAutoVisits &&
-      syncedDates !== currentRange
-    ) {
-      if (isEditMode && syncedDates === "") {
-        setSyncedDates(currentRange)
-        return
-      }
-
-      const newDetails: Record<string, any> = {}
-      const newItems = autoVisits.map((v) => {
-        newDetails[v.id] = v // Store the whole object for the table to use
-        return { visit_id: String(v.id) }
-      })
-
-      setVisitDetails((prev) => ({ ...prev, ...newDetails }))
-      form.setFieldValue("items", newItems)
-      setSyncedDates(currentRange)
-
-      if (newItems.length > 0) {
-        toast.success(
-          `Auto-attached ${newItems.length} visits for this date range.`
-        )
-      } else {
-        toast.info("No scheduled visits found in this date range.")
-      }
-    }
-  }, [
-    autoVisits,
-    isFetchingAutoVisits,
-    startDate,
-    endDate,
-    syncedDates,
-    isEditMode,
-    form,
-  ])
-
-  if (isEditMode && isLoadingPlan) {
-    return (
-      <div className="flex items-center space-x-2 p-4 text-sm text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        <span>Loading plan details...</span>
-      </div>
-    )
-  }
 
   return (
     <form
-      className="space-y-6"
+      className="space-y-8"
       onSubmit={(e) => {
         e.preventDefault()
         e.stopPropagation()
         form.handleSubmit()
       }}
     >
-      {/* HEADER SECTION */}
-      <div className="space-y-4">
+      {/* PLAN DETAILS */}
+      <div className="space-y-4 rounded-lg border bg-card p-6 shadow-sm">
+        <h3 className="text-lg font-semibold">Plan Details</h3>
         <form.Field name="title">
           {(field) => (
             <Field
@@ -190,14 +304,12 @@ export function VisitPlanForm({
                 Plan Title <span className="text-red-500">*</span>
               </FieldLabel>
               <Input
-                placeholder="e.g., Q3 Northern Route"
                 value={field.state.value}
+                onBlur={field.handleBlur}
                 onChange={(e) => field.handleChange(e.target.value)}
-                disabled={mutation.isPending}
+                placeholder="e.g., Q3 South Region Coverage"
               />
-              {field.state.meta.isTouched && !field.state.meta.isValid && (
-                <FieldError errors={field.state.meta.errors} />
-              )}
+              <FieldError errors={field.state.meta.errors} />
             </Field>
           )}
         </form.Field>
@@ -211,21 +323,18 @@ export function VisitPlanForm({
                 }
               >
                 <FieldLabel>
-                  Start Date <span className="text-red-500">*</span>
+                  Plan Start Date <span className="text-red-500">*</span>
                 </FieldLabel>
                 <Input
                   type="date"
                   value={field.state.value}
+                  onBlur={field.handleBlur}
                   onChange={(e) => field.handleChange(e.target.value)}
-                  disabled={mutation.isPending}
                 />
-                {field.state.meta.isTouched && !field.state.meta.isValid && (
-                  <FieldError errors={field.state.meta.errors} />
-                )}
+                <FieldError errors={field.state.meta.errors} />
               </Field>
             )}
           </form.Field>
-
           <form.Field name="end_date">
             {(field) => (
               <Field
@@ -234,53 +343,15 @@ export function VisitPlanForm({
                 }
               >
                 <FieldLabel>
-                  End Date <span className="text-red-500">*</span>
+                  Plan End Date <span className="text-red-500">*</span>
                 </FieldLabel>
                 <Input
                   type="date"
                   value={field.state.value}
+                  onBlur={field.handleBlur}
                   onChange={(e) => field.handleChange(e.target.value)}
-                  disabled={mutation.isPending}
                 />
-                {field.state.meta.isTouched && !field.state.meta.isValid && (
-                  <FieldError errors={field.state.meta.errors} />
-                )}
-              </Field>
-            )}
-          </form.Field>
-
-          <form.Field name="start_time">
-            {(field) => (
-              <Field
-                data-invalid={
-                  field.state.meta.isTouched && !field.state.meta.isValid
-                }
-              >
-                <FieldLabel>Start Time (Opt)</FieldLabel>
-                <Input
-                  type="time"
-                  value={field.state.value || ""}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  disabled={mutation.isPending}
-                />
-              </Field>
-            )}
-          </form.Field>
-
-          <form.Field name="end_time">
-            {(field) => (
-              <Field
-                data-invalid={
-                  field.state.meta.isTouched && !field.state.meta.isValid
-                }
-              >
-                <FieldLabel>End Time (Opt)</FieldLabel>
-                <Input
-                  type="time"
-                  value={field.state.value || ""}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  disabled={mutation.isPending}
-                />
+                <FieldError errors={field.state.meta.errors} />
               </Field>
             )}
           </form.Field>
@@ -288,144 +359,71 @@ export function VisitPlanForm({
 
         <form.Field name="remarks">
           {(field) => (
-            <Field
-              data-invalid={
-                field.state.meta.isTouched && !field.state.meta.isValid
-              }
-            >
+            <Field>
               <FieldLabel>Remarks</FieldLabel>
               <Textarea
-                placeholder="Objectives or notes for this plan..."
-                value={field.state.value || ""}
+                value={field.state.value ?? ""}
                 onChange={(e) => field.handleChange(e.target.value)}
-                disabled={mutation.isPending}
+                placeholder="Overall plan notes..."
                 rows={2}
+                className="resize-none"
               />
             </Field>
           )}
         </form.Field>
       </div>
 
-      <hr />
+      {/* VISITS ARRAY */}
+      <form.Field name="visits" mode="array">
+        {(field) => {
+          const visits = field.state.value || []
 
-      {/* AUTO-SYNCED VISITS TABLE */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h4 className="text-sm font-semibold">Automatically Tied Visits</h4>
-          {isFetchingAutoVisits && (
-            <span className="flex items-center text-xs text-muted-foreground">
-              <Loader2 className="mr-2 h-3 w-3 animate-spin" /> Syncing...
-            </span>
-          )}
-        </div>
+          return (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">Scheduled Visits</h3>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() =>
+                    field.pushValue({
+                      uid: "initial",
+                      outlet_id: "",
+                      visit_type_id: "",
+                      start_date: "",
+                      end_date: "",
+                      notes: "",
+                    })
+                  }
+                >
+                  <Plus className="mr-2 h-4 w-4" /> Add Visit
+                </Button>
+              </div>
 
-        <form.Field name="items" mode="array">
-          {(field) => (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Outlet</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Time</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isFetchingAutoVisits && (
-                    <TableRow>
-                      <TableCell
-                        colSpan={4}
-                        className="h-24 text-center text-muted-foreground"
-                      >
-                        <Loader2 className="mr-2 inline-block h-4 w-4 animate-spin" />
-                        Fetching visits...
-                      </TableCell>
-                    </TableRow>
+              {visits.map((visit, index) => (
+                <form.Field key={visit.uid} name={`visits[${index}]`}>
+                  {(subField) => (
+                    <VisitItemRow
+                      field={subField}
+                      index={index}
+                      onRemove={() => field.removeValue(index)}
+                      isOnlyItem={visits.length === 1}
+                    />
                   )}
-
-                  {!isFetchingAutoVisits && field.state.value.length === 0 && (
-                    <TableRow>
-                      <TableCell
-                        colSpan={4}
-                        className="h-24 text-center text-muted-foreground"
-                      >
-                        {startDate && endDate
-                          ? "No visits found in this date range."
-                          : "Select a Start and End Date to auto-fill visits."}
-                      </TableCell>
-                    </TableRow>
-                  )}
-
-                  {!isFetchingAutoVisits &&
-                    field.state.value.map((item, i) => {
-                      const details = visitDetails[item.visit_id]
-
-                      const outlet = getFirstItem(details?.outlets)
-                      const type = getFirstItem(details?.visit_types)
-
-                      const sDate = details?.start_date
-                        ? new Date(details.start_date).toLocaleDateString()
-                        : ""
-                      const eDate = details?.end_date
-                        ? new Date(details.end_date).toLocaleDateString()
-                        : ""
-                      const dateDisplay =
-                        sDate === eDate ? sDate : `${sDate} to ${eDate}`
-
-                      const timeDisplay = details?.start_time
-                        ? `${details.start_time} - ${details.end_time || "?"}`
-                        : "Anytime"
-
-                      return (
-                        <TableRow key={i}>
-                          <TableCell>
-                            <div className="font-semibold text-primary">
-                              {outlet?.outlet_name || `ID: ${item.visit_id}`}
-                            </div>
-                            {outlet?.outlet_code && (
-                              <div className="text-xs text-muted-foreground">
-                                {outlet.outlet_code}
-                              </div>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant="outline"
-                              className="bg-muted/20 font-normal"
-                            >
-                              {type?.type_name || "—"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            <div className="flex items-center">
-                              <CalendarDays className="mr-2 h-3.5 w-3.5" />
-                              {dateDisplay || "—"}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            <div className="flex items-center">
-                              <Clock className="mr-2 h-3.5 w-3.5" />
-                              {timeDisplay}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      )
-                    })}
-                </TableBody>
-              </Table>
+                </form.Field>
+              ))}
+              <FieldError errors={field.state.meta.errors} />
             </div>
-          )}
-        </form.Field>
-      </div>
+          )
+        }}
+      </form.Field>
 
-      <Button type="submit" disabled={mutation.isPending} className="w-full">
-        {mutation.isPending
-          ? "Saving..."
-          : isEditMode
-            ? "Update Plan"
-            : "Create Visit Plan"}
-      </Button>
+      <div className="flex justify-end pt-4">
+        <Button type="submit" disabled={mutation.isPending}>
+          {mutation.isPending ? "Creating Plan..." : "Save Visit Plan"}
+        </Button>
+      </div>
     </form>
   )
 }

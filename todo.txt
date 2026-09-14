@@ -57,6 +57,11 @@ Visits
 - Visit Plans
 - Visits
 
+- Create Plan
+- Create Visits
+
+
+
 Expenses
 - Dashboard
 - My Expenses
@@ -89,7 +94,6 @@ Bookings
 
 Production
 - Dashboard
-- Production Pipeline
 - My Daily Reports
 - My Production Entries
 - Daily Reports
