@@ -60,6 +60,7 @@ export type AppSubject =
   | "approval_rules"
   | "positions"
   | "departments"
+  | "expense_reports"
   | EmployeeSubject
   | LeaveSubject
   | InventorySubject

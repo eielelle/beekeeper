@@ -1,38 +1,14 @@
 import { toast } from "sonner"
-import * as z from "zod"
-import { expenseReportSchema } from "../schemas/expense_report.schema"
 import {
-  getExpenseReportAction,
   createExpenseReportAction,
   updateExpenseReportAction,
-  fetchAvailableExpensesAction,
+  getExpenseReportAction,
+  fetchExpenseReportTypeOptionsAction,
+  fetchExpenseTypeOptionsAction,
 } from "@/actions/expense_report.action"
+import { ExpenseReportFormValues } from "@/forms/schemas/expense_report.schema"
 
-export async function fetchAvailableExpenses(
-  dateFrom: string,
-  dateTo: string,
-  currentReportId?: string
-) {
-  try {
-    return await fetchAvailableExpensesAction(dateFrom, dateTo, currentReportId)
-  } catch (error: any) {
-    toast.error(`ERR: ${error.message}`)
-    return []
-  }
-}
-
-export async function getExpenseReport(id: string) {
-  try {
-    return await getExpenseReportAction(id)
-  } catch (error: any) {
-    toast.error(`ERR: ${error.message}`)
-    throw error
-  }
-}
-
-export async function createExpenseReport(
-  values: z.infer<typeof expenseReportSchema>
-) {
+export async function createExpenseReport(values: ExpenseReportFormValues) {
   const t = toast.loading("Submitting expense report...")
   try {
     const data = await createExpenseReportAction(values)
@@ -41,24 +17,45 @@ export async function createExpenseReport(
     return data
   } catch (error: any) {
     toast.dismiss(t)
-    toast.error(`Error: ${error.message}`)
+    toast.error(`ERR: ${error.message}`)
     throw error
   }
 }
 
 export async function updateExpenseReport(
   id: string,
-  values: z.infer<typeof expenseReportSchema>
+  values: ExpenseReportFormValues
 ) {
-  const t = toast.loading("Updating report...")
+  const t = toast.loading("Updating expense report...")
   try {
-    const success = await updateExpenseReportAction(id, values)
+    const data = await updateExpenseReportAction(id, values)
     toast.dismiss(t)
-    toast.success("Updated successfully.")
-    return success
+    toast.success("Expense report updated successfully.")
+    return data
   } catch (error: any) {
     toast.dismiss(t)
-    toast.error(`Error: ${error.message}`)
+    toast.error(`ERR: ${error.message}`)
     throw error
   }
+}
+
+export async function getExpenseReport(id: string) {
+  const t = toast.loading("Fetching expense report details...")
+  try {
+    const data = await getExpenseReportAction(id)
+    toast.dismiss(t)
+    return data
+  } catch (error: any) {
+    toast.dismiss(t)
+    toast.error(`ERR: ${error.message}`)
+    throw error
+  }
+}
+
+export async function fetchExpenseReportTypeOptions() {
+  return await fetchExpenseReportTypeOptionsAction()
+}
+
+export async function fetchExpenseTypeOptions() {
+  return await fetchExpenseTypeOptionsAction()
 }
